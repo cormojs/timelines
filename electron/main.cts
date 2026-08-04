@@ -249,6 +249,10 @@ async function getStartupBackgroundColor() {
 
 async function createWindow() {
   const backgroundColor = await getStartupBackgroundColor();
+  // Bun embeds __dirname from the build machine. Resolve resources through
+  // Electron instead so this remains an absolute path in packaged Windows apps.
+  const appRoot = app.getAppPath();
+  const electronRuntimeDir = path.join(appRoot, 'electron-build');
 
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -256,11 +260,11 @@ async function createWindow() {
     backgroundColor,
     frame: false,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(electronRuntimeDir, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
     },
-    icon: path.join(__dirname, '../public/favicon/favicon-light.ico'),
+    icon: path.join(appRoot, 'public/favicon/favicon-light.ico'),
   });
 
   Menu.setApplicationMenu(null);
@@ -277,7 +281,7 @@ async function createWindow() {
     mainWindow.webContents.openDevTools();
   } else {
     const debugProd = process.env.TIMELINES_DEBUG === 'true';
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+    mainWindow.loadFile(path.join(appRoot, 'dist/index.html'));
     if (debugProd) {
       mainWindow.webContents.openDevTools();
     }
