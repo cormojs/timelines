@@ -38,7 +38,7 @@ Timelines are stored as `.timeline` JSON files and notes as `.md` files. By defa
 
 ## Setup
 
-**Prerequisites:** [Node.js LTS](https://nodejs.org/)
+**Prerequisites:** [Bun](https://bun.sh/) 1.2 or later
 
 **1. Clone the repo**
 ```bash
@@ -49,14 +49,14 @@ cd timelines
 
 **2. Install dependencies**
 ```bash
-npm install
+bun install
 ```
 
 ## Development
 
 **Start the app:**
 ```bash
-npm run electron:dev
+bun run electron:dev
 ```
 
 > [!NOTE]
@@ -66,7 +66,7 @@ npm run electron:dev
 
 **Build the Electron app installer:**
 ```bash
-npm run electron:build
+bun run electron:build
 ```
 
 The output installer will be in the `release/` folder.
