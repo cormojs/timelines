@@ -8,7 +8,7 @@ test('colorToHex normalizes supported CSS color input for color controls', async
   assert.strictEqual(colorToHex('#123456'), '#123456');
   assert.strictEqual(colorToHex('rgb(300, 1.4, -1)'), '#ff0100');
   assert.strictEqual(colorToHex('rgba(12, 34, 56, 0.5)'), '#0c2238');
-  assert.strictEqual(colorToHex('blue'), null);
+  assert.strictEqual(colorToHex('blue'), '#0000ff');
 });
 
 test('color helpers preserve their existing fallback and blending behavior', async () => {

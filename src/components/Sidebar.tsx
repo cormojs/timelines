@@ -165,6 +165,7 @@ const resolveSecondaryBg = () => {
 
 // Returns a version of eraColor that reads well on bgHex while keeping the hue recognizable.
 function getEraLabelColor(eraColor: unknown, bgHex: string | null): string | null {
+  if (typeof eraColor !== 'string') return null;
   const hex = colorToHex(eraColor);
   if (!hex) return null;
   const eR = parseInt(hex.slice(1, 3), 16);
