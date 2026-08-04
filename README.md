@@ -54,6 +54,11 @@ bun install
 
 ## Development
 
+**Type-check the project:**
+```bash
+bun run typecheck
+```
+
 **Start the app:**
 ```bash
 bun run electron:dev
