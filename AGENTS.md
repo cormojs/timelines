@@ -16,7 +16,7 @@ bridge.
   stylesheet layers.
 - `src/utils/`: renderer-side domain and storage helpers.
 - `electron/`: Electron main process, preload bridge, and Node-side helpers.
-- `test/`: Node built-in test runner tests (`*.test.cjs`).
+- `test/`: Node built-in test runner tests (`*.test.cts`).
 
 ## Common commands
 
@@ -26,17 +26,20 @@ bun run electron:dev    # desktop app in development
 bun run dev:viewer      # browser viewer only
 bun run build           # production renderer build
 bun run build:viewer    # production viewer build
+bun run typecheck
 bun run lint
+bun run format:check
 bun test
 ```
 
 Use the smallest relevant verification first. Run `bun run lint` after React or
-JavaScript changes, and run `bun test` when changing utilities or Electron-side
+TypeScript changes, run `bun run typecheck` after any source change, and run `bun test` when changing utilities or Electron-side
 logic with applicable tests.
 
 ## Implementation conventions
 
-- Use ES modules in `src/`; Electron and tests currently use CommonJS (`.cjs`).
+- Use TypeScript throughout: `.ts` for modules (including Electron source),
+  `.tsx` for React UI, and `.cts` for Bun test modules.
 - Preserve the existing style of the file you edit. Most newer configuration and
   utility modules omit semicolons, while some older React files use them.
 - Keep reusable state and data transformations in `src/utils/` or hooks rather
@@ -44,8 +47,8 @@ logic with applicable tests.
 - Treat timeline files as user data: keep changes backward-compatible, validate
   imported data, and preserve unknown fields when practical.
 - Do not call Node/Electron APIs directly from React components. Add narrowly
-  scoped bridge methods through `electron/preload.cjs` and consume them via
-  `src/utils/electronApi.js`.
+  scoped bridge methods through `electron/preload.ts` and consume them via
+  `src/utils/electronApi.ts`.
 
 ## Viewer boundary
 

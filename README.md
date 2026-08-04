@@ -1,4 +1,5 @@
-# 
+#
+
 ![Temp Banner](docs/temp-banner-light.png)
 
 Timelines Studio is a free, open-source app for creating customizable, interactive timelines for worldbuilding and history. Organize events, spans, and eras with tags and groups, link Markdown notes or MediaWiki sources directly to elements, and visualize timelines geographically with map view and coordinate support.
@@ -41,6 +42,7 @@ Timelines are stored as `.timeline` JSON files and notes as `.md` files. By defa
 **Prerequisites:** [Bun](https://bun.sh/) 1.2 or later
 
 **1. Clone the repo**
+
 ```bash
 git clone https://github.com/sreegjl/timelines.git
 
@@ -48,13 +50,21 @@ cd timelines
 ```
 
 **2. Install dependencies**
+
 ```bash
 bun install
 ```
 
 ## Development
 
+**Type-check the project:**
+
+```bash
+bun run typecheck
+```
+
 **Start the app:**
+
 ```bash
 bun run electron:dev
 ```
@@ -65,6 +75,7 @@ bun run electron:dev
 ## Building
 
 **Build the Electron app installer:**
+
 ```bash
 bun run electron:build
 ```
