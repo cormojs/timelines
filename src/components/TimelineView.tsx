@@ -65,12 +65,103 @@ import {
   History,
 } from 'lucide-react';
 import { ICON_MAP } from '../config/elementIcons';
+import type { Keybind, Keybinds, TimelineData, TimelineElement, TimelineGroup } from '../types/timeline';
 
 const FILTER_HISTORY_KEY = 'timelines-filter-query-history';
 const FILTER_HISTORY_MAX = 8;
 
 const FONT_FALLBACK_STACK = '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 const FONT_WAIT_MS = 3000;
+
+type ElementId = TimelineElement['id'];
+
+type ElementCoordinates = {
+  lat?: number;
+  lng?: number;
+};
+
+export type TimelineViewExportPngOptions = {
+  transparentBg?: boolean;
+  customBg?: string;
+  filename?: string;
+  targetWidth?: number | null;
+  targetHeight?: number | null;
+  exportStartYear?: number;
+  exportEndYear?: number;
+  showTitle?: boolean;
+  titlePosition?: string;
+  titleStyle?: string;
+  title?: string;
+};
+
+export type TimelinePreviewOptions = {
+  transparentBg?: boolean;
+  customBg?: string;
+  maxWidth?: number;
+  maxHeight?: number;
+  simplifyContent?: boolean;
+};
+
+export type TimelinePreview = {
+  imageUrl: string;
+  canvasWidth: number;
+  canvasHeight: number;
+  elementWidth: number;
+  elementHeight: number;
+  timelineWidth: number;
+  minYear: number;
+  maxYear: number;
+  yearToPercent: (year: number) => number;
+  percentToYear: (percent: number) => number;
+};
+
+export type TimelineViewHandle = {
+  generatePreview: (options?: TimelinePreviewOptions) => Promise<TimelinePreview | null>;
+  scrollToElement: (elementId: ElementId) => void;
+  scrollToGroup: (groupId: string) => void;
+};
+
+export type TimelineViewProps = {
+  selectedId: ElementId | null;
+  onSelect: (elementId: ElementId) => void;
+  timelineData: TimelineData;
+  onZoomChange?: (scale: number) => void;
+  onHeightChange?: (height: number) => void;
+  onAddEvent?: (groupId: string | null, clickYear: number | null, coordinates: ElementCoordinates) => void;
+  onAddSpan?: (groupId: string | null, clickYear: number | null, coordinates: ElementCoordinates) => void;
+  onAddEra?: (clickYear: number | null, coordinates: ElementCoordinates) => void;
+  onOpenSettings?: () => void;
+  onDelete?: (elementId: ElementId) => void;
+  onDuplicateElement?: (elementId: ElementId) => void;
+  onEditElement?: (elementId: ElementId) => void;
+  downloadPngTrigger?: number;
+  exportPngOptions?: TimelineViewExportPngOptions | null;
+  onExportPng?: () => void;
+  onExportVideo?: () => void;
+  rightPanelWidth?: number;
+  isRightPanelOpen?: boolean;
+  leftPanelWidth?: number;
+  isLeftPanelOpen?: boolean;
+  activeTags?: string[];
+  hiddenTags?: string[];
+  allTags?: string[];
+  onToggleTag?: (tag: string) => void;
+  onToggleHiddenTag?: (tag: string) => void;
+  onClearTags?: () => void;
+  pinnedTags?: string[];
+  onTogglePinnedTag?: (tag: string) => void;
+  onViewportYearChange?: (year: number) => void;
+  onChipQueryChange?: (query: string) => void;
+  tagColors?: Record<string, string>;
+  keybinds?: Keybinds;
+  onSetViewMode?: (mode: 'spreadsheet') => void;
+  readOnly?: boolean;
+};
+
+type GroupLayoutSummary = {
+  bgColor?: string;
+  belowLine?: boolean;
+};
 
 const readAppFontStack = () => {
   const root = document.documentElement;
@@ -396,7 +487,7 @@ function OverflowTags({ tags, tagColors, getReadableTextColor: readableColor }) 
   );
 }
 
-const TimelineView = forwardRef(function TimelineView(
+const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(function TimelineView(
   {
     selectedId,
     onSelect,
@@ -432,17 +523,17 @@ const TimelineView = forwardRef(function TimelineView(
     keybinds = {},
     onSetViewMode,
     readOnly = false,
-  }: Record<string, DynamicValue>,
-  ref: DynamicValue,
+  }: TimelineViewProps,
+  ref,
 ) {
   const isMac = navigator.userAgent?.includes('Mac');
-  const fmtKey = (bind) => {
+  const fmtKey = (bind?: Keybind) => {
     if (!bind?.keys?.length) return '';
     return bind.keys
       .map((k) => (k === 'Ctrl' ? (isMac ? 'Cmd' : 'Ctrl') : k === 'Alt' ? (isMac ? 'Option' : 'Alt') : k))
       .join('+');
   };
-  const btnTip = (label, bind) => {
+  const btnTip = (label: string, bind?: Keybind) => {
     const s = fmtKey(bind);
     return s ? `${label} (${s})` : label;
   };
@@ -629,7 +720,7 @@ const TimelineView = forwardRef(function TimelineView(
       return adjustDate(value, label);
     };
 
-    const DEFAULT_GROUP = {
+    const DEFAULT_GROUP: TimelineGroup = {
       id: 'g-main',
       title: 'Main',
       order: 0,
@@ -637,7 +728,7 @@ const TimelineView = forwardRef(function TimelineView(
       visible: true,
       locked: false,
     };
-    const DEFAULT_BELOW_GROUP = {
+    const DEFAULT_BELOW_GROUP: TimelineGroup = {
       id: 'g-main-below',
       title: 'Main (Below)',
       order: 1,
@@ -646,13 +737,14 @@ const TimelineView = forwardRef(function TimelineView(
       locked: false,
       belowLine: true,
     };
-    const sourceGroups = Array.isArray(file?.groups) && file.groups.length > 0 ? file.groups : [DEFAULT_GROUP];
-    let disabledGroupIdMap = null;
+    const sourceGroups: TimelineGroup[] =
+      Array.isArray(file?.groups) && file.groups.length > 0 ? file.groups : [DEFAULT_GROUP];
+    let disabledGroupIdMap: Map<string, string> | null = null;
     const configuredGroups = (() => {
       if (!file?.disableGroups) return sourceGroups;
       const hasBelowLineSource = sourceGroups.some((g) => g?.belowLine);
-      disabledGroupIdMap = new Map(
-        sourceGroups.map((g, index) => [
+      disabledGroupIdMap = new Map<string, string>(
+        sourceGroups.map((g, index): [string, string] => [
           g?.id || `g-${index}`,
           hasBelowLineSource && g?.belowLine ? DEFAULT_BELOW_GROUP.id : DEFAULT_GROUP.id,
         ]),
@@ -1025,6 +1117,7 @@ const TimelineView = forwardRef(function TimelineView(
         ...group,
         yOffset: -cumulativeAbove,
         topExtent: group.contentTop - cumulativeAbove,
+        bottomExtent: undefined,
       };
       cumulativeAbove += group.contentHeight + interGroupGap;
       return next;
@@ -1035,6 +1128,7 @@ const TimelineView = forwardRef(function TimelineView(
       const next = {
         ...group,
         yOffset: +cumulativeBelow,
+        topExtent: undefined,
         bottomExtent: group.contentBottom + cumulativeBelow,
       };
       cumulativeBelow += group.contentHeight + interGroupGap;
@@ -1122,6 +1216,8 @@ const TimelineView = forwardRef(function TimelineView(
 
       return {
         ...group,
+        extentTop: undefined,
+        extentBottom: undefined,
         finalSpans,
         finalEvents,
       };
@@ -1416,8 +1512,20 @@ const TimelineView = forwardRef(function TimelineView(
     return nextTicks;
   }, [file, PX_PER_YEAR, currentScale, normalizedScaleSections]);
 
-  const finalSpanById = useMemo(() => new Map(finalSpans.map((span) => [span.id, span])), [finalSpans]);
-  const groupLayoutById = useMemo(() => new Map(groupLayouts.map((group) => [group.id, group])), [groupLayouts]);
+  const finalSpanById = useMemo(() => {
+    type FinalSpan = (typeof finalSpans)[number];
+    return new Map<ElementId, FinalSpan>(finalSpans.map((span): [ElementId, FinalSpan] => [span.id, span]));
+  }, [finalSpans]);
+  const groupLayoutById = useMemo(
+    () =>
+      new Map<string, GroupLayoutSummary>(
+        groupLayouts.map((group): [string, GroupLayoutSummary] => [
+          String(group.id),
+          { bgColor: group.bgColor, belowLine: group.belowLine },
+        ]),
+      ),
+    [groupLayouts],
+  );
   const extensionParentRoundedSet = useMemo(() => {
     const ids = new Set();
     finalSpans.forEach((childSpan) => {
@@ -4735,7 +4843,7 @@ const TimelineView = forwardRef(function TimelineView(
               className="context-menu-item"
               onClick={() =>
                 handleMenuAction(() =>
-                  onAddEvent(contextMenu.groupId, contextMenu.clickYear, {
+                  onAddEvent?.(contextMenu.groupId, contextMenu.clickYear, {
                     lat: contextMenu.lat,
                     lng: contextMenu.lng,
                   }),
@@ -4759,7 +4867,7 @@ const TimelineView = forwardRef(function TimelineView(
               className="context-menu-item"
               onClick={() =>
                 handleMenuAction(() =>
-                  onAddSpan(contextMenu.groupId, contextMenu.clickYear, { lat: contextMenu.lat, lng: contextMenu.lng }),
+                  onAddSpan?.(contextMenu.groupId, contextMenu.clickYear, { lat: contextMenu.lat, lng: contextMenu.lng }),
                 )
               }
             >
@@ -4773,7 +4881,7 @@ const TimelineView = forwardRef(function TimelineView(
             <button
               className="context-menu-item"
               onClick={() =>
-                handleMenuAction(() => onAddEra(contextMenu.clickYear, { lat: contextMenu.lat, lng: contextMenu.lng }))
+                handleMenuAction(() => onAddEra?.(contextMenu.clickYear, { lat: contextMenu.lat, lng: contextMenu.lng }))
               }
             >
               <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16 }}>

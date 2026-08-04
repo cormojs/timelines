@@ -24,6 +24,7 @@ import WikiSection from './WikiSection';
 import SourcesSection from './SourcesSection';
 import { useNoteManagement } from '../hooks/useNoteManagement';
 import IconPicker from './IconPicker';
+import type { TimelineData, TimelineElement } from '../types/timeline';
 import { ICON_MAP } from '../config/elementIcons';
 import {
   parseTimelineInput,
@@ -59,6 +60,29 @@ const EVENT_STROKE_STYLE_OPTIONS = [
   { value: 'none', label: 'None' },
 ];
 
+type RightPanelProps = {
+  onSelect: (id: string | number) => void;
+  selectedElement?: TimelineElement | null;
+  onUpdate: (element: TimelineElement) => void | Promise<void>;
+  timelineData: TimelineData;
+  editRequestId?: string | number | null;
+  onEditRequestHandled?: () => void;
+  isMaximized?: boolean;
+  onToggleMaximize?: () => void;
+  onFilterByTag?: (tag: string) => void;
+  activeTags?: string[];
+  onToggleTag?: (tag: string) => void;
+  onUpdateGroups?: (groups: unknown[]) => void;
+  tagColors?: Record<string, string>;
+  onRequestDelete?: (id: string | number) => void;
+  onSelectPrevious?: () => void;
+  onSelectNext?: () => void;
+  prevElement?: TimelineElement | null;
+  nextElement?: TimelineElement | null;
+  readOnly?: boolean;
+  onClose?: () => void;
+};
+
 export default function RightPanel({
   onSelect,
   selectedElement,
@@ -79,7 +103,7 @@ export default function RightPanel({
   nextElement,
   readOnly = false,
   onClose,
-}: Record<string, DynamicValue>) {
+}: RightPanelProps) {
   const [formData, setFormData] = useState(null);
   const [validationErrors, setValidationErrors] = useState([]);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -340,7 +364,7 @@ export default function RightPanel({
       });
       const parentId = selectedElement.parents?.[0];
       const parentTitle = parentId ? timelineData?.elements?.find((el) => el.id === parentId)?.title || parentId : '';
-      setParentQuery(parentTitle);
+      setParentQuery(String(parentTitle));
       setTagQuery('');
       setValidationErrors([]);
       if (prevId !== selectedElement.id) {
@@ -463,7 +487,7 @@ export default function RightPanel({
     const needle = parentQuery.trim().toLowerCase();
     if (!needle) return parentCandidates;
     return parentCandidates.filter(
-      (span) => span.id.toLowerCase().includes(needle) || (span.title || '').toLowerCase().includes(needle),
+      (span) => String(span.id).toLowerCase().includes(needle) || (span.title || '').toLowerCase().includes(needle),
     );
   }, [parentCandidates, parentQuery]);
 
@@ -505,7 +529,7 @@ export default function RightPanel({
     if (!spanParentQuery.trim()) return spanParentCandidates;
     const needle = spanParentQuery.trim().toLowerCase();
     return spanParentCandidates.filter(
-      (span) => span.id.toLowerCase().includes(needle) || (span.title || '').toLowerCase().includes(needle),
+      (span) => String(span.id).toLowerCase().includes(needle) || (span.title || '').toLowerCase().includes(needle),
     );
   }, [spanParentCandidates, spanParentQuery]);
 
@@ -525,7 +549,7 @@ export default function RightPanel({
     if (!spanParentQuery.trim()) return extendFromCandidates;
     const needle = spanParentQuery.trim().toLowerCase();
     return extendFromCandidates.filter(
-      (span) => span.id.toLowerCase().includes(needle) || (span.title || '').toLowerCase().includes(needle),
+      (span) => String(span.id).toLowerCase().includes(needle) || (span.title || '').toLowerCase().includes(needle),
     );
   }, [extendFromCandidates, spanParentQuery]);
 
@@ -557,7 +581,7 @@ export default function RightPanel({
     if (!mergeParentQuery.trim()) return mergeParentCandidates;
     const needle = mergeParentQuery.trim().toLowerCase();
     return mergeParentCandidates.filter(
-      (span) => span.id.toLowerCase().includes(needle) || (span.title || '').toLowerCase().includes(needle),
+      (span) => String(span.id).toLowerCase().includes(needle) || (span.title || '').toLowerCase().includes(needle),
     );
   }, [mergeParentCandidates, mergeParentQuery]);
 

@@ -1,6 +1,7 @@
 import { ArrowLeft } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { formatYear } from '../utils/timelineUtils';
+import type { TimelineData } from '../types/timeline';
 import '../styles/07-modals-menus.css';
 
 const RESOLUTION_OPTIONS = [
@@ -18,13 +19,21 @@ type PreviewOptions = {
   customBg?: string;
 };
 
+type ExportPngModalProps = {
+  isOpen: boolean;
+  onClose: () => void;
+  onExport: (options: Record<string, unknown>) => void;
+  timelineData?: TimelineData;
+  timelineViewRef?: { current?: { generatePreview: (options: PreviewOptions) => Promise<string> } | null };
+};
+
 export default function ExportPngModal({
   isOpen,
   onClose,
   onExport,
   timelineData,
   timelineViewRef,
-}: Record<string, DynamicValue>) {
+}: ExportPngModalProps) {
   const [filename, setFilename] = useState('');
   const [previewData, setPreviewData] = useState(null);
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);

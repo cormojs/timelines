@@ -28,6 +28,13 @@ const WIKI_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const WIKI_CACHE_MAX_ENTRIES = 30;
 const wikiCache = new Map<string, string>();
 
+type WikiSectionProps = {
+  wikiUrl?: string;
+  useWiki?: boolean;
+  isEditMode?: boolean;
+  onUrlChange?: (url: string) => void;
+};
+
 function getCachedWiki(key) {
   if (!wikiCache.has(key)) return undefined;
   const value = wikiCache.get(key);
@@ -225,7 +232,7 @@ function sanitizeWikiHtml(html, host = 'https://en.wikipedia.org') {
   return doc.body.innerHTML;
 }
 
-export default function WikiSection({ wikiUrl, useWiki, isEditMode, onUrlChange }: Record<string, DynamicValue>) {
+export default function WikiSection({ wikiUrl, useWiki, isEditMode, onUrlChange }: WikiSectionProps) {
   const [wikiContent, setWikiContent] = useState('');
   const [isWikiLoading, setIsWikiLoading] = useState(false);
   const [wikiError, setWikiError] = useState('');

@@ -15,10 +15,26 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { saveUserTheme, deleteUserTheme } from '../utils/electronApi';
-import { formatCollectionName } from '../utils/themeLoader';
+import { formatCollectionName, type Theme } from '../utils/themeLoader';
 import { parseThemeJson } from '../utils/json';
 
 const MARKETPLACE_BASE = 'https://raw.githubusercontent.com/sreegjl/timelines-marketplace/refs/heads/main/';
+
+type MarketplaceTheme = Theme & { id: string; thumbnail?: string; description?: string; paths?: { thumbnail?: string } }
+type BundledTheme = Theme & { thumbnail?: string }
+
+type MarketplaceModalProps = {
+  isOpen: boolean
+  onClose: () => void
+  appThemes: [string, Theme][]
+  userThemes: [string, Theme][]
+  userThemeIds: Set<string>
+  bundledThemes: Record<string, BundledTheme>
+  defaultThemeKey?: string
+  appThemeKey?: string
+  onAppThemeChange?: (themeKey: string) => void
+  onRefreshThemes?: () => Promise<void> | void
+}
 
 export default function MarketplaceModal({
   isOpen,
@@ -31,8 +47,8 @@ export default function MarketplaceModal({
   appThemeKey,
   onAppThemeChange,
   onRefreshThemes,
-}: Record<string, DynamicValue>) {
-  const [marketplaceThemes, setMarketplaceThemes] = useState<DynamicValue[]>([]);
+}: MarketplaceModalProps) {
+  const [marketplaceThemes, setMarketplaceThemes] = useState<MarketplaceTheme[]>([]);
   const [marketplaceError, setMarketplaceError] = useState('');
   const [marketplaceLoading, setMarketplaceLoading] = useState(false);
   const [marketplaceBusyId, setMarketplaceBusyId] = useState('');

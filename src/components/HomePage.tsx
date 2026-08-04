@@ -239,6 +239,7 @@ import '../styles/07-modals-menus.css';
 import themeConfig from '../config/theme.json';
 import { isTheme, loadThemeConfig, themeOptionLabel } from '../utils/themeLoader';
 import { DEFAULT_KEYBINDS, cloneDefaultKeybinds, saveKeybinds } from '../utils/keybinds';
+import type { Keybinds } from '../types/timeline';
 import MarketplaceModal from './MarketplaceModal';
 
 const RECENT_TIMELINES_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
@@ -259,6 +260,27 @@ const getHomeSidebarBounds = (shellWidth) => {
 const clampHomeSidebar = (w, shellWidth = NaN) => {
   const { min, max } = getHomeSidebarBounds(shellWidth);
   return Math.min(Math.max(w, min), max);
+};
+
+type HomeAction = (...args: unknown[]) => unknown | Promise<unknown>;
+type HomePageProps = {
+  settingsOnly?: boolean; reuseExistingBackdrop?: boolean;
+  onSelectTimeline: HomeAction; onRenameTimeline: HomeAction; onTimelineRenamed: HomeAction;
+  onCreateTimeline: (config: Record<string, unknown>) => Promise<{ success?: boolean }>;
+  onImportTimeline?: HomeAction;
+  appThemeKey?: string; appFontFamily?: string; appFontSize?: number;
+  fonts: { name?: string }[]; themes: Record<string, unknown>;
+  onAppThemeChange: (theme: string) => void; oldFormatThemeCount?: number; onMigrateOldThemes: () => void;
+  onAppFontChange: (font: string) => void; onAppFontSizeChange: (size: number | string) => void;
+  timelineStorageDir?: string; notesStorageDir?: string; assetsStorageDir?: string;
+  onAssetsStorageDirChange: (path: string) => void; onTimelineStorageDirChange: (path: string) => void;
+  onNotesStorageDirChange: (path: string) => void; onPickTimelinesDir: () => void; onPickNotesDir: () => void;
+  onPickAssetsDir: () => void; onOpenFontsFolder: () => void; onOpenTimelinesFolder: () => void;
+  onOpenNotesFolder: () => void; onOpenAssetsFolder: () => void; hardwareAcceleration?: boolean;
+  onHardwareAccelerationChange: (enabled: boolean) => void; startMaximized?: boolean;
+  onStartMaximizedChange: (enabled: boolean) => void; onRefreshThemes: () => void | Promise<void>;
+  openSettingsSignal?: number; onAppSettingsClosed: () => void; keybinds?: Keybinds;
+  onKeybindsChange: (...args: unknown[]) => void; thumbnailRefreshSignal?: number;
 };
 
 export default function HomePage({
@@ -302,7 +324,7 @@ export default function HomePage({
   keybinds = cloneDefaultKeybinds(),
   onKeybindsChange,
   thumbnailRefreshSignal = 0,
-}: Record<string, DynamicValue>) {
+}: HomePageProps) {
   const [timelineFiles, setTimelineFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isNewTimelineModalOpen, setIsNewTimelineModalOpen] = useState(false);
@@ -3036,8 +3058,8 @@ export default function HomePage({
       <MarketplaceModal
         isOpen={isMarketplaceOpen}
         onClose={() => setIsMarketplaceOpen(false)}
-        appThemes={appThemes}
-        userThemes={userThemes}
+        appThemes={appThemes as [string, import('../utils/themeLoader').Theme][]}
+        userThemes={userThemes as [string, import('../utils/themeLoader').Theme][]}
         userThemeIds={userThemeIds}
         bundledThemes={bundledThemes}
         defaultThemeKey={defaultThemeKey}

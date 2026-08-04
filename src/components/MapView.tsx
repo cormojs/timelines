@@ -1,4 +1,5 @@
-import { useMemo, useEffect, useRef, useState, memo, forwardRef, useImperativeHandle } from 'react';
+import { useMemo, useEffect, useRef, useState, memo, forwardRef, useImperativeHandle, type ForwardedRef } from 'react';
+import type { TimelineElement, TimelineFile } from '../types/timeline';
 import { MapContainer, TileLayer, Marker, Tooltip, Rectangle, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -304,6 +305,18 @@ function RepeatOverlay() {
 const DEFAULT_TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 const DEFAULT_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
+type MapViewHandle = { zoomIn: () => void; zoomOut: () => void };
+type MapViewProps = {
+  elements?: TimelineElement[];
+  onSelect: (id: string | number) => void;
+  onOpenContextMenu: (position: { x: number; y: number; lat: number; lng: number }) => void;
+  onAltWheelPan?: (event: { deltaX: number; deltaY: number; shiftKey: boolean }) => void;
+  onCtrlWheelZoom?: (event: { deltaY: number; clientX: number; clientY: number }) => void;
+  viewportYear?: number;
+  selectedId?: string | number | null;
+  fileConfig?: TimelineFile;
+};
+
 function isOpenStreetMapTileUrl(url) {
   if (!url) return true;
   return /^https:\/\/(?:[a-z0-9-]+\.)*tile\.openstreetmap\.org\//i.test(url);
@@ -320,8 +333,8 @@ export default memo(
       viewportYear,
       selectedId,
       fileConfig,
-    }: Record<string, DynamicValue>,
-    ref: DynamicValue,
+    }: MapViewProps,
+    ref: ForwardedRef<MapViewHandle>,
   ) {
     const spanById = useMemo(() => {
       const map = new Map();

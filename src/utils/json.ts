@@ -63,7 +63,7 @@ export const gitSyncStateSchema = z
 export const themeSchema = jsonObjectSchema;
 export const panelPreferencesSchema = z.record(z.string(), jsonObjectSchema);
 export const filterHistorySchema = z.array(z.string());
-export const sourcesSchema = z.array(jsonValueSchema);
+export const sourcesSchema = z.array(jsonObjectSchema);
 export const mediaWikiResponseSchema = z
   .object({
     parse: z

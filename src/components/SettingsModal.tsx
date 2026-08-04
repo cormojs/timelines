@@ -16,6 +16,7 @@ import {
 } from '../utils/sliderUtils';
 import { sanitizeTitle, loadScaleSections, validateScaleSection } from '../utils/validation';
 import { themeOptionLabel } from '../utils/themeLoader';
+import type { TimelineData } from '../types/timeline';
 import '../styles/07-modals-menus.css';
 
 const MAP_MARKER_OPTIONS = [
@@ -28,6 +29,25 @@ const MAP_MARKER_OPTIONS = [
 const DEFAULT_EVENT_MARKER = 'pin';
 const DEFAULT_SPAN_MARKER = 'circle';
 const DEFAULT_ERA_MARKER = 'diamond';
+
+type SettingsModalProps = {
+  isOpen: boolean;
+  onClose: () => void;
+  onOpenAppSettings: () => void;
+  isCovered?: boolean;
+  timelineData: TimelineData;
+  onUpdateTimeline: (patch: Record<string, unknown>) => void;
+  renameErrorMessage?: string;
+  onClearRenameError: () => void;
+  themeKey?: string;
+  defaultThemeKey?: string;
+  themes: Record<string, { name?: string }>;
+  fonts: { name?: string }[];
+  onThemeChange: (themeKey: string) => void;
+  oldFormatThemeCount?: number;
+  onMigrateOldThemes: () => void;
+  layoutOptions?: { value: string; label: string }[];
+};
 
 export default function SettingsModal({
   isOpen,
@@ -46,7 +66,7 @@ export default function SettingsModal({
   oldFormatThemeCount = 0,
   onMigrateOldThemes,
   layoutOptions = [],
-}: Record<string, DynamicValue>) {
+}: SettingsModalProps) {
   const [title, setTitle] = useState('');
   // Title drives the filename on disk, so it only commits on blur/Enter/close, not per keystroke
   const [committedTitle, setCommittedTitle] = useState('');

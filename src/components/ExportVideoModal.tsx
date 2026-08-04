@@ -2,6 +2,7 @@ import { ArrowLeft } from 'lucide-react';
 import { useState, useEffect, useRef, type CSSProperties } from 'react';
 import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
 import { formatYear } from '../utils/timelineUtils';
+import type { TimelineData } from '../types/timeline';
 import '../styles/07-modals-menus.css';
 
 const RESOLUTION_OPTIONS = [
@@ -28,12 +29,19 @@ const VIDEO_ZOOM_MAX = 1;
 
 type PreviewOptions = { transparentBg?: boolean; customBg?: string };
 
+type ExportVideoModalProps = {
+  isOpen: boolean;
+  onClose: () => void;
+  timelineData?: TimelineData;
+  timelineViewRef?: { current?: { generatePreview: (options: PreviewOptions) => Promise<string> } | null };
+};
+
 export default function ExportVideoModal({
   isOpen,
   onClose,
   timelineData,
   timelineViewRef,
-}: Record<string, DynamicValue>) {
+}: ExportVideoModalProps) {
   const [filename, setFilename] = useState('');
   const [previewData, setPreviewData] = useState(null);
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);

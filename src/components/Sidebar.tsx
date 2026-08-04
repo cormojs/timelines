@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect, useRef, useLayoutEffect, Fragment } from 'react';
+import type { Dispatch, MouseEvent, RefObject, SetStateAction } from 'react';
 import { parseFilterQuery, matchesFilter } from '../utils/filterUtils';
 import {
   PanelLeft,
@@ -33,9 +34,93 @@ import {
 import { formatYear } from '../utils/timelineUtils';
 import { displayDateLabel } from '../utils/dateUtils';
 import { ICON_MAP as iconMap } from '../config/elementIcons';
+import type { Keybinds, TimelineData, TimelineElement, TimelineFile, TimelineGroup } from '../types/timeline';
 import '../styles/07-modals-menus.css';
 
 const DEFAULT_GROUP_COLOR = '#d9d9d9';
+
+type ElementId = TimelineElement['id'];
+
+type ElementMenu = {
+  x: number;
+  y: number;
+  element: TimelineElement;
+};
+
+type ElementMenuSetter = Dispatch<SetStateAction<ElementMenu | null>>;
+
+type SidebarRowProps = {
+  item: TimelineElement;
+  rightText: string;
+  level?: number;
+  selectedId: ElementId | null;
+  onSelect?: (id: ElementId) => void;
+  listRef: RefObject<HTMLDivElement>;
+  lastScrollTopRef: RefObject<number>;
+  setElementMenu: ElementMenuSetter;
+};
+
+type ElementRowProps = {
+  element: TimelineElement;
+  selectedId: ElementId | null;
+  onSelect?: (id: ElementId) => void;
+  listRef: RefObject<HTMLDivElement>;
+  lastScrollTopRef: RefObject<number>;
+  setElementMenu: ElementMenuSetter;
+  tagColors?: Record<string, string>;
+  spanById: Map<ElementId, TimelineElement>;
+  fmtYear: (year: number) => string;
+};
+
+type SidebarProps = {
+  isCollapsed: boolean;
+  onToggle: () => void;
+  selectedId: ElementId | null;
+  onSelect: (id: ElementId) => void;
+  timelineData: TimelineData;
+  allElements: TimelineElement[];
+  chipFilter?: unknown;
+  activeTags?: string[];
+  hiddenTags?: string[];
+  onToggleTag?: (tag: string) => void;
+  onClearTags?: () => void;
+  onToggleHiddenTag?: (tag: string) => void;
+  pinnedTags?: string[];
+  onTogglePinnedTag?: (tag: string) => void;
+  tagColors?: Record<string, string>;
+  onUpdateTagColor?: (tag: string, color: string) => void;
+  onAddGroup?: () => void;
+  onUpdateGroup?: (groupId: string, updates: Partial<TimelineGroup>) => void;
+  onUpdateGroups?: (groups: TimelineGroup[]) => void;
+  onDeleteGroup?: (groupId: string) => void;
+  onCenterGroup?: (groupId: string) => void;
+  onAddEvent?: () => void;
+  onAddSpan?: () => void;
+  onAddEra?: (clickYear?: number, clickCoords?: { lat?: number; lng?: number }) => void;
+  onOpenSettings?: () => void;
+  onDownloadJson?: () => void;
+  onDownloadPackage?: () => void;
+  onDownloadPng?: () => void;
+  onDownloadVideo?: () => void;
+  onLoadTimeline?: (timelineId: string) => void;
+  onNewTimeline?: () => void;
+  onDuplicateTimeline?: () => void;
+  onBackToHome?: () => void;
+  onDelete?: (elementId: ElementId) => void;
+  onDuplicateElement?: (elementId: ElementId) => void;
+  onEditElement?: (elementId: ElementId) => void;
+  onPatchFile?: (patch: Partial<TimelineFile>) => void;
+  keybinds?: Keybinds;
+  readOnly?: boolean;
+};
+
+type ScaleSection = Record<string, unknown> & {
+  start?: number | string;
+  end?: number | string;
+  scale?: number | string;
+};
+
+const isScaleSection = (value: unknown): value is ScaleSection => typeof value === 'object' && value !== null;
 
 const expandShortHex = (value) =>
   value
@@ -118,7 +203,7 @@ function compareEraGroupItems(a, b) {
   return (a.title || a.id).localeCompare(b.title || b.id);
 }
 
-function SidebarRow({ item, rightText, level = 0, selectedId, onSelect, listRef, lastScrollTopRef, setElementMenu }) {
+function SidebarRow({ item, rightText, level = 0, selectedId, onSelect, listRef, lastScrollTopRef, setElementMenu }: SidebarRowProps) {
   const isSelected = selectedId && selectedId === item.id;
   const leftIndent = 16 + level * 16;
 
@@ -173,7 +258,7 @@ function ElementRow({
   tagColors = {},
   spanById,
   fmtYear,
-}) {
+}: ElementRowProps) {
   const isSelected = selectedId === element.id;
   const isSpan = element.type === 'span';
   const isEra = element.type === 'era';
@@ -263,7 +348,7 @@ export default function Sidebar({
   onPatchFile,
   keybinds = {},
   readOnly = false,
-}: Record<string, DynamicValue>) {
+}: SidebarProps) {
   const isMac = navigator.userAgent?.includes('Mac');
   const formatKeybind = (bind) => {
     if (!bind?.keys?.length) return '';
@@ -347,11 +432,11 @@ export default function Sidebar({
     const maxDate = Math.max(...allDates);
 
     // Build compressYear using the same scale sections logic as the timeline
-    const rawSections =
+    const rawSections: ScaleSection[] =
       Array.isArray(file?.scaleSections) && file.scaleSections.length > 0
-        ? file.scaleSections
+        ? file.scaleSections.filter(isScaleSection)
         : Array.isArray(file?.breaks) && file.breaks.length > 0
-          ? file.breaks.map((b) => ({ ...b, scale: 0 }))
+          ? file.breaks.filter(isScaleSection).map((section) => ({ ...section, scale: 0 }))
           : [];
     const normalizedSections = rawSections
       .map((item) => {
@@ -524,7 +609,9 @@ export default function Sidebar({
   }, [spans, events, eras]);
 
   const groups = useMemo(() => {
-    const fallback = [{ id: 'g-main', title: 'Main', order: 0, stack: 0, visible: true, locked: false }];
+    const fallback: TimelineGroup[] = [
+      { id: 'g-main', title: 'Main', order: 0, stack: 0, visible: true, locked: false },
+    ];
     const raw = Array.isArray(file?.groups) && file.groups.length > 0 ? file.groups : fallback;
     return [...raw].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   }, [file]);

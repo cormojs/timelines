@@ -23,6 +23,7 @@ import { parseFilterQuery, matchesFilter } from '../utils/filterUtils';
 import { ICON_MAP } from '../config/elementIcons';
 import { pickAndImportImage } from '../utils/electronApi';
 import { parseSourcesJson } from '../utils/json';
+import type { TimelineData } from '../types/timeline';
 
 const TYPE_LABEL = { event: 'Event', span: 'Span', era: 'Era' };
 
@@ -52,6 +53,34 @@ const DEFAULT_WIDTHS = {
   thumbnailStyle: 120,
 };
 
+type SpreadsheetViewProps = {
+  timelineData: TimelineData;
+  selectedId?: string | number | null;
+  onSelect: (id: string | number) => void;
+  onUpdate: (element: Record<string, unknown>) => void;
+  leftPanelWidth?: number;
+  rightPanelWidth?: number;
+  isRightPanelOpen?: boolean;
+  onSetViewMode?: (mode: string) => void;
+  onOpenSettings?: () => void;
+  onBackToHome?: () => void;
+  onAddEvent?: (groupId?: string) => void;
+  onAddSpan?: (groupId?: string) => void;
+  onAddEra?: (clickYear?: number, clickCoords?: { lat?: number; lng?: number }) => void;
+  onDelete?: (id: string | number) => void;
+  onDuplicate?: (id: string | number) => void;
+  onSetElementGroup?: (id: string | number, groupId: string) => void;
+  activeTags?: string[];
+  hiddenTags?: string[];
+  allTags?: string[];
+  onToggleTag?: (tag: string) => void;
+  onToggleHiddenTag?: (tag: string) => void;
+  onClearTags?: () => void;
+  pinnedTags?: string[];
+  onTogglePinnedTag?: (tag: string) => void;
+  readOnly?: boolean;
+};
+
 export default function SpreadsheetView({
   timelineData,
   selectedId,
@@ -78,7 +107,7 @@ export default function SpreadsheetView({
   pinnedTags = [],
   onTogglePinnedTag,
   readOnly = false,
-}: Record<string, DynamicValue>) {
+}: SpreadsheetViewProps) {
   const [editCell, setEditCell] = useState(null);
   const [editValue, setEditValue] = useState('');
   const [selectedCell, setSelectedCell] = useState(null); // { id, field } selection anchor

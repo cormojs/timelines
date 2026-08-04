@@ -1090,7 +1090,7 @@ function App() {
     setEditRequestId(spanWithCoords.id);
   };
 
-  const handleAddEra = (_clickYear, clickCoords) => {
+  const handleAddEra = (_clickYear?: number, clickCoords?: { lat?: number; lng?: number }) => {
     const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
     const tlStart = timelineData.file.start;
     const tlEnd = timelineData.file.end;
