@@ -37,8 +37,8 @@ logic with applicable tests.
 
 ## Implementation conventions
 
-- Use TypeScript throughout: `.ts` for modules, `.tsx` for React UI, and `.cts`
-  for CommonJS Electron and test modules.
+- Use TypeScript throughout: `.ts` for modules (including Electron source),
+  `.tsx` for React UI, and `.cts` for Bun test modules.
 - Preserve the existing style of the file you edit. Most newer configuration and
   utility modules omit semicolons, while some older React files use them.
 - Keep reusable state and data transformations in `src/utils/` or hooks rather
