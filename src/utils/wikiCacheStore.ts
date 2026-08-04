@@ -1,13 +1,20 @@
-// @ts-nocheck
 // Persistent IndexedDB cache for sanitized wiki HTML; every call is best-effort and fails silently.
 const DB_NAME = "timelines-wiki-cache";
 const STORE_NAME = "articles";
 const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
 const MAX_ENTRY_BYTES = 2 * 1024 * 1024;
 
-let dbPromise = null;
+type WikiCacheEntry = {
+  key: string;
+  html: string;
+  fetchedAt: number;
+  lastUsedAt: number;
+  bytes: number;
+};
 
-function openDb() {
+let dbPromise: Promise<IDBDatabase> | null = null;
+
+function openDb(): Promise<IDBDatabase> {
   if (dbPromise) return dbPromise;
   dbPromise = new Promise((resolve, reject) => {
     if (typeof indexedDB === "undefined") {
@@ -27,16 +34,16 @@ function openDb() {
   return dbPromise;
 }
 
-function requestToPromise(request) {
-  return new Promise((resolve, reject) => {
+function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
 }
 
-async function prune(db) {
+async function prune(db: IDBDatabase) {
   const store = db.transaction(STORE_NAME, "readwrite").objectStore(STORE_NAME);
-  const entries = await requestToPromise(store.getAll());
+  const entries = await requestToPromise(store.getAll()) as WikiCacheEntry[];
   let total = entries.reduce((sum, e) => sum + (e.bytes || 0), 0);
   if (total <= MAX_TOTAL_BYTES) return;
   entries.sort((a, b) => (a.lastUsedAt || 0) - (b.lastUsedAt || 0));
@@ -47,11 +54,11 @@ async function prune(db) {
   }
 }
 
-export async function getWikiCacheEntry(key) {
+export async function getWikiCacheEntry(key: string): Promise<WikiCacheEntry | null> {
   try {
     const db = await openDb();
     const store = db.transaction(STORE_NAME, "readwrite").objectStore(STORE_NAME);
-    const entry = await requestToPromise(store.get(key));
+    const entry = await requestToPromise(store.get(key)) as WikiCacheEntry | undefined;
     if (!entry) return null;
     store.put({ ...entry, lastUsedAt: Date.now() });
     return entry;
@@ -60,7 +67,7 @@ export async function getWikiCacheEntry(key) {
   }
 }
 
-export async function setWikiCacheEntry(key, html) {
+export async function setWikiCacheEntry(key: string, html: string) {
   try {
     const bytes = html.length * 2;
     if (bytes > MAX_ENTRY_BYTES) return;

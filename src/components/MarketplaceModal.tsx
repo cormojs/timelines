@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useState, useEffect, useRef } from "react";
 import { ArrowLeft, Upload, X, Download, Check, Trash2, FolderOpen, Search, Moon, Sun, ChevronDown, MoreVertical, RefreshCw } from "lucide-react";
 import { saveUserTheme, deleteUserTheme } from "../utils/electronApi";
@@ -17,8 +16,8 @@ export default function MarketplaceModal({
   appThemeKey,
   onAppThemeChange,
   onRefreshThemes,
-}) {
-  const [marketplaceThemes, setMarketplaceThemes] = useState([]);
+}: any) {
+  const [marketplaceThemes, setMarketplaceThemes] = useState<any[]>([]);
   const [marketplaceError, setMarketplaceError] = useState("");
   const [marketplaceLoading, setMarketplaceLoading] = useState(false);
   const [marketplaceBusyId, setMarketplaceBusyId] = useState("");
@@ -98,7 +97,7 @@ export default function MarketplaceModal({
     const onDragOver = (e) => { e.preventDefault(); setLocalDragOver(true); };
     const onDragLeave = (e) => { if (!e.relatedTarget) setLocalDragOver(false); };
     const onDrop = (e) => {
-      const files = Array.from(e.dataTransfer?.files || []).filter(f => f.name.endsWith(".json"));
+      const files = (Array.from(e.dataTransfer?.files ?? []) as File[]).filter((file) => file.name.endsWith(".json"));
       if (!files.length) return;
       e.preventDefault();
       setLocalDragOver(false);
@@ -196,7 +195,7 @@ export default function MarketplaceModal({
 
   if (!isOpen) return null;
 
-  const collectionCounts = {};
+  const collectionCounts: Record<string, number> = {};
   marketplaceThemes.forEach((t) => {
     const c = t.collection || "other";
     collectionCounts[c] = (collectionCounts[c] || 0) + 1;

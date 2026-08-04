@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useMemo, useState, useRef, useEffect, useCallback, startTransition } from "react";
 import TimelineView from "./components/TimelineView";
 import SpreadsheetView from "./components/SpreadsheetView";
@@ -502,8 +501,8 @@ function App() {
   }, []);
 
   // Serialize renames/saves so an in-flight save can't land after a rename and recreate the old file
-  const persistQueueRef = useRef(Promise.resolve());
-  const enqueuePersist = useCallback((task) => {
+  const persistQueueRef = useRef<Promise<unknown>>(Promise.resolve());
+  const enqueuePersist = useCallback(<T,>(task: () => T | Promise<T>): Promise<T> => {
     const next = persistQueueRef.current.catch(() => {}).then(task);
     persistQueueRef.current = next.catch(console.error);
     return next;
@@ -684,13 +683,13 @@ function App() {
 
       if (matchesKeybind(e, keybinds.newEvent)) {
         e.preventDefault();
-        handleAddEvent();
+        handleAddEvent(undefined, undefined, undefined);
       } else if (matchesKeybind(e, keybinds.newSpan)) {
         e.preventDefault();
-        handleAddSpan();
+        handleAddSpan(undefined, undefined, undefined);
       } else if (matchesKeybind(e, keybinds.newEra)) {
         e.preventDefault();
-        handleAddEra();
+        handleAddEra(undefined, undefined);
       }
     };
 
@@ -977,7 +976,7 @@ function App() {
     });
   };
 
-  const handleAddEvent = (groupId, clickYear, clickCoords) => {
+  const handleAddEvent = (groupId?: any, clickYear?: any, clickCoords?: any) => {
     if (!timelineData?.file) return;
     const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
     const fallbackMid = (timelineData.file.start + timelineData.file.end) / 2;
@@ -985,7 +984,7 @@ function App() {
     const clampedYear = clamp(baseYear, timelineData.file.start, timelineData.file.end);
     const snappedYear = timelineData.file.useCalendar === true ? snapToDayGrid(clampedYear) : Math.round(clampedYear);
     const eventId = generateUniqueRandomElementId(timelineData.elements, "event");
-    const newEvent = {
+    const newEvent: any = {
       id: eventId,
       type: "event",
       title: "New Event",
@@ -1015,7 +1014,7 @@ function App() {
     setEditRequestId(newEvent.id);
   };
 
-  const handleAddSpan = (groupId, clickYear, clickCoords) => {
+  const handleAddSpan = (groupId?: any, clickYear?: any, clickCoords?: any) => {
     const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
     const range = timelineData.file.end - timelineData.file.start;
     const duration = Math.max(1, Math.floor(range / 4));
@@ -1027,7 +1026,7 @@ function App() {
 
     const spanId = generateUniqueRandomElementId(timelineData.elements, "span");
     const defaultGroupId = groupId || timelineData.file?.groups?.[0]?.id || DEFAULT_GROUP_ID;
-    const newSpan = {
+    const newSpan: any = {
       id: spanId,
       type: "span",
       title: "New Span",
@@ -1084,7 +1083,7 @@ function App() {
     }
 
     const eraId = generateUniqueRandomElementId(timelineData.elements, "era");
-    const newEra = {
+    const newEra: any = {
       id: eraId,
       type: "era",
       title: "New Era",
@@ -1630,7 +1629,7 @@ function App() {
   };
 
   const getThemeFont = useCallback((themeKeyValue) => {
-    const theme = themeConfig.themes?.[themeKeyValue];
+    const theme: any = themeConfig.themes?.[themeKeyValue];
     if (!theme?.font?.family) return null;
     return {
       family: theme.font.family,
@@ -1999,7 +1998,7 @@ function App() {
         });
       }
     });
-    return Array.from(tags).sort((a, b) => a.localeCompare(b));
+    return (Array.from(tags) as string[]).sort((a, b) => a.localeCompare(b));
   }, [timelineData]);
 
   useEffect(() => {

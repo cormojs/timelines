@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useMemo, useEffect, useRef, useState, memo, forwardRef, useImperativeHandle } from "react";
 import { MapContainer, TileLayer, Marker, Tooltip, Rectangle, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
@@ -87,9 +86,9 @@ function makeColoredIcon(color, selected, markerType = DEFAULT_MARKER_TYPE) {
   return L.divIcon({
     html: svg,
     className: "",
-    iconSize,
-    iconAnchor,
-    tooltipAnchor,
+    iconSize: iconSize as any,
+    iconAnchor: iconAnchor as any,
+    tooltipAnchor: tooltipAnchor as any,
   });
 }
 
@@ -129,7 +128,7 @@ function formatElementDate(el, fileConfig) {
 function MapClickHandler({ onSelect }) {
   useMapEvents({
     click: (e) => {
-      if (e.originalEvent?.target?.closest?.(".leaflet-marker-icon")) return;
+      if ((e.originalEvent?.target as Element | null)?.closest(".leaflet-marker-icon")) return;
       onSelect?.(null);
     }
   });
@@ -139,7 +138,7 @@ function MapClickHandler({ onSelect }) {
 function MapContextMenuHandler({ onOpenContextMenu }) {
   useMapEvents({
     contextmenu: (e) => {
-      if (e.originalEvent?.target?.closest?.(".leaflet-marker-icon")) return;
+      if ((e.originalEvent?.target as Element | null)?.closest(".leaflet-marker-icon")) return;
       L.DomEvent.stop(e.originalEvent);
       onOpenContextMenu?.({
         x: e.originalEvent?.clientX ?? 0,
@@ -157,7 +156,7 @@ function HoverCleanupHandler({ onHoverChange }) {
 
   useMapEvents({
     mousemove: (e) => {
-      const overMarker = e.originalEvent?.target?.closest?.(".leaflet-marker-icon");
+      const overMarker = (e.originalEvent?.target as Element | null)?.closest(".leaflet-marker-icon");
       if (!overMarker) onHoverChange(null);
     },
     dragstart: () => onHoverChange(null),
@@ -285,7 +284,7 @@ function isOpenStreetMapTileUrl(url) {
   return /^https:\/\/(?:[a-z0-9-]+\.)*tile\.openstreetmap\.org\//i.test(url);
 }
 
-export default memo(forwardRef(function MapView({ elements = [], onSelect, onOpenContextMenu, onAltWheelPan, onCtrlWheelZoom, viewportYear, selectedId, fileConfig }, ref) {
+export default memo(forwardRef(function MapView({ elements = [], onSelect, onOpenContextMenu, onAltWheelPan, onCtrlWheelZoom, viewportYear, selectedId, fileConfig }: any, ref: any) {
   const spanById = useMemo(() => {
     const map = new Map();
     elements.forEach((el) => { if (el.type === "span") map.set(el.id, el); });
@@ -311,7 +310,7 @@ export default memo(forwardRef(function MapView({ elements = [], onSelect, onOpe
   return (
     <div className="timeline-map-view">
       <MapContainer
-        center={initialView.center}
+        center={initialView.center as any}
         zoom={initialView.zoom}
         style={{ width: "100%", height: "100%" }}
         zoomControl={true}

@@ -1,6 +1,5 @@
-// @ts-nocheck
 import { ArrowLeft } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type CSSProperties } from "react";
 import { Muxer, ArrayBufferTarget } from "mp4-muxer";
 import { formatYear } from "../utils/timelineUtils";
 import "../styles/07-modals-menus.css";
@@ -28,7 +27,9 @@ const VIDEO_ZOOM_MIN = 0.2;
 const VIDEO_ZOOM_MAX = 1;
 
 
-export default function ExportVideoModal({ isOpen, onClose, timelineData, timelineViewRef }) {
+type PreviewOptions = { transparentBg?: boolean; customBg?: string };
+
+export default function ExportVideoModal({ isOpen, onClose, timelineData, timelineViewRef }: any) {
   const [filename, setFilename] = useState("");
   const [previewData, setPreviewData] = useState(null);
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
@@ -37,7 +38,7 @@ export default function ExportVideoModal({ isOpen, onClose, timelineData, timeli
   const [resolution, setResolution] = useState('hd');
   const [customWidth, setCustomWidth] = useState('1920');
   const [customHeight, setCustomHeight] = useState('1080');
-  const [duration, setDuration] = useState(10);
+  const [duration, setDuration] = useState<number | "custom">(10);
   const [customDuration, setCustomDuration] = useState('10');
   const [fps, setFps] = useState(30);
   const [bgOption, setBgOption] = useState('default');
@@ -97,7 +98,7 @@ export default function ExportVideoModal({ isOpen, onClose, timelineData, timeli
     previewTimeoutRef.current = setTimeout(async () => {
       setIsGeneratingPreview(true);
       try {
-        let previewOpts = {};
+        const previewOpts: PreviewOptions = {};
         if (bgOption === 'transparent') {
           previewOpts.transparentBg = true;
         } else if (bgOption === 'secondary' || bgOption === 'tertiary') {
@@ -498,7 +499,7 @@ export default function ExportVideoModal({ isOpen, onClose, timelineData, timeli
                     '--pan-left-start': `${previewMetrics?.panLeftStartPercent || 0}%`,
                     '--pan-left-end': `${previewMetrics?.panLeftEndPercent || 0}%`,
                     animation: `panPreviewLeft ${previewMetrics?.durationSeconds || getDurationValue()}s linear infinite`,
-                  }}
+                  } as CSSProperties & Record<`--${string}`, string>}
                 />
                 {showTitle && (
                   <div className={`export-preview-title export-preview-title-${titlePosition}`}>

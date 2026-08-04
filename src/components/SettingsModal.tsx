@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { ArrowLeft, Plus, X } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { parseTimelineInput, snapToMonthGrid, formatDateForInput } from "../utils/dateUtils";
@@ -35,7 +34,7 @@ export default function SettingsModal({
   oldFormatThemeCount = 0,
   onMigrateOldThemes,
   layoutOptions = [],
-}) {
+}: any) {
   const [title, setTitle] = useState("");
   // Title drives the filename on disk, so it only commits on blur/Enter/close, not per keystroke
   const [committedTitle, setCommittedTitle] = useState("");
@@ -390,7 +389,7 @@ export default function SettingsModal({
       const parsedScaleSections = saveScaleSections(scaleSections);
       if (onUpdateTimelineRef.current) {
         // Core fields (rename/parsing) are always sent; the rest only when changed.
-        const patch = {
+        const patch: Record<string, any> = {
           title: committedTitle,
           start: startValue,
           end: endValue,
@@ -464,11 +463,11 @@ export default function SettingsModal({
 
   if (!isOpen) return null;
 
-  const fontNames = Array.from(
+  const fontNames = Array.from<string>(
     new Set(
       (fonts || [])
         .map((font) => font?.name?.trim())
-        .filter(Boolean)
+        .filter((name): name is string => Boolean(name))
     )
   ).sort((a, b) => a.localeCompare(b));
 
@@ -936,7 +935,7 @@ export default function SettingsModal({
                       }}
                     >
                       <option value="default">Default (App Theme)</option>
-                      {Object.entries(themes || {}).map(([key, theme]) => (
+                      {(Object.entries(themes || {}) as [string, any][]).map(([key, theme]) => (
                         <option key={key} value={key}>
                           {themeOptionLabel(key, theme)}
                         </option>
@@ -976,7 +975,7 @@ export default function SettingsModal({
                     value={fontFamily || "default"}
                     onChange={(e) => setFontFamily(e.target.value)}
                   >
-                    {fontOptions.map((option) => (
+                    {(fontOptions as { value: string; label: string }[]).map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
                       </option>
@@ -1184,7 +1183,7 @@ export default function SettingsModal({
                       checked={useMaps}
                       onChange={(e) => {
                         setUseMaps(e.target.checked);
-                        if (!e.target.checked && settingsSection === "maps") setSettingsSection("advanced");
+                        if (!e.target.checked && String(settingsSection) === "maps") setSettingsSection("advanced");
                       }}
                     />
                     <span className="settings-toggle-slider"></span>

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useState, useEffect, useRef } from "react";
 import { ChevronDown, Pencil, Trash2, BookOpen, RotateCw } from "lucide-react";
 import DOMPurify from "dompurify";
@@ -8,7 +7,7 @@ import { getWikiCacheEntry, setWikiCacheEntry } from "../utils/wikiCacheStore";
 
 // Outside Electron there is no IPC proxy; MediaWiki APIs allow direct
 // anonymous CORS requests when origin=* is appended.
-async function fetchWikiApi(url) {
+async function fetchWikiApi(url: string): Promise<any> {
   if (window.electron !== undefined) return fetchWikipedia({ url });
   try {
     const res = await fetch(`${url}${url.includes("?") ? "&" : "?"}origin=*`);
@@ -26,7 +25,7 @@ const WIKI_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 // Module-level LRU so cached articles survive component remounts (WikiSection is keyed by selected element).
 const WIKI_CACHE_MAX_ENTRIES = 30;
-const wikiCache = new Map();
+const wikiCache = new Map<string, string>();
 
 function getCachedWiki(key) {
   if (!wikiCache.has(key)) return undefined;
@@ -145,7 +144,7 @@ function sanitizeWikiHtml(html, host = "https://en.wikipedia.org") {
   return doc.body.innerHTML;
 }
 
-export default function WikiSection({ wikiUrl, useWiki, isEditMode, onUrlChange }) {
+export default function WikiSection({ wikiUrl, useWiki, isEditMode, onUrlChange }: any) {
   const [wikiContent, setWikiContent] = useState("");
   const [isWikiLoading, setIsWikiLoading] = useState(false);
   const [wikiError, setWikiError] = useState("");

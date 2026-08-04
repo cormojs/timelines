@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Git sync engine; main.cts injects all library ops. See docs/private/git_sync_plan.md
 const path = require('path');
 const os = require('os');
@@ -117,7 +116,7 @@ function summarizePackageDiff(oldBuf, newBuf) {
   for (const [id, el] of newEls) {
     const prev = oldEls.get(id);
     if (!prev) added += 1;
-    else if ((prev.title || '') !== (el.title || '')) renamed.push(el.title || 'untitled');
+    else if (((prev as any).title || '') !== ((el as any).title || '')) renamed.push((el as any).title || 'untitled');
   }
   for (const id of oldEls.keys()) {
     if (!newEls.has(id)) removed += 1;
@@ -158,7 +157,9 @@ const isEmptyRemoteError = (err) => err?.code === 'NotFoundError'
   || /could not find|no refs|empty/i.test(err?.message || '');
 
 class GitSyncEngine {
-  constructor(opts = {}) {
+  [key: string]: any;
+
+  constructor(opts: any = {}) {
     this.repoDir = opts.repoDir;
     this.statePath = opts.statePath;
     this.listTimelines = opts.listTimelines;
@@ -166,7 +167,7 @@ class GitSyncEngine {
     this.importPackage = opts.importPackage;
     this.removeLocalTimeline = opts.removeLocalTimeline;
     this.http = opts.http || httpNode;
-    this.fetch = opts.fetch || ((...args) => globalThis.fetch(...args));
+    this.fetch = opts.fetch || ((...args: any[]) => (globalThis.fetch as any)(...args));
     this.onAuth = opts.onAuth || (() => (
       this.credentials?.token
         ? {
@@ -357,7 +358,7 @@ class GitSyncEngine {
     };
   }
 
-  async updateSettings({ machineLabel, excludedPaths, autoSync, debounceMs, writeReadme } = {}) {
+  async updateSettings({ machineLabel, excludedPaths, autoSync, debounceMs, writeReadme }: any = {}) {
     if (machineLabel !== undefined) {
       const nextLabel = safeName(machineLabel) || this.machineLabel;
       this.machineLabel = nextLabel;
@@ -408,7 +409,7 @@ class GitSyncEngine {
     return walk(this.repoDir);
   }
 
-  async updateCredentials({ token, username = 'x-access-token', authType = 'pat' } = {}) {
+  async updateCredentials({ token, username = 'x-access-token', authType = 'pat' }: any = {}) {
     const trimmedToken = String(token || '').trim();
     if (!trimmedToken) throw new Error('Missing personal access token');
     const trimmedUsername = String(username || '').trim() || 'x-access-token';
@@ -638,7 +639,7 @@ class GitSyncEngine {
         await this._regenerateReadme();
       }
       await this._stageAndCommit(this._commitMessage(summaries));
-      await this._pushWithRetry(branch);
+      await (this._pushWithRetry as any)(branch);
       await this._importPass(exportedPaths);
       await this._saveState();
       this.lastSyncedAt = this.now().toISOString();
@@ -858,7 +859,7 @@ class GitSyncEngine {
       const remote = remoteByPath.get(change.path);
       if (!remote) {
         localWins.push(change);
-      } else if (remote.to !== change.to) {
+      } else if ((remote as any).to !== (change as any).to) {
         // Remote wins the path, so the import pass must apply its version
         exportedPaths?.delete(change.path);
         if (change.to && change.path.endsWith('.timeline')) {

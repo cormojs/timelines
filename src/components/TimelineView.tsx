@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, forwardRef, useImperativeHandle, Fragment, useCallback, lazy, Suspense, useDeferredValue } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -307,7 +306,7 @@ function OverflowTags({ tags, tagColors, getReadableTextColor: readableColor }) 
   useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const tagEls = Array.from(el.querySelectorAll('.pinned-tag-item'));
+    const tagEls = Array.from((el as HTMLElement).querySelectorAll('.pinned-tag-item')) as HTMLElement[];
     if (tagEls.length < 2) return;
     const firstTop = tagEls[0].getBoundingClientRect().top;
     let firstLineCount = 0;
@@ -374,7 +373,7 @@ const TimelineView = forwardRef(function TimelineView({
   keybinds = {},
   onSetViewMode,
   readOnly = false,
-}, ref) {
+}: any, ref: any) {
   const isMac = navigator.userAgent?.includes("Mac");
   const fmtKey = (bind) => {
     if (!bind?.keys?.length) return "";
@@ -846,12 +845,12 @@ const TimelineView = forwardRef(function TimelineView({
       const spanIdsInGroup = new Set(spansInGroup.map((span) => span.id));
       const groupSpanChildPlacement = Object.fromEntries(
         Object.entries(globalSpanChildPlacement).filter(
-          ([childId, placement]) => spanIdsInGroup.has(childId) && spanIdsInGroup.has(placement.parentId)
+          ([childId, placement]) => spanIdsInGroup.has(childId) && spanIdsInGroup.has((placement as any).parentId)
         )
       );
       const groupSpanMergePlacement = Object.fromEntries(
         Object.entries(globalSpanMergePlacement).filter(
-          ([childId, placement]) => spanIdsInGroup.has(childId) && spanIdsInGroup.has(placement.parentId)
+          ([childId, placement]) => spanIdsInGroup.has(childId) && spanIdsInGroup.has((placement as any).parentId)
         )
       );
 
@@ -3243,7 +3242,7 @@ const TimelineView = forwardRef(function TimelineView({
       ref={containerRef}
       className={`timeline-scroll${file?.fixedEventHeight ? ' fixed-event-height' : ''}`}
       style={file?.useSecondaryBg ? { backgroundColor: "var(--surface)" } : undefined}
-      onClick={(e) => { if (!file?.keepSelection && (e.target === e.currentTarget || e.target.closest(".timeline, .grid-year-labels-overlay"))) handleSelect(null); }}
+      onClick={(e) => { if (!file?.keepSelection && (e.target === e.currentTarget || (e.target as Element).closest(".timeline, .grid-year-labels-overlay"))) handleSelect(null); }}
       onContextMenu={handleContextMenu}
     >
       {!fontReady && !showMap && <div className="timeline-loading">Loading…</div>}
@@ -3813,7 +3812,7 @@ const TimelineView = forwardRef(function TimelineView({
                           top: `${spanRenderTopById.get(span.id) ?? span.top}px`,
                           height: `${span.spanHeight ?? 20}px`,
                           background: span.color || "var(--secondary-text)",
-                        }}
+                        } as any}
                         onClick={(e) => {
                           e.stopPropagation();
                           handleSelect(span.id);
@@ -3903,7 +3902,7 @@ const TimelineView = forwardRef(function TimelineView({
                         }}
                       >
                         {event.thumbnail && (event.thumbnailStyle === "square-fill" || event.thumbnailStyle === "circle-fill") ? (
-                          <img className={event.thumbnailStyle === "circle-fill" ? "event-thumbnail-circle" : "event-thumbnail-square"} src={event.thumbnail} alt="" style={{ objectFit: event.thumbnailFit || "cover" }} onError={(e) => { e.target.style.display = 'none'; }} />
+                          <img className={event.thumbnailStyle === "circle-fill" ? "event-thumbnail-circle" : "event-thumbnail-square"} src={event.thumbnail} alt="" style={{ objectFit: event.thumbnailFit || "cover" }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                         ) : (<>
                         {event.thumbnail && event.thumbnailStyle !== "banner" && <div className="event-thumbnail-tile" style={{ backgroundImage: `url("${event.thumbnail}")`, backgroundSize: event.thumbnailFit || "cover" }} />}
                         {event.thumbnail && event.thumbnailStyle === "banner" && <img className="event-thumbnail-banner" src={event.thumbnail} alt="" style={{ objectFit: event.thumbnailFit || "cover" }} />}
@@ -4003,7 +4002,7 @@ const TimelineView = forwardRef(function TimelineView({
                   top: `${spanRenderTopById.get(span.id) ?? span.top}px`,
                   height: `${span.spanHeight ?? 20}px`,
                   background: span.color || "var(--secondary-text)",
-                }}
+                } as any}
                 onClick={(e) => {
                   e.stopPropagation();
                   handleSelect(span.id);
@@ -4233,7 +4232,7 @@ const TimelineView = forwardRef(function TimelineView({
                 }}
               >
                 {event.thumbnail && event.thumbnailStyle === "square-fill" ? (
-                  <img className="event-thumbnail-square" src={event.thumbnail} alt="" style={{ objectFit: event.thumbnailFit || "cover" }} onError={(e) => { e.target.style.display = 'none'; }} />
+                  <img className="event-thumbnail-square" src={event.thumbnail} alt="" style={{ objectFit: event.thumbnailFit || "cover" }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                 ) : (<>
                 {event.thumbnail && event.thumbnailStyle !== "banner" && <div className="event-thumbnail-tile" style={{ backgroundImage: `url("${event.thumbnail}")`, backgroundSize: event.thumbnailFit || "cover" }} />}
                 {event.thumbnail && event.thumbnailStyle === "banner" && <img className="event-thumbnail-banner" src={event.thumbnail} alt="" style={{ objectFit: event.thumbnailFit || "cover" }} />}

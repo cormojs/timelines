@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TimelineView from "../components/TimelineView";
 import SpreadsheetView from "../components/SpreadsheetView";
@@ -526,7 +525,7 @@ export default function ViewerApp() {
         element.tags.forEach((tag) => { if (tag) tags.add(tag); });
       }
     });
-    return Array.from(tags).sort((a, b) => a.localeCompare(b));
+    return (Array.from(tags) as string[]).sort((a, b) => a.localeCompare(b));
   }, [timelineData]);
 
   useEffect(() => {

@@ -1,4 +1,3 @@
-// @ts-nocheck
 ﻿import { useState, useEffect, useRef, useMemo } from "react";
 import { File, FilePlus, Copy, Trash2, Settings, ArrowLeft, Folder, Plus, Store, X, LayoutGrid, List, MoreVertical, Pencil, RotateCcw, ArrowUpAZ, ArrowDownAZ, Clock, ChevronRight, Search, Import, Cloud, CloudOff, RefreshCw, AlertTriangle, CheckCircle2, History, ExternalLink, Share2 } from "lucide-react";
 import { createFolder, listFolders, moveTimeline, renameFolder, updateTimelineTitle, deleteFolder, moveFolder } from "../utils/electronApi.ts";
@@ -251,7 +250,7 @@ export default function HomePage({
   keybinds = cloneDefaultKeybinds(),
   onKeybindsChange,
   thumbnailRefreshSignal = 0,
-}) {
+}: any) {
   const [timelineFiles, setTimelineFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isNewTimelineModalOpen, setIsNewTimelineModalOpen] = useState(false);
@@ -477,7 +476,7 @@ export default function HomePage({
     }
   };
 
-  const saveGitSyncSettings = async (partial = {}) => {
+  const saveGitSyncSettings = async (partial: any = {}) => {
     if (!window.electron?.gitSyncUpdateSettings) return;
     const payload = {
       autoSync: partial.autoSync ?? gitSyncAuto,
@@ -1275,7 +1274,7 @@ export default function HomePage({
       next.delete(targetKey);
       next.delete(targetId);
     } else {
-      for (const e of [...next]) {
+      for (const e of [...next] as string[]) {
         const eId = e.endsWith("/") ? e.slice(0, -1) : e;
         if (eId === targetId || eId.startsWith(`${targetId}/`)) next.delete(e);
       }
@@ -1925,7 +1924,7 @@ export default function HomePage({
                               value={appThemeKey || ""}
                               onChange={(e) => onAppThemeChange?.(e.target.value)}
                             >
-                              {appThemes.map(([key, theme]) => {
+                              {(appThemes as [string, any][]).map(([key, theme]) => {
                                 const isDefault = key.toLowerCase() === "parchment_v2";
                                 const label = `${themeOptionLabel(key, theme)}${isDefault ? " (Default)" : ""}`;
                                 return (
@@ -1934,7 +1933,7 @@ export default function HomePage({
                                   </option>
                                 );
                               })}
-                              {userThemes.map(([key, theme]) => (
+                              {(userThemes as [string, any][]).map(([key, theme]) => (
                                 <option key={key} value={key}>
                                   {themeOptionLabel(key, theme)}
                                 </option>
@@ -2069,7 +2068,7 @@ export default function HomePage({
 
                 {settingsSection === "hotkeys" && (
                   <>
-                    {Object.entries(keybinds).map(([id, { label, keys }]) => (
+                    {(Object.entries(keybinds) as [string, any][]).map(([id, { label, keys }]) => (
                       <div className="settings-row" key={id}>
                         <div className="settings-row-left">
                           <div className="settings-row-label">{label}</div>

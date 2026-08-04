@@ -1,17 +1,25 @@
-// @ts-nocheck
-import { Component } from "react";
+import { Component, type ErrorInfo, type ReactNode } from "react";
 
-export default class ErrorBoundary extends Component {
-  constructor(props) {
+type ErrorBoundaryProps = {
+  children: ReactNode;
+  name: string;
+};
+
+type ErrorBoundaryState = {
+  error: Error | null;
+};
+
+export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { error: null };
   }
 
-  static getDerivedStateFromError(error) {
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { error };
   }
 
-  componentDidCatch(error, info) {
+  componentDidCatch(error: Error, info: ErrorInfo) {
     console.error(`[ErrorBoundary: ${this.props.name}]`, error, info.componentStack);
   }
 

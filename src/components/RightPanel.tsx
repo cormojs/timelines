@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from "react";
 import { Maximize2, Minimize2, Underline, Link, Trash2, Unlink, ChevronLeft, ChevronRight, ChevronDown, Pencil, ExternalLink, Calendar, Clock, FileText, BookOpen, ImagePlus, RotateCcw, X } from "lucide-react";
 import NoteEditor from "./NoteEditor";
@@ -59,7 +58,7 @@ export default function RightPanel({
   nextElement,
   readOnly = false,
   onClose,
-}) {
+}: any) {
   const [formData, setFormData] = useState(null);
   const [validationErrors, setValidationErrors] = useState([]);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -570,13 +569,13 @@ export default function RightPanel({
         });
       }
     });
-    return Array.from(tags).sort((a, b) => a.localeCompare(b));
+    return (Array.from(tags) as string[]).sort((a, b) => a.localeCompare(b));
   }, [timelineData]);
 
   const tagSuggestions = useMemo(() => {
     const needle = tagQuery.trim().toLowerCase();
     if (!needle) return tagCandidates;
-    return tagCandidates.filter((tag) => tag.toLowerCase().includes(needle));
+    return (tagCandidates as string[]).filter((tag) => tag.toLowerCase().includes(needle));
   }, [tagCandidates, tagQuery]);
 
   const setSpanParent = (spanId) => {
@@ -993,9 +992,10 @@ export default function RightPanel({
                     className="note-render"
                     ref={noteViewCallbackRef}
                     onClick={(e) => {
-                      if (e.target.tagName !== "INPUT" || e.target.type !== "checkbox") return;
+                      const target = e.target as HTMLInputElement;
+                      if (target.tagName !== "INPUT" || target.type !== "checkbox") return;
                       e.preventDefault();
-                      const idx = parseInt(e.target.getAttribute("data-idx"), 10);
+                      const idx = parseInt(target.getAttribute("data-idx") || "", 10);
                       if (!isNaN(idx) && !readOnly) handleTaskToggle(idx);
                     }}
                   />
@@ -1102,8 +1102,8 @@ export default function RightPanel({
                         </button>
                         <input
                           ref={(node) => {
-                            if (node) datePickerRefs.current.date = node;
-                            else delete datePickerRefs.current.date;
+                            if (node) (datePickerRefs.current as any).date = node;
+                            else delete (datePickerRefs.current as any).date;
                           }}
                           type="date"
                           tabIndex={-1}
@@ -1151,8 +1151,8 @@ export default function RightPanel({
                         </button>
                         <input
                           ref={(node) => {
-                            if (node) datePickerRefs.current.start = node;
-                            else delete datePickerRefs.current.start;
+                            if (node) (datePickerRefs.current as any).start = node;
+                            else delete (datePickerRefs.current as any).start;
                           }}
                           type="date"
                           tabIndex={-1}
@@ -1198,8 +1198,8 @@ export default function RightPanel({
                         </button>
                         <input
                           ref={(node) => {
-                            if (node) datePickerRefs.current.end = node;
-                            else delete datePickerRefs.current.end;
+                            if (node) (datePickerRefs.current as any).end = node;
+                            else delete (datePickerRefs.current as any).end;
                           }}
                           type="date"
                           tabIndex={-1}
@@ -1853,7 +1853,8 @@ export default function RightPanel({
                     } catch {
                       ext = formData.thumbnail.split('.').pop()?.split('?')[0]?.toLowerCase() ?? '';
                     }
-                    setThumbnailMeta({ width: e.target.naturalWidth, height: e.target.naturalHeight, ext });
+                    const image = e.target as HTMLImageElement;
+                    setThumbnailMeta({ width: image.naturalWidth, height: image.naturalHeight, ext });
                   }}
                 />
                 <div className="thumbnail-full-topbar">
@@ -1941,7 +1942,7 @@ export default function RightPanel({
                       if (!file) return;
                       const ext = file.name.split('.').pop().toLowerCase();
                       if (!['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'avif'].includes(ext)) return;
-                      const filePath = window.electron?.getPathForFile?.(file) ?? file.path;
+                      const filePath = window.electron?.getPathForFile?.(file) ?? (file as any).path;
                       const url = await handleDropThumbnail(filePath);
                       if (!url) return;
                       const next = { ...formData, thumbnail: url };

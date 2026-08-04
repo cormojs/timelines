@@ -1,4 +1,3 @@
-// @ts-nocheck
 const STORAGE_KEY = "timelines-app-settings";
 
 export async function getAppSettings() {

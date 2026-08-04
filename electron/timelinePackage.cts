@@ -1,4 +1,3 @@
-// @ts-nocheck
 // Packaged .timeline format: a zip holding timeline.json (identical to the bare
 // format), assets/, notes/, and manifest.json. The same shape is read in the
 // browser viewer via src/utils/packageReader.ts; keep the two in sync.
@@ -25,7 +24,7 @@ const DETERMINISTIC_MTIME = new Date('2000-01-01T00:00:00Z');
 // files: { 'assets/img.png': Uint8Array, 'notes/note.md': Uint8Array }
 // opts.deterministic: sorted entries, stored (level 0), fixed mtime, so an
 // unchanged timeline zips byte-identically; used by git sync mirror exports
-function buildPackage(timelineJson, files = {}, opts = {}) {
+function buildPackage(timelineJson: string, files: Record<string, any> = {}, opts: { deterministic?: boolean } = {}) {
   const entries = {
     'manifest.json': strToU8(JSON.stringify({ format: 'timeline-package', version: PACKAGE_FORMAT_VERSION }, null, 2)),
     'timeline.json': strToU8(timelineJson),

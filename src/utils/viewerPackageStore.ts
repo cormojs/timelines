@@ -1,9 +1,18 @@
-// @ts-nocheck
 // In-memory contents of a packaged .timeline opened in the web viewer.
 // Desktop-only note/asset references resolve against this store instead of
 // the filesystem when running in the browser.
 
-let current = null; // { notes: { rel: string }, assetUrls: { rel: blobUrl } }
+type ViewerPackage = {
+  notes?: Record<string, string>;
+  assets?: Record<string, BlobPart>;
+};
+
+type ViewerPackageStore = {
+  notes: Record<string, string>;
+  assetUrls: Record<string, string>;
+};
+
+let current: ViewerPackageStore | null = null;
 
 // Mirrors sanitizeNoteFilename in electron/main.cts so bare noteFile refs
 // find the entry the desktop app would have written
@@ -18,7 +27,7 @@ const sanitizeNoteFilename = (value) => {
   return `${cleaned || "note"}.md`;
 };
 
-const MIME_BY_EXT = {
+const MIME_BY_EXT: Record<string, string> = {
   png: "image/png",
   jpg: "image/jpeg",
   jpeg: "image/jpeg",
@@ -31,7 +40,7 @@ const MIME_BY_EXT = {
 };
 
 // pkg: { notes, assets } from packageReader; pass null to clear
-export function setViewerPackage(pkg) {
+export function setViewerPackage(pkg: ViewerPackage | null) {
   if (current) {
     Object.values(current.assetUrls).forEach((url) => URL.revokeObjectURL(url));
   }
@@ -39,15 +48,15 @@ export function setViewerPackage(pkg) {
     current = null;
     return;
   }
-  const assetUrls = {};
+  const assetUrls: Record<string, string> = {};
   for (const [rel, bytes] of Object.entries(pkg.assets || {})) {
-    const ext = rel.split(".").pop().toLowerCase();
+    const ext = rel.split(".").pop()?.toLowerCase() ?? "";
     assetUrls[rel] = URL.createObjectURL(new Blob([bytes], { type: MIME_BY_EXT[ext] || "application/octet-stream" }));
   }
   current = { notes: pkg.notes || {}, assetUrls };
 }
 
-export function getPackageNote(filename) {
+export function getPackageNote(filename: string | null | undefined) {
   if (!current) return null;
   const raw = String(filename || "").replace(/\\/g, "/");
   if (Object.prototype.hasOwnProperty.call(current.notes, raw)) return current.notes[raw];
@@ -58,7 +67,7 @@ export function getPackageNote(filename) {
   return null;
 }
 
-export function resolvePackageAssetSrc(src) {
+export function resolvePackageAssetSrc(src: string | null | undefined) {
   if (!current) return null;
   const key = String(src || "").replace(/\\/g, "/");
   return current.assetUrls[key] || null;

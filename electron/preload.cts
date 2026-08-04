@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
-contextBridge.exposeInMainWorld('electron', {
+const electronApi = {
   saveTimeline: (data, filename, options) => ipcRenderer.invoke('save-timeline', { data, filename, create: options?.create === true }),
   saveTimelineThumbnail: (payload) => ipcRenderer.invoke('save-timeline-thumbnail', payload),
   listTimelines: () => ipcRenderer.invoke('list-timelines'),
@@ -87,4 +87,8 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.removeAllListeners('updater-status');
   },
   platform: process.platform,
-});
+};
+
+export type ElectronApi = typeof electronApi;
+
+contextBridge.exposeInMainWorld('electron', electronApi);

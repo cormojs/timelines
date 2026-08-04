@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { getPackageNote } from './viewerPackageStore';
 
 // Check if running in Electron

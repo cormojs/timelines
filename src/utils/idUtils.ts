@@ -63,7 +63,7 @@ export function ensureUniqueElementIds(elements) {
   return changed ? next : elements;
 }
 
-export function generateUniqueRandomElementId(elements, type = "item", excludeId) {
+export function generateUniqueRandomElementId(elements, type = "item", excludeId = undefined) {
   const ids = new Set((elements || []).map((el) => String(el.id)));
   if (excludeId) ids.delete(String(excludeId));
   const prefix = String(type || "item").trim().toLowerCase();

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useState, useMemo, useCallback, useRef, useEffect, useLayoutEffect } from "react";
 import {
   ChevronUp, ChevronDown, ChevronsUpDown,
@@ -47,7 +46,7 @@ export default function SpreadsheetView({
   pinnedTags = [],
   onTogglePinnedTag,
   readOnly = false,
-}) {
+}: any) {
   const [editCell, setEditCell] = useState(null);
   const [editValue, setEditValue] = useState("");
   const [selectedCell, setSelectedCell] = useState(null); // { id, field } selection anchor
@@ -735,7 +734,7 @@ export default function SpreadsheetView({
     const val = e.target.value;
     setEditValue(val);
     const q = val.trim().toLowerCase();
-    const used = new Set(elements.map((x) => x.noteFile).filter(Boolean));
+    const used = new Set<string>(elements.map((x) => x.noteFile).filter(Boolean));
     const matches = [...used].filter((f) => f.toLowerCase().includes(q));
     setNoteDropdown(matches);
     if (matches.length > 0 && noteInputRef.current) {
@@ -794,7 +793,7 @@ export default function SpreadsheetView({
     if (!t) { setNewSourceCellId(null); setNewSourceTitle(""); setNewSourceUrl(""); setNewSourceDesc(""); return; }
     const el = elements.find((x) => x.id === elId);
     if (!el) return;
-    const src = { title: t };
+    const src: { title: string; url?: string; description?: string } = { title: t };
     const u = newSourceUrl.trim();
     if (u) src.url = u;
     const d = newSourceDesc.trim();

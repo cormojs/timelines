@@ -1,17 +1,30 @@
-// @ts-nocheck
 import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from "react";
 import { Heading1, Heading2, Heading3, Bold, Italic, Strikethrough, Underline, Highlighter, Link2, Trash2, Unlink, ImagePlay, Paperclip } from "lucide-react";
 
-const NoteEditor = forwardRef(function NoteEditor(
+type NoteEditorProps = {
+  initialContent?: string;
+  isNoteLoading: boolean;
+  noteExists: boolean;
+  onSave: (content: string) => void | Promise<void>;
+  onUnlink: () => void;
+  onDelete: () => void | Promise<void>;
+  onPickLocalImage?: () => string | null | Promise<string | null>;
+};
+
+export type NoteEditorHandle = {
+  save: () => void;
+};
+
+const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function NoteEditor(
   { initialContent, isNoteLoading, noteExists, onSave, onUnlink, onDelete, onPickLocalImage },
   ref
 ) {
   const [noteContent, setNoteContent] = useState(initialContent ?? "");
   const noteContentRef = useRef(noteContent);
-  const textareaRef = useRef(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   noteContentRef.current = noteContent;
   const savedContentRef = useRef(initialContent ?? "");
-  const saveTimerRef = useRef(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onSaveRef = useRef(onSave);
   onSaveRef.current = onSave;
 
@@ -74,7 +87,7 @@ const NoteEditor = forwardRef(function NoteEditor(
     });
   };
 
-  const insertHeading = (level) => {
+  const insertHeading = (level: number) => {
     const textarea = textareaRef.current;
     if (!textarea) return;
     const start = textarea.selectionStart ?? 0;

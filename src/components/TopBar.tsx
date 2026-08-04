@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { Minus, Square, X, PanelLeft, PanelRight, Lock, LockOpen } from "lucide-react";
 
 export default function TopBar({
@@ -10,7 +9,7 @@ export default function TopBar({
   onToggleRight,
   rightLockState,
   onCycleRightLock,
-}) {
+}: any) {
   const isElectron = window.electron !== undefined;
 
   const handleMinimize = () => {

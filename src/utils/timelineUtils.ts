@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { daysInMonth, displayDateLabel, getActiveDateFormat, formatCalendarDate } from "./dateUtils";
 
 export const MONTH_LABELS = [
@@ -133,7 +132,7 @@ export function buildSpanChildPlacement(spans, branchOrdering = "later-first") {
     }
   }
 
-  for (const [parentId, childIds] of Object.entries(childrenByParent)) {
+  for (const [parentId, childIds] of Object.entries(childrenByParent) as [string, any[]][]) {
     // offset -1 = lower lane number = larger Y = BELOW parent (lower on screen)
     // offset +1 = higher lane number = smaller Y = ABOVE parent (higher on screen)
     const orderedChildren =
@@ -204,7 +203,7 @@ export function layoutSpans({
 
   const childToParent = {};
   const parentToChildren = {};
-  Object.entries(spanChildPlacement).forEach(([childId, { parentId }]) => {
+  Object.entries(spanChildPlacement).forEach(([childId, { parentId }]: [string, any]) => {
     childToParent[childId] = parentId;
     if (!parentToChildren[parentId]) parentToChildren[parentId] = [];
     parentToChildren[parentId].push(childId);
@@ -532,7 +531,7 @@ export function layoutSpans({
 
     // Densify lane indexes to remove empty gaps between used lanes.
     // This prevents visual blank rows when some lane numbers end up unused.
-    const usedLaneSet = new Set();
+    const usedLaneSet = new Set<number>();
     finalSpans.forEach((span) => {
       usedLaneSet.add(span.lane);
       if (isThickSpan(span)) usedLaneSet.add(span.lane + 1);

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useMemo, useState, useEffect, useRef, useLayoutEffect, Fragment } from "react";
 import { parseFilterQuery, matchesFilter } from "../utils/filterUtils";
 import { PanelLeft, PanelRight, ChevronDown, FilePlus, File, Copy, FileJson, Image, Video, Settings, ChevronRight, ArrowLeft, Edit2, Trash2, Plus, Tag, Eye, EyeOff, Target, List, Layers3, Search, MoreVertical, Square, SquareDashed, ArrowUpDown, Check, Package } from "lucide-react";
@@ -216,7 +215,7 @@ export default function Sidebar({
   onPatchFile,
   keybinds = {},
   readOnly = false,
-}) {
+}: any) {
   const isMac = navigator.userAgent?.includes("Mac");
   const formatKeybind = (bind) => {
     if (!bind?.keys?.length) return "";
@@ -1748,7 +1747,7 @@ export default function Sidebar({
                       }
                     }}
                     onDragLeave={(e) => {
-                      if (!e.currentTarget.contains(e.relatedTarget)) setDividerDragOver(false);
+                      if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDividerDragOver(false);
                     }}
                     onDrop={(e) => {
                       e.preventDefault();
@@ -1796,7 +1795,7 @@ export default function Sidebar({
                         }
                       }}
                       onDragLeave={(e) => {
-                        if (!e.currentTarget.contains(e.relatedTarget)) {
+                        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
                           setDragOverPlacement((prev) => (prev?.id === group.id ? null : prev));
                         }
                       }}
@@ -1979,7 +1978,7 @@ export default function Sidebar({
                     }
                   }}
                   onDragLeave={(e) => {
-                    if (!e.currentTarget.contains(e.relatedTarget)) setDividerDragOver(false);
+                    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDividerDragOver(false);
                   }}
                   onDrop={(e) => {
                     e.preventDefault();

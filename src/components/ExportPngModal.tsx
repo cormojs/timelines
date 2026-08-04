@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { ArrowLeft } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { formatYear } from "../utils/timelineUtils";
@@ -14,7 +13,12 @@ const RESOLUTION_OPTIONS = [
   { value: 'custom', label: 'Custom', width: null, height: null },
 ];
 
-export default function ExportPngModal({ isOpen, onClose, onExport, timelineData, timelineViewRef }) {
+type PreviewOptions = {
+  transparentBg?: boolean;
+  customBg?: string;
+};
+
+export default function ExportPngModal({ isOpen, onClose, onExport, timelineData, timelineViewRef }: any) {
   const [filename, setFilename] = useState("");
   const [previewData, setPreviewData] = useState(null);
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
@@ -104,7 +108,7 @@ export default function ExportPngModal({ isOpen, onClose, onExport, timelineData
     previewTimeoutRef.current = setTimeout(async () => {
       setIsGeneratingPreview(true);
       try {
-        let previewOpts = {};
+        const previewOpts: PreviewOptions = {};
         if (bgOption === 'transparent') {
           previewOpts.transparentBg = true;
         } else if (bgOption === 'secondary' || bgOption === 'tertiary') {
@@ -217,7 +221,7 @@ export default function ExportPngModal({ isOpen, onClose, onExport, timelineData
       targetHeight = selectedRes.height;
     }
 
-    let exportBgOpts = {};
+    const exportBgOpts: PreviewOptions = {};
     if (bgOption === 'transparent') {
       exportBgOpts.transparentBg = true;
     } else if (bgOption === 'secondary' || bgOption === 'tertiary') {

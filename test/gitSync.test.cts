@@ -1,4 +1,3 @@
-// @ts-nocheck
 // gitSync engine tests against a real local bare repo (no GitHub): export
 // pass, delete tracking, commit summaries, reconcile with conflict copies,
 // and the import pass, using two fake machine libraries A and B.
@@ -43,7 +42,7 @@ function makeLibrary() {
         for (const [k, v] of Object.entries(t.notes)) files[`notes/${k}`] = strToU8(v);
         return buildPackage(JSON.stringify(data, null, 2), files, { deterministic: true });
       },
-      importPackage: async (buf, opts = {}) => {
+      importPackage: async (buf: any, opts: any = {}) => {
         const pkg = readPackage(buf);
         const data = JSON.parse(pkg.timelineJson);
         let uid = data.file.uid;

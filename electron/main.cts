@@ -1,4 +1,3 @@
-// @ts-nocheck
 const { app, BrowserWindow, ipcMain, dialog, Menu, shell, protocol, net, session, safeStorage } = require('electron');
 const path = require('path');
 const { pathToFileURL } = require('url');
@@ -765,7 +764,7 @@ async function collectPackageFiles(data, storageId) {
     } catch {}
     if (content === null) { skipped.push(el.noteFile); continue; }
 
-    for (const src of extractNoteImageSrcs(content)) {
+    for (const src of extractNoteImageSrcs(content) as string[]) {
       if (src.startsWith('timelines-asset://')) {
         const decoded = decodeAssetUrl(src);
         const normalizedRoot = path.normalize(assetsRoot);
@@ -870,7 +869,7 @@ async function overwriteExistingTimeline(data, pkg, existing, opts) {
   if (pkg) {
     const assetsRoot = await getAssetsRootDir();
     const assetsDir = await getAssetsDir(storageId);
-    for (const [rel, bytes] of Object.entries(pkg.assets)) {
+    for (const [rel, bytes] of Object.entries(pkg.assets) as [string, any][]) {
       const target = rel.includes('/') ? path.join(assetsRoot, ...rel.split('/')) : path.join(assetsDir, rel);
       await fs.mkdir(path.dirname(target), { recursive: true });
       await fs.writeFile(target, Buffer.from(bytes));
@@ -903,7 +902,7 @@ async function overwriteExistingTimeline(data, pkg, existing, opts) {
 }
 
 // Installs a timeline (JSON or zip) from bytes; opts: sourcePath, resolution (open-existing|copy|overwrite), preferredRelId, titleSuffix. Throws on bad input.
-async function installTimelineFromBuffer(buf, opts = {}) {
+async function installTimelineFromBuffer(buf: any, opts: any = {}) {
   const { sourcePath = null, resolution = null } = opts;
   let pkg = null;
   let data;
@@ -1154,7 +1153,7 @@ ipcMain.handle('import-timeline', async (event, payload) => {
 
     const buf = await fs.readFile(sourcePath);
     const result = await installTimelineFromBuffer(buf, { sourcePath, resolution });
-    if (result?.success && !result?.openedExisting) {
+    if ((result as any)?.success && !(result as any)?.openedExisting) {
       markGitSyncStructureDirty();
     }
     return result;
@@ -1421,7 +1420,7 @@ ipcMain.handle('create-note', async (event, { timelineId, title, elementId }) =>
   }
 });
 
-ipcMain.handle('add-existing-note', async (event, { timelineId } = {}) => {
+ipcMain.handle('add-existing-note', async (event, { timelineId }: any = {}) => {
   try {
     if (!timelineId) {
       return { success: false, error: 'Missing timelineId' };

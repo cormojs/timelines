@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { renderNoteMarkdown } from "../utils/noteUtils";
 import { createNote, addExistingNote, readNote, writeNote, deleteNote, getNotesBaseDir, getAssetsBaseDir, pickAndImportImage, importImageFromPath } from "../utils/electronApi";

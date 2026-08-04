@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 
@@ -154,7 +153,7 @@ export function sanitizeNoteHtml(html, baseUrl = "", basePath = "", assetsBasePa
 
     if (tagName === "input" && node.getAttribute("type") === "checkbox") {
       node.removeAttribute("disabled");
-      node.setAttribute("data-idx", checkboxIdx++);
+      node.setAttribute("data-idx", String(checkboxIdx++));
     }
   });
 

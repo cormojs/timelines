@@ -31,6 +31,7 @@ export default defineConfig([
         argsIgnorePattern: '^_',
       }],
       '@typescript-eslint/ban-ts-comment': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-require-imports': 'off',
       'no-empty': 'off',
       'no-irregular-whitespace': 'off',

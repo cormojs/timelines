@@ -1,5 +1,14 @@
-// @ts-nocheck
-export const getInitialThemeKey = (themeConfig) => {
+type Theme = {
+  colors?: Record<string, string>;
+  [key: string]: any;
+};
+
+type ThemeConfig = {
+  activeTheme?: string;
+  themes?: Record<string, Theme>;
+};
+
+export const getInitialThemeKey = (themeConfig: ThemeConfig) => {
   if (themeConfig.activeTheme && themeConfig.themes?.[themeConfig.activeTheme]) {
     return themeConfig.activeTheme;
   }
@@ -8,7 +17,7 @@ export const getInitialThemeKey = (themeConfig) => {
   return keys[0] || "warm";
 };
 
-export const applyTheme = (themeConfig, themeKey) => {
+export const applyTheme = (themeConfig: ThemeConfig, themeKey: string) => {
   const themes = themeConfig.themes || {};
   const fallbackKey = themeConfig.activeTheme || Object.keys(themes)[0];
   const theme = themes[themeKey] || themes[fallbackKey];
