@@ -1,0 +1,121 @@
+export type TimelineElementType = 'event' | 'span' | 'era'
+
+export type TimelineSource = {
+  title?: string
+  url?: string
+  [key: string]: unknown
+}
+
+export type TimelineElement = {
+  id: string | number
+  type: TimelineElementType
+  title?: string
+  description?: string
+  date?: number
+  end?: number
+  start?: number
+  _start?: number
+  _end?: number
+  groupId?: string
+  parent?: string | number
+  mergeParent?: string | number
+  tags?: string[]
+  sources?: TimelineSource[]
+  thumbnail?: string
+  thumbnailStyle?: string
+  thumbnailFit?: string
+  color?: string
+  icon?: string
+  lat?: number | string
+  lng?: number | string
+  wikiUrl?: string
+  useWiki?: boolean
+  hideDetails?: boolean
+  hideName?: boolean
+  hideYears?: boolean
+  fuzzyStart?: boolean
+  fuzzyEnd?: boolean
+  eventLineStyle?: string
+  eventBorderStyle?: string
+  spanSize?: string
+  eraSize?: string
+  noteFile?: string
+  parents?: (string | number)[]
+  extendFrom?: string | number
+  [key: string]: unknown
+}
+
+export type TimelineGroup = {
+  id: string
+  title?: string
+  order?: number
+  stack?: number
+  visible?: boolean
+  locked?: boolean
+  belowLine?: boolean
+  bgColor?: string
+  hideBand?: boolean
+  [key: string]: unknown
+}
+
+export type TimelineFile = {
+  id?: string
+  uid?: string
+  title?: string
+  start?: number
+  end?: number
+  groups?: TimelineGroup[]
+  tagColors?: Record<string, string>
+  useCalendar?: boolean
+  negID?: string
+  posID?: string
+  hideDecimals?: boolean
+  panelGroupMode?: string
+  useEraGroupsInPanel?: boolean
+  nestEraSubGroups?: boolean
+  startLabel?: string
+  endLabel?: string
+  detailLevel?: number
+  tickDensity?: number
+  theme?: string
+  font?: string
+  layout?: string
+  useDays?: boolean
+  useMonths?: boolean
+  dateFormat?: string
+  scaleSections?: unknown[]
+  breaks?: unknown[]
+  scaleType?: string
+  logScaleFactor?: number
+  branchOrdering?: string
+  fixedEventHeight?: boolean
+  eventWidth?: number
+  eventFontSize?: number
+  compactEvents?: boolean
+  thinConnectors?: boolean
+  hideSpanConnectors?: boolean
+  eventLinesToGroupBottom?: boolean
+  showGrid?: boolean
+  showTodayLine?: boolean
+  spanColorEvents?: boolean
+  disableGroups?: boolean
+  autoHideEmptyGroups?: boolean
+  useSpreadsheet?: boolean
+  mapTileUrl?: string
+  mapEventMarker?: string
+  mapSpanMarker?: string
+  mapEraMarker?: string
+  mapLimitToViewportYear?: boolean
+  useWiki?: boolean
+  [key: string]: unknown
+}
+
+export type TimelineData = {
+  file: TimelineFile
+  elements: TimelineElement[]
+  [key: string]: unknown
+}
+
+export type Keybind = { label?: string; keys?: string[] }
+export type Keybinds = Record<string, Keybind>
+export type Callback = (...args: unknown[]) => unknown
