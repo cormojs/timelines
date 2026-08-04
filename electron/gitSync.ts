@@ -174,10 +174,87 @@ function getChangeTarget(change: unknown): string | undefined {
   return typeof change.to === 'string' ? change.to : undefined;
 }
 
-class GitSyncEngine {
-  [key: string]: DynamicValue;
+type GitSyncCredentials = { token: string; username?: string; authType?: string }
+type GitSyncState = {
+  url: string
+  branch: string
+  machineLabel?: string
+  uidToPath: Record<string, string>
+  excludedPaths?: string[]
+  writeReadme?: boolean
+  lastSyncedCommit?: string
+  [key: string]: unknown
+}
+type SyncTimeline = { uid: string; relativeId: string; neverSync?: boolean }
+type ImportResult = { success: boolean; uid?: string; id?: string; error?: string }
+type GitSyncSettingsUpdate = {
+  machineLabel?: string
+  excludedPaths?: string[]
+  autoSync?: boolean
+  debounceMs?: number
+  writeReadme?: boolean
+}
+type GitSyncCredentialsUpdate = { token?: string; username?: string; authType?: string }
+type GitSyncEngineOptions = {
+  repoDir: string
+  statePath: string
+  listTimelines: () => Promise<SyncTimeline[]>
+  buildPackageForTimeline: (timeline: SyncTimeline) => Promise<Uint8Array>
+  importPackage: (
+    buf: Uint8Array,
+    options?: { preferredRelId?: string; resolution?: string; silent?: boolean; titleSuffix?: string },
+  ) => Promise<ImportResult>
+  removeLocalTimeline: (uid: string) => Promise<ImportResult>
+  http?: typeof httpNode
+  fetch?: typeof fetch
+  onAuth?: () => { username?: string; password?: string }
+  author?: { name: string; email: string }
+  machineLabel?: string
+  onStatus?: (status: ReturnType<GitSyncEngine['getStatus']>) => void
+  onApplied?: (ids: string[]) => void
+  now?: () => Date
+  debounceMs?: number
+  autoSync?: boolean
+  loadCredentials?: () => Promise<GitSyncCredentials | null>
+  saveCredentials?: (credentials: GitSyncCredentials) => Promise<void>
+  clearCredentials?: () => Promise<void>
+}
 
-  constructor(opts: DynamicValue = {}) {
+class GitSyncEngine {
+  repoDir: string
+  statePath: string
+  listTimelines: GitSyncEngineOptions['listTimelines']
+  buildPackageForTimeline: GitSyncEngineOptions['buildPackageForTimeline']
+  importPackage: GitSyncEngineOptions['importPackage']
+  removeLocalTimeline: GitSyncEngineOptions['removeLocalTimeline']
+  http: typeof httpNode
+  fetch: typeof fetch
+  onAuth: NonNullable<GitSyncEngineOptions['onAuth']>
+  author: { name: string; email: string }
+  machineLabel: string
+  onStatus: GitSyncEngineOptions['onStatus'] | null
+  onApplied: GitSyncEngineOptions['onApplied'] | null
+  now: () => Date
+  debounceMs: number
+  autoSync: boolean
+  state: GitSyncState | null
+  loadCredentials: NonNullable<GitSyncEngineOptions['loadCredentials']>
+  saveCredentials: NonNullable<GitSyncEngineOptions['saveCredentials']>
+  clearCredentials: NonNullable<GitSyncEngineOptions['clearCredentials']>
+  credentials: GitSyncCredentials | null
+  dirtyUids: Set<string>
+  structureDirty: boolean
+  importing: boolean
+  statusState: string
+  lastError: Error | null
+  lastSyncedAt: string | null
+  conflictCopies: unknown[]
+  importErrors: unknown[]
+  exportErrors: unknown[]
+  _timer: ReturnType<typeof setTimeout> | null
+  _queue: Promise<unknown>
+
+  constructor(opts: GitSyncEngineOptions) {
     this.repoDir = opts.repoDir;
     this.statePath = opts.statePath;
     this.listTimelines = opts.listTimelines;
@@ -377,7 +454,7 @@ class GitSyncEngine {
     };
   }
 
-  async updateSettings({ machineLabel, excludedPaths, autoSync, debounceMs, writeReadme }: DynamicValue = {}) {
+  async updateSettings({ machineLabel, excludedPaths, autoSync, debounceMs, writeReadme }: GitSyncSettingsUpdate = {}) {
     if (machineLabel !== undefined) {
       const nextLabel = safeName(machineLabel) || this.machineLabel;
       this.machineLabel = nextLabel;
@@ -430,7 +507,7 @@ class GitSyncEngine {
     return walk(this.repoDir);
   }
 
-  async updateCredentials({ token, username = 'x-access-token', authType = 'pat' }: DynamicValue = {}) {
+  async updateCredentials({ token, username = 'x-access-token', authType = 'pat' }: GitSyncCredentialsUpdate = {}) {
     const trimmedToken = String(token || '').trim();
     if (!trimmedToken) throw new Error('Missing personal access token');
     const trimmedUsername = String(username || '').trim() || 'x-access-token';
