@@ -1,6 +1,6 @@
 type Theme = {
   colors?: Record<string, string>;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 type ThemeConfig = {

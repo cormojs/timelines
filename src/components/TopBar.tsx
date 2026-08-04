@@ -1,5 +1,16 @@
 import { Minus, Square, X, PanelLeft, PanelRight, Lock, LockOpen } from "lucide-react";
 
+type TopBarProps = {
+  title?: string;
+  version?: string;
+  isLeftCollapsed?: boolean;
+  onToggleLeft?: () => void;
+  isRightCollapsed?: boolean;
+  onToggleRight?: () => void;
+  rightLockState?: string;
+  onCycleRightLock?: () => void;
+};
+
 export default function TopBar({
   title = "Timelines",
   version,
@@ -9,7 +20,7 @@ export default function TopBar({
   onToggleRight,
   rightLockState,
   onCycleRightLock,
-}: any) {
+}: TopBarProps) {
   const isElectron = window.electron !== undefined;
 
   const handleMinimize = () => {
