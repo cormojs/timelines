@@ -12,15 +12,17 @@ type ElementInput = {
  * @param {string} type - The type prefix (event, span, era)
  * @returns {string} - The generated ID
  */
-export function generateIdFromTitle(title: unknown, type: string): string {
-  const sanitized = String(title || '')
+export function slugify(value: unknown): string {
+  return String(value || '')
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
     .replace(/\s+/g, '-') // Replace spaces with hyphens
     .replace(/-+/g, '-') // Replace multiple hyphens with single
     .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
+}
 
-  return `${type}-${sanitized}`;
+export function generateIdFromTitle(title: unknown, type: string): string {
+  return `${type}-${slugify(title)}`;
 }
 
 /**

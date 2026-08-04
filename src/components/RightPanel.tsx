@@ -276,7 +276,7 @@ export default function RightPanel({
   );
 
   const formatEditableDateInput = useCallback(
-    (value: number | undefined, label: unknown): string => {
+    (value: number | undefined, label: string | undefined): string => {
       if (label != null && label !== '') return stripEditableEraSuffix(formatDateForInput(label));
       if (!Number.isFinite(value)) return String(value ?? '');
       return stripEditableEraSuffix(
@@ -298,7 +298,7 @@ export default function RightPanel({
     ],
   );
 
-  const getPickerIsoValue = useCallback((inputValue: unknown, fallbackValue: number | undefined): string => {
+  const getPickerIsoValue = useCallback((inputValue: string, fallbackValue: number | undefined): string => {
     const parsed = parseTimelineInput(inputValue);
     const resolvedValue = Number.isFinite(parsed.value) ? parsed.value : fallbackValue;
     if (!Number.isFinite(resolvedValue)) return '';

@@ -1,5 +1,9 @@
+import { isValid, parse } from 'date-fns';
+import { Temporal } from '@js-temporal/polyfill';
+
 export type DatePrecision = 'year' | 'month' | 'day';
-export type DateFormat = 'MDY' | 'DMY' | 'ISO';
+export type DateFormat = 'MDY' | 'DMY' | 'YMD' | 'ISO';
+export type TimelineDateInput = string | number | null | undefined;
 type CalendarDate = {
   value: number;
   precision: DatePrecision;
@@ -13,9 +17,11 @@ type DateKeyword = Pick<CalendarDate, 'value' | 'precision'>;
 type DateParts = Pick<CalendarDate, 'year' | 'month' | 'day'>;
 
 export const daysInMonth = (year: number, month: number): number => {
-  const isLeap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
-  const monthDays = [31, isLeap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-  return monthDays[month - 1] || 0;
+  try {
+    return Temporal.PlainYearMonth.from({ year, month }).daysInMonth;
+  } catch {
+    return 0;
+  }
 };
 
 const precisionFromValue = (value: number): DatePrecision | null => {
@@ -26,32 +32,23 @@ const precisionFromValue = (value: number): DatePrecision | null => {
   return isMonthGrid ? 'month' : 'day';
 };
 
-const dateToFractionalYear = (date: Date): number => {
-  const year = date.getFullYear();
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
+const dateToFractionalYear = (date: Temporal.PlainDate): number => {
+  const { year, month, day } = date;
   return year + (month - 1) / 12 + (day - 1) / (daysInMonth(year, month) * 12);
 };
 
 // current date as a fractional year on the same day grid as parseTimelineInput
-export const todayFractionalYear = () => dateToFractionalYear(new Date());
+export const todayFractionalYear = () => dateToFractionalYear(Temporal.Now.plainDateISO());
 
 // Format is a display + input lens only; stored labels stay canonical ISO.
 let activeDateFormat: DateFormat = 'MDY';
 export const setActiveDateFormat = (fmt: string): void => {
-  activeDateFormat = fmt === 'DMY' || fmt === 'ISO' ? fmt : 'MDY';
+  activeDateFormat = fmt === 'DMY' || fmt === 'YMD' || fmt === 'ISO' ? fmt : 'MDY';
 };
 export const getActiveDateFormat = (): DateFormat => activeDateFormat;
 
-const pad2 = (n: number): string => String(n).padStart(2, '0');
 const normalizeYear = (y: number): number => (Number.isFinite(y) && y >= 0 && y <= 99 ? y + 2000 : y);
-
-// Canonical ISO stored label; year precision needs no label.
-const canonicalDateLabel = (year: number, month: number, day: number, precision: DatePrecision): string | null => {
-  if (precision === 'year') return null;
-  if (precision === 'month') return `${year}-${pad2(month)}`;
-  return `${year}-${pad2(month)}-${pad2(day)}`;
-};
+const PARSE_REFERENCE_DATE = new Date(0);
 
 export const formatCalendarDate = (
   year: number,
@@ -60,59 +57,83 @@ export const formatCalendarDate = (
   precision: DatePrecision,
   fmt: DateFormat = activeDateFormat,
 ): string => {
-  if (precision === 'year') return `${year}`;
-  if (precision === 'month') return fmt === 'ISO' ? `${year}-${pad2(month)}` : `${pad2(month)}/${year}`;
-  if (fmt === 'ISO') return `${year}-${pad2(month)}-${pad2(day)}`;
-  if (fmt === 'DMY') return `${pad2(day)}/${pad2(month)}/${year}`;
-  return `${pad2(month)}/${pad2(day)}/${year}`;
+  const date = Temporal.PlainDate.from({ year, month, day }, { overflow: 'reject' });
+  if (precision === 'year') return String(date.year);
+  if (fmt === 'YMD') {
+    const monthPart = String(date.month).padStart(2, '0');
+    return precision === 'day' ? `${date.year}/${monthPart}/${String(date.day).padStart(2, '0')}` : `${date.year}/${monthPart}`;
+  }
+
+  const locale = fmt === 'DMY' ? 'en-GB' : fmt === 'ISO' ? 'en-CA' : 'en-US';
+  const options: Intl.DateTimeFormatOptions = {
+    year: 'numeric',
+    month: '2-digit',
+    calendar: 'iso8601',
+    numberingSystem: 'latn',
+  };
+  if (precision === 'day') options.day = '2-digit';
+  return date.toLocaleString(locale, options);
 };
 
-const buildCalendarDate = (year: number, month: number, day: number, precision: DatePrecision): CalendarDate | null => {
-  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
-  if (month < 1 || month > 12) return null;
-  const maxDay = daysInMonth(year, month);
-  if (day < 1 || day > maxDay) return null;
-  return {
-    value: year + (month - 1) / 12 + (day - 1) / (maxDay * 12),
-    precision,
-    label: canonicalDateLabel(year, month, day, precision),
-    year,
-    month,
-    day,
-  };
+const buildCalendarDate = (date: Temporal.PlainDate, precision: DatePrecision): CalendarDate => ({
+  value: dateToFractionalYear(date),
+  precision,
+  label: precision === 'year' ? null : formatCalendarDate(date.year, date.month, date.day, precision, 'ISO'),
+  year: date.year,
+  month: date.month,
+  day: date.day,
+});
+
+const parsePlainDate = (value: string): CalendarDate | null => {
+  try {
+    return buildCalendarDate(Temporal.PlainDate.from(value), 'day');
+  } catch {
+    try {
+      const month = Temporal.PlainYearMonth.from(value);
+      return buildCalendarDate(month.toPlainDate({ day: 1 }), 'month');
+    } catch {
+      return null;
+    }
+  }
+};
+
+const parseFormattedDate = (value: string, format: string, precision: DatePrecision): CalendarDate | null => {
+  const parsed = parse(value, format, PARSE_REFERENCE_DATE);
+  if (!isValid(parsed)) return null;
+
+  try {
+    return buildCalendarDate(
+      Temporal.PlainDate.from({
+        year: normalizeYear(parsed.getFullYear()),
+        month: parsed.getMonth() + 1,
+        day: parsed.getDate(),
+      }),
+      precision,
+    );
+  } catch {
+    return null;
+  }
 };
 
 // ISO (dash) is auto-detected regardless of format; slash order follows the format.
 const parseCalendarDate = (raw: string, fmt: DateFormat = activeDateFormat): CalendarDate | null => {
-  const iso = /^(\d{4})-(\d{1,2})(?:-(\d{1,2}))?$/.exec(raw);
-  if (iso) {
-    const hasDay = iso[3] !== undefined;
-    return buildCalendarDate(Number(iso[1]), Number(iso[2]), hasDay ? Number(iso[3]) : 1, hasDay ? 'day' : 'month');
-  }
-  if (raw.includes('/')) {
-    const parts = raw.split('/').map((p) => p.trim());
-    if (parts.length === 2) {
-      return buildCalendarDate(normalizeYear(Number(parts[1])), Number(parts[0]), 1, 'month');
-    }
-    if (parts.length === 3) {
-      const [a, b, c] = parts.map(Number);
-      return fmt === 'DMY'
-        ? buildCalendarDate(normalizeYear(c), b, a, 'day')
-        : buildCalendarDate(normalizeYear(c), a, b, 'day');
-    }
-  }
-  return null;
+  const direct = parsePlainDate(raw);
+  if (direct) return direct;
+  const iso = parseFormattedDate(raw, 'yyyy-M-d', 'day') ?? parseFormattedDate(raw, 'yyyy-M', 'month');
+  if (iso) return iso;
+
+  const dayFormat = fmt === 'DMY' ? 'd/M/yyyy' : fmt === 'YMD' ? 'yyyy/M/d' : 'M/d/yyyy';
+  const monthFormat = fmt === 'YMD' ? 'yyyy/M' : 'M/yyyy';
+  return parseFormattedDate(raw, dayFormat, 'day') ?? parseFormattedDate(raw, monthFormat, 'month');
 };
 
 const DATE_KEYWORD_RE = /^(current|current-month|current-year|today|now)$/i;
 
-export const parseDateKeyword = (raw: unknown): DateKeyword | null => {
-  if (typeof raw !== 'string' || !DATE_KEYWORD_RE.test(raw.trim())) return null;
+export const parseDateKeyword = (raw: string): DateKeyword | null => {
+  if (!DATE_KEYWORD_RE.test(raw.trim())) return null;
   const kw = raw.trim().toLowerCase();
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
-  const day = now.getDate();
+  const now = Temporal.Now.plainDateISO();
+  const { year, month, day } = now;
   if (kw === 'current-year') return { value: year, precision: 'year' };
   if (kw === 'current-month') return { value: year + (month - 1) / 12, precision: 'month' };
   return {
@@ -130,8 +151,8 @@ const DYNAMIC_LABEL_NAMES: Record<string, string> = {
 };
 
 // Read-only display: keywords -> "This year (2026)", fixed dates -> active format.
-export const displayDateLabel = (label: unknown): string | null => {
-  if (typeof label !== 'string') return null;
+export const displayDateLabel = (label: string | null | undefined): string | null => {
+  if (label === null || label === undefined) return null;
   const kw = parseDateKeyword(label);
   if (kw !== null) {
     const { year, month, day } = fractionalYearToDate(kw.value);
@@ -144,8 +165,8 @@ export const displayDateLabel = (label: unknown): string | null => {
 };
 
 // Editable-field form: keywords stay literal so they can be re-typed.
-export const formatDateForInput = (label: unknown): string => {
-  if (typeof label !== 'string' || !label.trim()) return '';
+export const formatDateForInput = (label: string | null | undefined): string => {
+  if (!label?.trim()) return '';
   if (parseDateKeyword(label) !== null) return label.trim().toLowerCase();
   const cal = parseCalendarDate(label);
   if (cal) return formatCalendarDate(cal.year, cal.month, cal.day, cal.precision);
@@ -153,15 +174,13 @@ export const formatDateForInput = (label: unknown): string => {
 };
 
 // Legacy slash labels were always MM/DD/YYYY; upgrade to ISO regardless of active format.
-export function normalizeLegacyDateLabel(label: string): string;
-export function normalizeLegacyDateLabel(label: unknown): unknown;
-export function normalizeLegacyDateLabel(label: unknown): unknown {
-  if (typeof label !== 'string' || !label.includes('/')) return label;
+export const normalizeLegacyDateLabel = (label: string): string => {
+  if (!label.includes('/')) return label;
   const cal = parseCalendarDate(label, 'MDY');
   return cal ? cal.label : label;
-}
+};
 
-export const parseTimelineInput = (value: unknown): ParsedTimelineInput => {
+export const parseTimelineInput = (value: TimelineDateInput): ParsedTimelineInput => {
   if (value === null || value === undefined) {
     return { value: null, label: null, precision: null };
   }
@@ -169,7 +188,7 @@ export const parseTimelineInput = (value: unknown): ParsedTimelineInput => {
     return { value, label: null, precision: precisionFromValue(value) };
   }
 
-  const raw = String(value).trim();
+  const raw = typeof value === 'string' ? value.trim() : '';
   if (!raw) return { value: null, label: null, precision: null };
 
   // dynamic keywords stay labels so they re-resolve to the current date on every load

@@ -36,3 +36,9 @@ test('ensureUniqueElementIds assigns ids to elements missing one', async () => {
   assert.strictEqual(result[1].id, 'event-1');
   assert.strictEqual(new Set(result.map((e) => e.id)).size, 2);
 });
+
+test('slugify matches IDs generated from titles', async () => {
+  const { generateIdFromTitle, slugify } = await import('../src/utils/idUtils.ts');
+  assert.strictEqual(slugify(' A -- Timeline! '), 'a-timeline');
+  assert.strictEqual(generateIdFromTitle(' A -- Timeline! ', 'timeline'), 'timeline-a-timeline');
+});
