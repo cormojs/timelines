@@ -256,7 +256,7 @@ async function createWindow() {
     backgroundColor,
     frame: false,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.cts'),
+      preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
     },

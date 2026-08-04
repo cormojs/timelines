@@ -6,14 +6,17 @@
   "author": "sreegjl",
   "type": "module",
   "packageManager": "bun@1.2.19",
-  "main": "electron/main.cts",
+  "main": "electron-build/main.js",
   "scripts": {
     "dev": "vite",
     "dev:viewer": "vite --config vite.viewer.config.ts",
     "build": "vite build",
     "build:viewer": "vite build --config vite.viewer.config.ts && bun -e \"require('fs').renameSync('dist-viewer/viewer.html','dist-viewer/index.html')\"",
-    "electron:dev": "concurrently \"bun run dev\" \"wait-on tcp:5183 && cross-env NODE_ENV=development electron .\"",
-    "electron:build": "bun run build && electron-builder",
+    "build:electron": "bun build electron/main.cts --outdir electron-build --target=node --format=cjs --packages=external && bun build electron/preload.cts --outdir electron-build --target=node --format=cjs --packages=external",
+    "electron:dev": "concurrently \"bun run dev\" \"bun run build:electron && wait-on tcp:5183 && cross-env NODE_ENV=development electron .\"",
+    "electron:build": "bun run build && bun run build:electron && electron-builder",
+    "electron:build:win": "bun run build && bun run build:electron && electron-builder --win",
+    "electron:build:mac": "bun run build && bun run build:electron && electron-builder --mac",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "bun test"
@@ -27,7 +30,7 @@
     },
     "files": [
       "dist/**/*",
-      "electron/**/*"
+      "electron-build/**/*"
     ],
     "win": {
       "target": [
