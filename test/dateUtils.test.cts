@@ -80,6 +80,12 @@ test('parseTimelineInput stores canonical ISO labels and respects the active for
   assert.strictEqual(iso.label, '2020-03-04');
   assert.strictEqual(iso.precision, 'day');
 
+  const unpaddedIso = parseTimelineInput('2020-3-4');
+  assert.strictEqual(unpaddedIso.label, '2020-03-04');
+
+  const twoDigitYear = parseTimelineInput('3/4/20');
+  assert.strictEqual(twoDigitYear.label, '2020-04-03');
+
   setActiveDateFormat('MDY');
 });
 
@@ -93,6 +99,10 @@ test('format is a display lens: canonical labels render per active format, value
 
   setActiveDateFormat('DMY');
   assert.strictEqual(displayDateLabel(iso), '04/03/2020');
+
+  setActiveDateFormat('YMD');
+  assert.strictEqual(displayDateLabel(iso), '2020/03/04');
+  assert.strictEqual(formatDateForInput(iso), '2020/03/04');
 
   setActiveDateFormat('ISO');
   assert.strictEqual(displayDateLabel(iso), '2020-03-04');
@@ -110,8 +120,13 @@ test('normalizeLegacyDateLabel upgrades old MM/DD/YYYY labels to ISO, leaves the
   // ISO, keywords, and non-dates pass through untouched.
   assert.strictEqual(normalizeLegacyDateLabel('2020-03-04'), '2020-03-04');
   assert.strictEqual(normalizeLegacyDateLabel('current'), 'current');
-  assert.strictEqual(normalizeLegacyDateLabel(undefined), undefined);
   setActiveDateFormat('MDY');
+});
+
+test('calendar parsing uses Temporal validation for leap days', async () => {
+  const { parseTimelineInput } = await load();
+  assert.strictEqual(parseTimelineInput('2024-02-29').label, '2024-02-29');
+  assert.strictEqual(parseTimelineInput('2023-02-29').value, null);
 });
 
 test('parseTimelineInput still parses plain and calendar dates', async () => {

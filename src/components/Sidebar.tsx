@@ -748,7 +748,7 @@ export default function Sidebar({
     return [...pinned, ...rest].slice(0, 4);
   }, [allTags, pinnedTags]);
 
-  const formatRange = (start: number, end: number, startLabel: unknown, endLabel: unknown): string => {
+  const formatRange = (start: number, end: number, startLabel?: string, endLabel?: string): string => {
     const left = displayDateLabel(startLabel) ?? fmtYear(start);
     const right = displayDateLabel(endLabel) ?? fmtYear(end);
     return `${left} - ${right}`;
