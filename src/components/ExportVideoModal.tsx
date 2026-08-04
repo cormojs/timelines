@@ -29,7 +29,7 @@ const VIDEO_ZOOM_MAX = 1;
 
 type PreviewOptions = { transparentBg?: boolean; customBg?: string };
 
-export default function ExportVideoModal({ isOpen, onClose, timelineData, timelineViewRef }: any) {
+export default function ExportVideoModal({ isOpen, onClose, timelineData, timelineViewRef }: Record<string, DynamicValue>) {
   const [filename, setFilename] = useState("");
   const [previewData, setPreviewData] = useState(null);
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);

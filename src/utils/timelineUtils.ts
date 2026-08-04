@@ -132,7 +132,7 @@ export function buildSpanChildPlacement(spans, branchOrdering = "later-first") {
     }
   }
 
-  for (const [parentId, childIds] of Object.entries(childrenByParent) as [string, any[]][]) {
+  for (const [parentId, childIds] of Object.entries(childrenByParent) as [string, string[]][]) {
     // offset -1 = lower lane number = larger Y = BELOW parent (lower on screen)
     // offset +1 = higher lane number = smaller Y = ABOVE parent (higher on screen)
     const orderedChildren =
@@ -203,7 +203,7 @@ export function layoutSpans({
 
   const childToParent = {};
   const parentToChildren = {};
-  Object.entries(spanChildPlacement).forEach(([childId, { parentId }]: [string, any]) => {
+  Object.entries(spanChildPlacement).forEach(([childId, { parentId }]: [string, { parentId: string }]) => {
     childToParent[childId] = parentId;
     if (!parentToChildren[parentId]) parentToChildren[parentId] = [];
     parentToChildren[parentId].push(childId);

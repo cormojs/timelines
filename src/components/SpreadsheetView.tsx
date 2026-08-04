@@ -46,7 +46,7 @@ export default function SpreadsheetView({
   pinnedTags = [],
   onTogglePinnedTag,
   readOnly = false,
-}: any) {
+}: Record<string, DynamicValue>) {
   const [editCell, setEditCell] = useState(null);
   const [editValue, setEditValue] = useState("");
   const [selectedCell, setSelectedCell] = useState(null); // { id, field } selection anchor

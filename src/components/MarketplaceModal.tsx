@@ -16,8 +16,8 @@ export default function MarketplaceModal({
   appThemeKey,
   onAppThemeChange,
   onRefreshThemes,
-}: any) {
-  const [marketplaceThemes, setMarketplaceThemes] = useState<any[]>([]);
+}: Record<string, DynamicValue>) {
+  const [marketplaceThemes, setMarketplaceThemes] = useState<DynamicValue[]>([]);
   const [marketplaceError, setMarketplaceError] = useState("");
   const [marketplaceLoading, setMarketplaceLoading] = useState(false);
   const [marketplaceBusyId, setMarketplaceBusyId] = useState("");

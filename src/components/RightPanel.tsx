@@ -58,7 +58,7 @@ export default function RightPanel({
   nextElement,
   readOnly = false,
   onClose,
-}: any) {
+}: Record<string, DynamicValue>) {
   const [formData, setFormData] = useState(null);
   const [validationErrors, setValidationErrors] = useState([]);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -122,7 +122,7 @@ export default function RightPanel({
   const [isNoteCollapsed, setIsNoteCollapsed] = useState(false);
   const [thumbnailMeta, setThumbnailMeta] = useState(null);
   const panelRef = useRef(null);
-  const datePickerRefs = useRef({});
+  const datePickerRefs = useRef<Record<string, HTMLInputElement>>({});
   const TAG_MAX_LENGTH = 32;
   const ID_MAX_LENGTH = 60;
   const showCalendarInputIcon = timelineData?.file?.useCalendar === true;
@@ -1102,8 +1102,8 @@ export default function RightPanel({
                         </button>
                         <input
                           ref={(node) => {
-                            if (node) (datePickerRefs.current as any).date = node;
-                            else delete (datePickerRefs.current as any).date;
+                            if (node) datePickerRefs.current.date = node;
+                            else delete datePickerRefs.current.date;
                           }}
                           type="date"
                           tabIndex={-1}
@@ -1151,8 +1151,8 @@ export default function RightPanel({
                         </button>
                         <input
                           ref={(node) => {
-                            if (node) (datePickerRefs.current as any).start = node;
-                            else delete (datePickerRefs.current as any).start;
+                            if (node) datePickerRefs.current.start = node;
+                            else delete datePickerRefs.current.start;
                           }}
                           type="date"
                           tabIndex={-1}
@@ -1198,8 +1198,8 @@ export default function RightPanel({
                         </button>
                         <input
                           ref={(node) => {
-                            if (node) (datePickerRefs.current as any).end = node;
-                            else delete (datePickerRefs.current as any).end;
+                            if (node) datePickerRefs.current.end = node;
+                            else delete datePickerRefs.current.end;
                           }}
                           type="date"
                           tabIndex={-1}
@@ -1942,7 +1942,7 @@ export default function RightPanel({
                       if (!file) return;
                       const ext = file.name.split('.').pop().toLowerCase();
                       if (!['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'avif'].includes(ext)) return;
-                      const filePath = window.electron?.getPathForFile?.(file) ?? (file as any).path;
+                      const filePath = window.electron?.getPathForFile?.(file) ?? (file as File & { path?: string }).path;
                       const url = await handleDropThumbnail(filePath);
                       if (!url) return;
                       const next = { ...formData, thumbnail: url };

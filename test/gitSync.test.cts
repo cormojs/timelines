@@ -42,7 +42,11 @@ function makeLibrary() {
         for (const [k, v] of Object.entries(t.notes)) files[`notes/${k}`] = strToU8(v);
         return buildPackage(JSON.stringify(data, null, 2), files, { deterministic: true });
       },
-      importPackage: async (buf: any, opts: any = {}) => {
+      importPackage: async (buf: Uint8Array, opts: {
+        preferredRelId?: string;
+        resolution?: string;
+        titleSuffix?: string;
+      } = {}) => {
         const pkg = readPackage(buf);
         const data = JSON.parse(pkg.timelineJson);
         let uid = data.file.uid;

@@ -103,9 +103,14 @@ function summarizePackageDiff(oldBuf, newBuf) {
   } catch {
     return null;
   }
-  const byId = (data) => new Map(
+  type SummaryElement = { id: string | number; title?: string };
+  const isSummaryElement = (value: unknown): value is SummaryElement => (
+    typeof value === 'object' && value !== null
+    && 'id' in value && (typeof value.id === 'string' || typeof value.id === 'number')
+  );
+  const byId = (data: { elements?: unknown }): Map<string | number, SummaryElement> => new Map(
     (Array.isArray(data.elements) ? data.elements : [])
-      .filter((el) => el && el.id != null)
+      .filter(isSummaryElement)
       .map((el) => [el.id, el])
   );
   const oldEls = byId(oldData);
@@ -116,7 +121,7 @@ function summarizePackageDiff(oldBuf, newBuf) {
   for (const [id, el] of newEls) {
     const prev = oldEls.get(id);
     if (!prev) added += 1;
-    else if (((prev as any).title || '') !== ((el as any).title || '')) renamed.push((el as any).title || 'untitled');
+    else if ((prev.title || '') !== (el.title || '')) renamed.push(el.title || 'untitled');
   }
   for (const id of oldEls.keys()) {
     if (!newEls.has(id)) removed += 1;
@@ -157,9 +162,9 @@ const isEmptyRemoteError = (err) => err?.code === 'NotFoundError'
   || /could not find|no refs|empty/i.test(err?.message || '');
 
 class GitSyncEngine {
-  [key: string]: any;
+  [key: string]: DynamicValue;
 
-  constructor(opts: any = {}) {
+  constructor(opts: DynamicValue = {}) {
     this.repoDir = opts.repoDir;
     this.statePath = opts.statePath;
     this.listTimelines = opts.listTimelines;
@@ -167,7 +172,7 @@ class GitSyncEngine {
     this.importPackage = opts.importPackage;
     this.removeLocalTimeline = opts.removeLocalTimeline;
     this.http = opts.http || httpNode;
-    this.fetch = opts.fetch || ((...args: any[]) => (globalThis.fetch as any)(...args));
+    this.fetch = opts.fetch || ((...args: Parameters<typeof fetch>) => globalThis.fetch(...args));
     this.onAuth = opts.onAuth || (() => (
       this.credentials?.token
         ? {
@@ -358,7 +363,7 @@ class GitSyncEngine {
     };
   }
 
-  async updateSettings({ machineLabel, excludedPaths, autoSync, debounceMs, writeReadme }: any = {}) {
+  async updateSettings({ machineLabel, excludedPaths, autoSync, debounceMs, writeReadme }: DynamicValue = {}) {
     if (machineLabel !== undefined) {
       const nextLabel = safeName(machineLabel) || this.machineLabel;
       this.machineLabel = nextLabel;
@@ -409,7 +414,7 @@ class GitSyncEngine {
     return walk(this.repoDir);
   }
 
-  async updateCredentials({ token, username = 'x-access-token', authType = 'pat' }: any = {}) {
+  async updateCredentials({ token, username = 'x-access-token', authType = 'pat' }: DynamicValue = {}) {
     const trimmedToken = String(token || '').trim();
     if (!trimmedToken) throw new Error('Missing personal access token');
     const trimmedUsername = String(username || '').trim() || 'x-access-token';
@@ -639,7 +644,7 @@ class GitSyncEngine {
         await this._regenerateReadme();
       }
       await this._stageAndCommit(this._commitMessage(summaries));
-      await (this._pushWithRetry as any)(branch);
+      await this._pushWithRetry(branch, new Set());
       await this._importPass(exportedPaths);
       await this._saveState();
       this.lastSyncedAt = this.now().toISOString();
@@ -859,7 +864,7 @@ class GitSyncEngine {
       const remote = remoteByPath.get(change.path);
       if (!remote) {
         localWins.push(change);
-      } else if ((remote as any).to !== (change as any).to) {
+      } else if ((remote as { to?: string }).to !== (change as { to?: string }).to) {
         // Remote wins the path, so the import pass must apply its version
         exportedPaths?.delete(change.path);
         if (change.to && change.path.endsWith('.timeline')) {

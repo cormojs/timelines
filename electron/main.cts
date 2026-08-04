@@ -869,7 +869,7 @@ async function overwriteExistingTimeline(data, pkg, existing, opts) {
   if (pkg) {
     const assetsRoot = await getAssetsRootDir();
     const assetsDir = await getAssetsDir(storageId);
-    for (const [rel, bytes] of Object.entries(pkg.assets) as [string, any][]) {
+    for (const [rel, bytes] of Object.entries(pkg.assets) as [string, Uint8Array][]) {
       const target = rel.includes('/') ? path.join(assetsRoot, ...rel.split('/')) : path.join(assetsDir, rel);
       await fs.mkdir(path.dirname(target), { recursive: true });
       await fs.writeFile(target, Buffer.from(bytes));
@@ -902,7 +902,14 @@ async function overwriteExistingTimeline(data, pkg, existing, opts) {
 }
 
 // Installs a timeline (JSON or zip) from bytes; opts: sourcePath, resolution (open-existing|copy|overwrite), preferredRelId, titleSuffix. Throws on bad input.
-async function installTimelineFromBuffer(buf: any, opts: any = {}) {
+type TimelineInstallOptions = {
+  sourcePath?: string | null;
+  resolution?: 'open-existing' | 'copy' | 'overwrite' | null;
+  preferredRelId?: string;
+  titleSuffix?: string;
+};
+
+async function installTimelineFromBuffer(buf: Uint8Array, opts: TimelineInstallOptions = {}) {
   const { sourcePath = null, resolution = null } = opts;
   let pkg = null;
   let data;
@@ -1153,7 +1160,7 @@ ipcMain.handle('import-timeline', async (event, payload) => {
 
     const buf = await fs.readFile(sourcePath);
     const result = await installTimelineFromBuffer(buf, { sourcePath, resolution });
-    if ((result as any)?.success && !(result as any)?.openedExisting) {
+    if (result.success && !('openedExisting' in result && result.openedExisting)) {
       markGitSyncStructureDirty();
     }
     return result;
@@ -1420,7 +1427,7 @@ ipcMain.handle('create-note', async (event, { timelineId, title, elementId }) =>
   }
 });
 
-ipcMain.handle('add-existing-note', async (event, { timelineId }: any = {}) => {
+ipcMain.handle('add-existing-note', async (event, { timelineId }: { timelineId?: string } = {}) => {
   try {
     if (!timelineId) {
       return { success: false, error: 'Missing timelineId' };

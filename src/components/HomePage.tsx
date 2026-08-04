@@ -250,7 +250,7 @@ export default function HomePage({
   keybinds = cloneDefaultKeybinds(),
   onKeybindsChange,
   thumbnailRefreshSignal = 0,
-}: any) {
+}: Record<string, DynamicValue>) {
   const [timelineFiles, setTimelineFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isNewTimelineModalOpen, setIsNewTimelineModalOpen] = useState(false);
@@ -476,7 +476,13 @@ export default function HomePage({
     }
   };
 
-  const saveGitSyncSettings = async (partial: any = {}) => {
+  const saveGitSyncSettings = async (partial: {
+    autoSync?: boolean;
+    intervalMinutes?: number;
+    machineLabel?: string;
+    excludedPaths?: string[];
+    writeReadme?: boolean;
+  } = {}) => {
     if (!window.electron?.gitSyncUpdateSettings) return;
     const payload = {
       autoSync: partial.autoSync ?? gitSyncAuto,
@@ -1280,7 +1286,7 @@ export default function HomePage({
       }
       next.add(targetKey);
     }
-    await saveGitSyncSettings({ excludedPaths: [...next].sort() });
+    await saveGitSyncSettings({ excludedPaths: [...next] as string[] });
   };
 
   if (loading && !settingsOnly) {
@@ -1924,18 +1930,18 @@ export default function HomePage({
                               value={appThemeKey || ""}
                               onChange={(e) => onAppThemeChange?.(e.target.value)}
                             >
-                              {(appThemes as [string, any][]).map(([key, theme]) => {
+                              {appThemes.map(([key, theme]) => {
                                 const isDefault = key.toLowerCase() === "parchment_v2";
-                                const label = `${themeOptionLabel(key, theme)}${isDefault ? " (Default)" : ""}`;
+                                const label = `${themeOptionLabel(key, theme as Parameters<typeof themeOptionLabel>[1])}${isDefault ? " (Default)" : ""}`;
                                 return (
                                   <option key={key} value={key}>
                                     {label}
                                   </option>
                                 );
                               })}
-                              {(userThemes as [string, any][]).map(([key, theme]) => (
+                              {userThemes.map(([key, theme]) => (
                                 <option key={key} value={key}>
-                                  {themeOptionLabel(key, theme)}
+                                  {themeOptionLabel(key, theme as Parameters<typeof themeOptionLabel>[1])}
                                 </option>
                               ))}
                             </select>
@@ -2068,7 +2074,7 @@ export default function HomePage({
 
                 {settingsSection === "hotkeys" && (
                   <>
-                    {(Object.entries(keybinds) as [string, any][]).map(([id, { label, keys }]) => (
+                    {(Object.entries(keybinds) as [string, { label: string; keys: string[] }][]).map(([id, { label, keys }]) => (
                       <div className="settings-row" key={id}>
                         <div className="settings-row-left">
                           <div className="settings-row-label">{label}</div>

@@ -18,7 +18,7 @@ type PreviewOptions = {
   customBg?: string;
 };
 
-export default function ExportPngModal({ isOpen, onClose, onExport, timelineData, timelineViewRef }: any) {
+export default function ExportPngModal({ isOpen, onClose, onExport, timelineData, timelineViewRef }: Record<string, DynamicValue>) {
   const [filename, setFilename] = useState("");
   const [previewData, setPreviewData] = useState(null);
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);

@@ -86,9 +86,9 @@ function makeColoredIcon(color, selected, markerType = DEFAULT_MARKER_TYPE) {
   return L.divIcon({
     html: svg,
     className: "",
-    iconSize: iconSize as any,
-    iconAnchor: iconAnchor as any,
-    tooltipAnchor: tooltipAnchor as any,
+    iconSize: iconSize as L.PointExpression,
+    iconAnchor: iconAnchor as L.PointExpression,
+    tooltipAnchor: tooltipAnchor as L.PointExpression,
   });
 }
 
@@ -284,7 +284,7 @@ function isOpenStreetMapTileUrl(url) {
   return /^https:\/\/(?:[a-z0-9-]+\.)*tile\.openstreetmap\.org\//i.test(url);
 }
 
-export default memo(forwardRef(function MapView({ elements = [], onSelect, onOpenContextMenu, onAltWheelPan, onCtrlWheelZoom, viewportYear, selectedId, fileConfig }: any, ref: any) {
+export default memo(forwardRef(function MapView({ elements = [], onSelect, onOpenContextMenu, onAltWheelPan, onCtrlWheelZoom, viewportYear, selectedId, fileConfig }: Record<string, DynamicValue>, ref: DynamicValue) {
   const spanById = useMemo(() => {
     const map = new Map();
     elements.forEach((el) => { if (el.type === "span") map.set(el.id, el); });
@@ -310,7 +310,7 @@ export default memo(forwardRef(function MapView({ elements = [], onSelect, onOpe
   return (
     <div className="timeline-map-view">
       <MapContainer
-        center={initialView.center as any}
+        center={initialView.center as L.LatLngExpression}
         zoom={initialView.zoom}
         style={{ width: "100%", height: "100%" }}
         zoomControl={true}

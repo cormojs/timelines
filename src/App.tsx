@@ -976,7 +976,7 @@ function App() {
     });
   };
 
-  const handleAddEvent = (groupId?: any, clickYear?: any, clickCoords?: any) => {
+  const handleAddEvent = (groupId?: string, clickYear?: number, clickCoords?: { lat?: number; lng?: number }) => {
     if (!timelineData?.file) return;
     const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
     const fallbackMid = (timelineData.file.start + timelineData.file.end) / 2;
@@ -984,7 +984,7 @@ function App() {
     const clampedYear = clamp(baseYear, timelineData.file.start, timelineData.file.end);
     const snappedYear = timelineData.file.useCalendar === true ? snapToDayGrid(clampedYear) : Math.round(clampedYear);
     const eventId = generateUniqueRandomElementId(timelineData.elements, "event");
-    const newEvent: any = {
+    const newEvent = {
       id: eventId,
       type: "event",
       title: "New Event",
@@ -994,15 +994,14 @@ function App() {
       eventLineStyle: "solid",
       eventBorderStyle: "solid",
     };
-    if (Number.isFinite(clickCoords?.lat) && Number.isFinite(clickCoords?.lng)) {
-      newEvent.lat = clickCoords.lat;
-      newEvent.lng = clickCoords.lng;
-    }
+    const eventWithCoords = Number.isFinite(clickCoords?.lat) && Number.isFinite(clickCoords?.lng)
+      ? { ...newEvent, lat: clickCoords.lat, lng: clickCoords.lng }
+      : newEvent;
 
     setTimelineData((prevData) => {
       const updatedData = {
         ...prevData,
-        elements: [...prevData.elements, newEvent],
+        elements: [...prevData.elements, eventWithCoords],
       };
 
       saveCurrentTimeline(updatedData).catch(console.error);
@@ -1010,11 +1009,11 @@ function App() {
       return updatedData;
     });
 
-    setSelectedId(newEvent.id);
-    setEditRequestId(newEvent.id);
+    setSelectedId(eventWithCoords.id);
+    setEditRequestId(eventWithCoords.id);
   };
 
-  const handleAddSpan = (groupId?: any, clickYear?: any, clickCoords?: any) => {
+  const handleAddSpan = (groupId?: string, clickYear?: number, clickCoords?: { lat?: number; lng?: number }) => {
     const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
     const range = timelineData.file.end - timelineData.file.start;
     const duration = Math.max(1, Math.floor(range / 4));
@@ -1026,7 +1025,7 @@ function App() {
 
     const spanId = generateUniqueRandomElementId(timelineData.elements, "span");
     const defaultGroupId = groupId || timelineData.file?.groups?.[0]?.id || DEFAULT_GROUP_ID;
-    const newSpan: any = {
+    const newSpan = {
       id: spanId,
       type: "span",
       title: "New Span",
@@ -1035,15 +1034,14 @@ function App() {
       groupId: defaultGroupId,
       color: "#A6977E",
     };
-    if (Number.isFinite(clickCoords?.lat) && Number.isFinite(clickCoords?.lng)) {
-      newSpan.lat = clickCoords.lat;
-      newSpan.lng = clickCoords.lng;
-    }
+    const spanWithCoords = Number.isFinite(clickCoords?.lat) && Number.isFinite(clickCoords?.lng)
+      ? { ...newSpan, lat: clickCoords.lat, lng: clickCoords.lng }
+      : newSpan;
 
     setTimelineData((prevData) => {
       const updatedData = {
         ...prevData,
-        elements: [...prevData.elements, newSpan],
+        elements: [...prevData.elements, spanWithCoords],
       };
 
       saveCurrentTimeline(updatedData).catch(console.error);
@@ -1051,8 +1049,8 @@ function App() {
       return updatedData;
     });
 
-    setSelectedId(newSpan.id);
-    setEditRequestId(newSpan.id);
+    setSelectedId(spanWithCoords.id);
+    setEditRequestId(spanWithCoords.id);
   };
 
   const handleAddEra = (_clickYear, clickCoords) => {
@@ -1083,7 +1081,7 @@ function App() {
     }
 
     const eraId = generateUniqueRandomElementId(timelineData.elements, "era");
-    const newEra: any = {
+    const newEra = {
       id: eraId,
       type: "era",
       title: "New Era",
@@ -1091,15 +1089,14 @@ function App() {
       end,
       color: "#F4D05A",
     };
-    if (Number.isFinite(clickCoords?.lat) && Number.isFinite(clickCoords?.lng)) {
-      newEra.lat = clickCoords.lat;
-      newEra.lng = clickCoords.lng;
-    }
+    const eraWithCoords = Number.isFinite(clickCoords?.lat) && Number.isFinite(clickCoords?.lng)
+      ? { ...newEra, lat: clickCoords.lat, lng: clickCoords.lng }
+      : newEra;
 
     setTimelineData((prevData) => {
       const updatedData = {
         ...prevData,
-        elements: [...prevData.elements, newEra],
+        elements: [...prevData.elements, eraWithCoords],
       };
 
       saveCurrentTimeline(updatedData).catch(console.error);
@@ -1629,7 +1626,7 @@ function App() {
   };
 
   const getThemeFont = useCallback((themeKeyValue) => {
-    const theme: any = themeConfig.themes?.[themeKeyValue];
+    const theme = themeConfig.themes?.[themeKeyValue] as { font?: { family?: string; cssUrl?: string } } | undefined;
     if (!theme?.font?.family) return null;
     return {
       family: theme.font.family,

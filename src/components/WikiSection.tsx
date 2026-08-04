@@ -7,7 +7,7 @@ import { getWikiCacheEntry, setWikiCacheEntry } from "../utils/wikiCacheStore";
 
 // Outside Electron there is no IPC proxy; MediaWiki APIs allow direct
 // anonymous CORS requests when origin=* is appended.
-async function fetchWikiApi(url: string): Promise<any> {
+async function fetchWikiApi(url: string): Promise<{ success: boolean; html?: string; error?: string }> {
   if (window.electron !== undefined) return fetchWikipedia({ url });
   try {
     const res = await fetch(`${url}${url.includes("?") ? "&" : "?"}origin=*`);
@@ -144,7 +144,7 @@ function sanitizeWikiHtml(html, host = "https://en.wikipedia.org") {
   return doc.body.innerHTML;
 }
 
-export default function WikiSection({ wikiUrl, useWiki, isEditMode, onUrlChange }: any) {
+export default function WikiSection({ wikiUrl, useWiki, isEditMode, onUrlChange }: Record<string, DynamicValue>) {
   const [wikiContent, setWikiContent] = useState("");
   const [isWikiLoading, setIsWikiLoading] = useState(false);
   const [wikiError, setWikiError] = useState("");

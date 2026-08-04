@@ -34,7 +34,7 @@ export default function SettingsModal({
   oldFormatThemeCount = 0,
   onMigrateOldThemes,
   layoutOptions = [],
-}: any) {
+}: Record<string, DynamicValue>) {
   const [title, setTitle] = useState("");
   // Title drives the filename on disk, so it only commits on blur/Enter/close, not per keystroke
   const [committedTitle, setCommittedTitle] = useState("");
@@ -389,7 +389,7 @@ export default function SettingsModal({
       const parsedScaleSections = saveScaleSections(scaleSections);
       if (onUpdateTimelineRef.current) {
         // Core fields (rename/parsing) are always sent; the rest only when changed.
-        const patch: Record<string, any> = {
+        const patch: Record<string, unknown> = {
           title: committedTitle,
           start: startValue,
           end: endValue,
@@ -935,7 +935,7 @@ export default function SettingsModal({
                       }}
                     >
                       <option value="default">Default (App Theme)</option>
-                      {(Object.entries(themes || {}) as [string, any][]).map(([key, theme]) => (
+                      {(Object.entries(themes || {}) as [string, { name?: string }][]).map(([key, theme]) => (
                         <option key={key} value={key}>
                           {themeOptionLabel(key, theme)}
                         </option>

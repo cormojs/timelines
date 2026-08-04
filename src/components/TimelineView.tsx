@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, forwardRef, useImperativeHandle, Fragment, useCallback, lazy, Suspense, useDeferredValue } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, forwardRef, useImperativeHandle, Fragment, useCallback, lazy, Suspense, useDeferredValue, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import {
   pickStep,
@@ -373,7 +373,7 @@ const TimelineView = forwardRef(function TimelineView({
   keybinds = {},
   onSetViewMode,
   readOnly = false,
-}: any, ref: any) {
+}: Record<string, DynamicValue>, ref: DynamicValue) {
   const isMac = navigator.userAgent?.includes("Mac");
   const fmtKey = (bind) => {
     if (!bind?.keys?.length) return "";
@@ -845,12 +845,12 @@ const TimelineView = forwardRef(function TimelineView({
       const spanIdsInGroup = new Set(spansInGroup.map((span) => span.id));
       const groupSpanChildPlacement = Object.fromEntries(
         Object.entries(globalSpanChildPlacement).filter(
-          ([childId, placement]) => spanIdsInGroup.has(childId) && spanIdsInGroup.has((placement as any).parentId)
+          ([childId, placement]) => spanIdsInGroup.has(childId) && spanIdsInGroup.has((placement as { parentId?: string }).parentId)
         )
       );
       const groupSpanMergePlacement = Object.fromEntries(
         Object.entries(globalSpanMergePlacement).filter(
-          ([childId, placement]) => spanIdsInGroup.has(childId) && spanIdsInGroup.has((placement as any).parentId)
+          ([childId, placement]) => spanIdsInGroup.has(childId) && spanIdsInGroup.has((placement as { parentId?: string }).parentId)
         )
       );
 
@@ -3812,7 +3812,7 @@ const TimelineView = forwardRef(function TimelineView({
                           top: `${spanRenderTopById.get(span.id) ?? span.top}px`,
                           height: `${span.spanHeight ?? 20}px`,
                           background: span.color || "var(--secondary-text)",
-                        } as any}
+                        } as CSSProperties}
                         onClick={(e) => {
                           e.stopPropagation();
                           handleSelect(span.id);
@@ -4002,7 +4002,7 @@ const TimelineView = forwardRef(function TimelineView({
                   top: `${spanRenderTopById.get(span.id) ?? span.top}px`,
                   height: `${span.spanHeight ?? 20}px`,
                   background: span.color || "var(--secondary-text)",
-                } as any}
+                } as CSSProperties}
                 onClick={(e) => {
                   e.stopPropagation();
                   handleSelect(span.id);

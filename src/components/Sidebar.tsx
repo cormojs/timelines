@@ -215,7 +215,7 @@ export default function Sidebar({
   onPatchFile,
   keybinds = {},
   readOnly = false,
-}: any) {
+}: Record<string, DynamicValue>) {
   const isMac = navigator.userAgent?.includes("Mac");
   const formatKeybind = (bind) => {
     if (!bind?.keys?.length) return "";
