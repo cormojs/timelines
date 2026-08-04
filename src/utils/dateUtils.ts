@@ -37,11 +37,11 @@ const dateToFractionalYear = (date: Date): number => {
 export const todayFractionalYear = () => dateToFractionalYear(new Date());
 
 // Format is a display + input lens only; stored labels stay canonical ISO.
-let activeDateFormat = 'MDY'; // "MDY" | "DMY" | "ISO"
+let activeDateFormat: DateFormat = 'MDY';
 export const setActiveDateFormat = (fmt: string): void => {
   activeDateFormat = fmt === 'DMY' || fmt === 'ISO' ? fmt : 'MDY';
 };
-export const getActiveDateFormat = (): DateFormat => activeDateFormat as DateFormat;
+export const getActiveDateFormat = (): DateFormat => activeDateFormat;
 
 const pad2 = (n: number): string => String(n).padStart(2, '0');
 const normalizeYear = (y: number): number => (Number.isFinite(y) && y >= 0 && y <= 99 ? y + 2000 : y);
@@ -58,7 +58,7 @@ export const formatCalendarDate = (
   month: number,
   day: number,
   precision: DatePrecision,
-  fmt: DateFormat = activeDateFormat as DateFormat,
+  fmt: DateFormat = activeDateFormat,
 ): string => {
   if (precision === 'year') return `${year}`;
   if (precision === 'month') return fmt === 'ISO' ? `${year}-${pad2(month)}` : `${pad2(month)}/${year}`;
@@ -83,7 +83,7 @@ const buildCalendarDate = (year: number, month: number, day: number, precision: 
 };
 
 // ISO (dash) is auto-detected regardless of format; slash order follows the format.
-const parseCalendarDate = (raw: string, fmt: DateFormat = activeDateFormat as DateFormat): CalendarDate | null => {
+const parseCalendarDate = (raw: string, fmt: DateFormat = activeDateFormat): CalendarDate | null => {
   const iso = /^(\d{4})-(\d{1,2})(?:-(\d{1,2}))?$/.exec(raw);
   if (iso) {
     const hasDay = iso[3] !== undefined;

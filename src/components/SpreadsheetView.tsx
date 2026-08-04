@@ -1224,17 +1224,18 @@ export default function SpreadsheetView({
   };
 
   const cellFromEvent = (e: React.MouseEvent<HTMLTableSectionElement>) => {
-    const target = e.target as Element;
+    const target = e.target;
+    if (!(target instanceof Element)) return null;
     const td = target.closest('td.sheet-cell');
     if (!td) return null;
     const id = td.closest('tr')?.dataset.rowId;
-    const field = visibleCols[(td as HTMLTableCellElement).cellIndex]?.key;
+    const field = td instanceof HTMLTableCellElement ? visibleCols[td.cellIndex]?.key : undefined;
     return id && field ? { id, field } : null;
   };
 
   const handleTableMouseDown = (e: React.MouseEvent<HTMLTableSectionElement>) => {
     if (e.button !== 0) return;
-    if ((e.target as Element).closest('input, select, button, textarea')) return;
+    if (e.target instanceof Element && e.target.closest('input, select, button, textarea')) return;
     const cell = cellFromEvent(e);
     if (!cell) return;
     didDragRef.current = false;

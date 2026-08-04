@@ -404,8 +404,7 @@ function App() {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (!selectedId) return;
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+      if (isEditableEventTarget(e.target)) return;
       const deleteBind = keybinds.delete;
       const altDeleteBind = { keys: ['Backspace'] };
       if (!matchesKeybind(e, deleteBind) && !matchesKeybind(e, altDeleteBind)) return;
@@ -658,13 +657,7 @@ function App() {
   useEffect(() => {
     const handleUndoRedo = (e: KeyboardEvent) => {
       if (!timelineData) return;
-      const target = e.target as HTMLElement;
-      const isEditable =
-        target?.tagName === 'INPUT' ||
-        target?.tagName === 'TEXTAREA' ||
-        target?.tagName === 'SELECT' ||
-        target?.isContentEditable;
-      if (isEditable) return;
+      if (isEditableEventTarget(e.target)) return;
       if (matchesKeybind(e, keybinds.undo)) {
         e.preventDefault();
         undoTimeline();
@@ -691,13 +684,7 @@ function App() {
     if (!timelineData) return;
     const handleSearchKey = (e: KeyboardEvent) => {
       if (!matchesKeybind(e, keybinds.search)) return;
-      const target = e.target as HTMLElement;
-      const isEditable =
-        target?.tagName === 'INPUT' ||
-        target?.tagName === 'TEXTAREA' ||
-        target?.tagName === 'SELECT' ||
-        target?.isContentEditable;
-      if (isEditable) return;
+      if (isEditableEventTarget(e.target)) return;
       e.preventDefault();
       setIsSearchOpen(true);
     };
@@ -708,13 +695,7 @@ function App() {
   useEffect(() => {
     if (!timelineData) return;
     const handleAddShortcuts = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      const isEditable =
-        target?.tagName === 'INPUT' ||
-        target?.tagName === 'TEXTAREA' ||
-        target?.tagName === 'SELECT' ||
-        target?.isContentEditable;
-      if (isEditable) return;
+      if (isEditableEventTarget(e.target)) return;
 
       if (matchesKeybind(e, keybinds.newEvent)) {
         e.preventDefault();
@@ -2158,13 +2139,7 @@ function App() {
     if (!selectedId || !timelineData) return;
 
     const handleSelectionNavigation = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      const isEditable =
-        target?.tagName === 'INPUT' ||
-        target?.tagName === 'TEXTAREA' ||
-        target?.tagName === 'SELECT' ||
-        target?.isContentEditable;
-      if (isEditable) return;
+      if (isEditableEventTarget(e.target)) return;
 
       if (matchesKeybind(e, keybinds.selectPrevious)) {
         if (!selectionNavigation.prevElement) return;
@@ -2697,3 +2672,9 @@ function App() {
 }
 
 export default App;
+const isEditableEventTarget = (target: EventTarget | null): boolean =>
+  target instanceof HTMLElement &&
+  (target.tagName === 'INPUT' ||
+    target.tagName === 'TEXTAREA' ||
+    target.tagName === 'SELECT' ||
+    target.isContentEditable);

@@ -337,7 +337,7 @@ import NewTimelineModal from './NewTimelineModal';
 import '../styles/02-homepage.css';
 import '../styles/07-modals-menus.css';
 import themeConfig from '../config/theme.json';
-import { isTheme, loadThemeConfig, themeOptionLabel } from '../utils/themeLoader';
+import { isTheme, loadThemeConfig, themeOptionLabel, type Theme } from '../utils/themeLoader';
 import { DEFAULT_KEYBINDS, cloneDefaultKeybinds, saveKeybinds } from '../utils/keybinds';
 import type { Keybinds } from '../types/timeline';
 import MarketplaceModal from './MarketplaceModal';
@@ -570,8 +570,10 @@ export default function HomePage({
     };
   }, [settingsOnly]);
 
-  const appThemes = useMemo(() => {
-    const entries = Object.entries(themes || {}).filter(([key]) => bundledKeys.has(key.toLowerCase()));
+  const appThemes = useMemo<[string, Theme][]>(() => {
+    const entries = Object.entries(themes || {}).filter(
+      (entry): entry is [string, Theme] => bundledKeys.has(entry[0].toLowerCase()) && isTheme(entry[1]),
+    );
     return entries.sort(([aKey], [bKey]) => {
       const aLower = aKey.toLowerCase();
       const bLower = bKey.toLowerCase();
@@ -585,8 +587,10 @@ export default function HomePage({
     });
   }, [themes, bundledKeys, defaultThemeKey]);
 
-  const userThemes = useMemo(() => {
-    const entries = Object.entries(themes || {}).filter(([key]) => !bundledKeys.has(key.toLowerCase()));
+  const userThemes = useMemo<[string, Theme][]>(() => {
+    const entries = Object.entries(themes || {}).filter(
+      (entry): entry is [string, Theme] => !bundledKeys.has(entry[0].toLowerCase()) && isTheme(entry[1]),
+    );
     return entries.sort(([aKey], [bKey]) => aKey.localeCompare(bKey));
   }, [themes, bundledKeys]);
 
@@ -2349,47 +2353,45 @@ export default function HomePage({
 
                 {settingsSection === 'hotkeys' && (
                   <>
-                    {(Object.entries(keybinds) as [string, { label: string; keys: string[] }][]).map(
-                      ([id, { label, keys }]) => (
-                        <div className="settings-row" key={id}>
-                          <div className="settings-row-left">
-                            <div className="settings-row-label">{label}</div>
-                          </div>
-                          <div className="settings-row-right">
-                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                              {recordingKey === id ? (
-                                <span className="hotkey-badge hotkey-badge-recording">Press a key…</span>
-                              ) : (
-                                <span className="hotkey-badge">{keys.join(' + ')}</span>
-                              )}
-                              <button
-                                className="hotkey-icon-button"
-                                type="button"
-                                title={recordingKey === id ? 'Cancel' : 'Edit'}
-                                onClick={() => setRecordingKey(recordingKey === id ? null : id)}
-                              >
-                                {recordingKey === id ? <X size={13} /> : <Pencil size={13} />}
-                              </button>
-                              <button
-                                className="hotkey-icon-button"
-                                type="button"
-                                title="Reset to default"
-                                onClick={() => {
-                                  const updated = {
-                                    ...keybinds,
-                                    [id]: { ...keybinds[id], keys: [...DEFAULT_KEYBINDS[id].keys] },
-                                  };
-                                  onKeybindsChange?.(updated);
-                                  saveKeybinds(updated);
-                                }}
-                              >
-                                <RotateCcw size={13} />
-                              </button>
-                            </div>
+                    {Object.entries(keybinds).map(([id, { label = id, keys = [] }]) => (
+                      <div className="settings-row" key={id}>
+                        <div className="settings-row-left">
+                          <div className="settings-row-label">{label}</div>
+                        </div>
+                        <div className="settings-row-right">
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            {recordingKey === id ? (
+                              <span className="hotkey-badge hotkey-badge-recording">Press a key…</span>
+                            ) : (
+                              <span className="hotkey-badge">{keys.join(' + ')}</span>
+                            )}
+                            <button
+                              className="hotkey-icon-button"
+                              type="button"
+                              title={recordingKey === id ? 'Cancel' : 'Edit'}
+                              onClick={() => setRecordingKey(recordingKey === id ? null : id)}
+                            >
+                              {recordingKey === id ? <X size={13} /> : <Pencil size={13} />}
+                            </button>
+                            <button
+                              className="hotkey-icon-button"
+                              type="button"
+                              title="Reset to default"
+                              onClick={() => {
+                                const updated = {
+                                  ...keybinds,
+                                  [id]: { ...keybinds[id], keys: [...DEFAULT_KEYBINDS[id].keys] },
+                                };
+                                onKeybindsChange?.(updated);
+                                saveKeybinds(updated);
+                              }}
+                            >
+                              <RotateCcw size={13} />
+                            </button>
                           </div>
                         </div>
-                      ),
-                    )}
+                      </div>
+                    ))}
                   </>
                 )}
 
@@ -3194,8 +3196,8 @@ export default function HomePage({
       <MarketplaceModal
         isOpen={isMarketplaceOpen}
         onClose={() => setIsMarketplaceOpen(false)}
-        appThemes={appThemes as [string, import('../utils/themeLoader').Theme][]}
-        userThemes={userThemes as [string, import('../utils/themeLoader').Theme][]}
+        appThemes={appThemes}
+        userThemes={userThemes}
         userThemeIds={userThemeIds}
         bundledThemes={bundledThemes}
         defaultThemeKey={defaultThemeKey}

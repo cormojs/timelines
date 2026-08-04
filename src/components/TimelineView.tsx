@@ -241,13 +241,17 @@ const readAppFontStack = () => {
 };
 
 const FILTER_TYPE_TERMS = ['is:event', 'is:span', 'is:era', 'has:coords'];
-const FILTER_DATE_OPS = [
+const FILTER_DATE_OPS: Array<[keyof typeof FILTER_OP_GLYPH, string]> = [
   ['>', '>'],
   ['>=', '≥'],
   ['<', '<'],
   ['<=', '≤'],
 ];
 const FILTER_OP_GLYPH = { '>': '>', '>=': '≥', '<': '<', '<=': '≤' };
+const getObjectFit = (value: unknown): CSSProperties['objectFit'] =>
+  value === 'contain' || value === 'cover' || value === 'fill' || value === 'none' || value === 'scale-down'
+    ? value
+    : 'cover';
 
 const HTML2CANVAS_COLOR_PROPERTIES = [
   'color',
@@ -322,7 +326,8 @@ const normalizeHtml2CanvasColors = (clonedDocument: Document, clonedRoot: HTMLEl
     for (const property of HTML2CANVAS_COLOR_PROPERTIES) {
       const value = styles.getPropertyValue(property);
       if (UNSUPPORTED_COLOR_FUNCTION.test(value)) {
-        (element as HTMLElement).style.setProperty(property, replaceColorFunctions(value), 'important');
+        if (element instanceof HTMLElement)
+          element.style.setProperty(property, replaceColorFunctions(value), 'important');
       }
     }
   }
@@ -358,7 +363,7 @@ const simplifyTimelinePreview = (clonedDocument: Document, clonedTimeline: HTMLE
   for (const element of [clonedTimeline, ...clonedTimeline.querySelectorAll('*')]) {
     const backgroundImage = clonedDocument.defaultView?.getComputedStyle(element).backgroundImage;
     if (backgroundImage?.includes('url(')) {
-      (element as HTMLElement).style.setProperty('background-image', 'none', 'important');
+      if (element instanceof HTMLElement) element.style.setProperty('background-image', 'none', 'important');
     }
   }
 };
@@ -1114,14 +1119,12 @@ const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(function 
       const spanIdsInGroup = new Set(spansInGroup.map((span) => span.id));
       const groupSpanChildPlacement = Object.fromEntries(
         Object.entries(globalSpanChildPlacement).filter(
-          ([childId, placement]) =>
-            spanIdsInGroup.has(childId) && spanIdsInGroup.has((placement as { parentId?: string }).parentId),
+          ([childId, placement]) => spanIdsInGroup.has(childId) && spanIdsInGroup.has(placement.parentId),
         ),
       );
       const groupSpanMergePlacement = Object.fromEntries(
         Object.entries(globalSpanMergePlacement).filter(
-          ([childId, placement]) =>
-            spanIdsInGroup.has(childId) && spanIdsInGroup.has((placement as { parentId?: string }).parentId),
+          ([childId, placement]) => spanIdsInGroup.has(childId) && spanIdsInGroup.has(placement.parentId),
         ),
       );
 
@@ -1827,7 +1830,8 @@ const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(function 
       if (!skipLabels && lastGridScaleRef.current !== scale) {
         const labels = overlay.children;
         for (let i = 0; i < labels.length; i++) {
-          const el = labels[i] as HTMLElement;
+          const el = labels[i];
+          if (!(el instanceof HTMLElement)) continue;
           const basePx = Number(el.dataset.px);
           el.style.left = `${basePx * scale + 4}px`;
         }
@@ -2345,7 +2349,7 @@ const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(function 
                   type="button"
                   className={`fm-date-op${filterDateOp === op ? ' is-active' : ''}`}
                   aria-pressed={filterDateOp === op}
-                  onClick={() => setFilterDateOp(op as keyof typeof FILTER_OP_GLYPH)}
+                  onClick={() => setFilterDateOp(op)}
                 >
                   {glyph}
                 </button>
@@ -4356,7 +4360,7 @@ const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(function 
                                   }
                                   src={event.thumbnail}
                                   alt=""
-                                  style={{ objectFit: (event.thumbnailFit || 'cover') as CSSProperties['objectFit'] }}
+                                  style={{ objectFit: getObjectFit(event.thumbnailFit) }}
                                   onError={(e) => {
                                     e.currentTarget.style.display = 'none';
                                   }}
@@ -4378,7 +4382,7 @@ const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(function 
                                       src={event.thumbnail}
                                       alt=""
                                       style={{
-                                        objectFit: (event.thumbnailFit || 'cover') as CSSProperties['objectFit'],
+                                        objectFit: getObjectFit(event.thumbnailFit),
                                       }}
                                     />
                                   )}
@@ -4784,7 +4788,7 @@ const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(function 
                             className="event-thumbnail-square"
                             src={event.thumbnail}
                             alt=""
-                            style={{ objectFit: (event.thumbnailFit || 'cover') as CSSProperties['objectFit'] }}
+                            style={{ objectFit: getObjectFit(event.thumbnailFit) }}
                             onError={(e) => {
                               e.currentTarget.style.display = 'none';
                             }}
@@ -4805,7 +4809,7 @@ const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(function 
                                 className="event-thumbnail-banner"
                                 src={event.thumbnail}
                                 alt=""
-                                style={{ objectFit: (event.thumbnailFit || 'cover') as CSSProperties['objectFit'] }}
+                                style={{ objectFit: getObjectFit(event.thumbnailFit) }}
                               />
                             )}
                             <div
