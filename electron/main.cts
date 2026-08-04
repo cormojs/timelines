@@ -8,6 +8,8 @@ const { autoUpdater } = require('electron-updater');
 const { isZipBuffer, readPackage, buildPackage, strToU8 } = require('./timelinePackage.cts');
 const { createEngine } = require('./gitSync.cts');
 const DEFAULT_THEME_KEY = 'parchment';
+const devServerUrl = process.env.TIMELINES_DEV_SERVER_URL;
+const isDevelopment = typeof devServerUrl === 'string' && devServerUrl.length > 0;
 
 // Force sRGB color profile to prevent washed-out appearance in screenshots/screenshare on HDR displays
 app.commandLine.appendSwitch('force-color-profile', 'srgb');
@@ -274,10 +276,8 @@ async function createWindow() {
     if (JSON.parse(raw)?.startMaximized === true) mainWindow.maximize();
   } catch {}
 
-  const isDev = process.env.NODE_ENV === 'development';
-
-  if (isDev) {
-    mainWindow.loadURL('http://localhost:5183');
+  if (isDevelopment) {
+    mainWindow.loadURL(devServerUrl);
     mainWindow.webContents.openDevTools();
   } else {
     const debugProd = process.env.TIMELINES_DEBUG === 'true';
@@ -333,8 +333,7 @@ protocol.registerSchemesAsPrivileged([
 
 // Auto-updater setup
 function setupAutoUpdater() {
-  const isDev = process.env.NODE_ENV === 'development';
-  if (isDev) return;
+  if (isDevelopment) return;
 
   autoUpdater.allowPrerelease = true;
   autoUpdater.autoDownload = false;
@@ -396,8 +395,7 @@ function setupOsmTileRequestHeaders() {
 }
 
 ipcMain.handle('check-for-updates', async () => {
-  const isDev = process.env.NODE_ENV === 'development';
-  if (isDev) {
+  if (isDevelopment) {
     return { status: 'dev' };
   }
   try {
