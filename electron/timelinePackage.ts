@@ -1,9 +1,7 @@
-export {};
-
 // Packaged .timeline format: a zip holding timeline.json (identical to the bare
 // format), assets/, notes/, and manifest.json. The same shape is read in the
 // browser viewer via src/utils/packageReader.ts; keep the two in sync.
-const { zipSync, unzipSync, strToU8, strFromU8 } = require('fflate');
+import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
 
 const PACKAGE_FORMAT_VERSION = 1;
 
@@ -40,7 +38,7 @@ function buildPackage(timelineJson: string, files: Record<string, Uint8Array> = 
   return zipSync(sorted);
 }
 
-function readPackage(buf) {
+function readPackage(buf: Uint8Array) {
   const entries = unzipSync(buf instanceof Uint8Array ? buf : new Uint8Array(buf));
   const timelineRaw = entries['timeline.json'];
   if (!timelineRaw) throw new Error('Package is missing timeline.json');
@@ -50,8 +48,8 @@ function readPackage(buf) {
     try { manifest = JSON.parse(strFromU8(entries['manifest.json'])); } catch {}
   }
 
-  const assets = {};
-  const notes = {};
+  const assets: Record<string, Uint8Array> = {};
+  const notes: Record<string, string> = {};
   for (const [name, data] of Object.entries(entries)) {
     if (name.endsWith('/')) continue; // directory entry
     if (name.startsWith('assets/')) {

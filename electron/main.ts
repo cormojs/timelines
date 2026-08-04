@@ -1,14 +1,11 @@
-export {};
-
-const { app, BrowserWindow, ipcMain, dialog, Menu, shell, protocol, net, session, safeStorage } = require('electron');
-const path = require('path');
-const { pathToFileURL } = require('url');
-const fs = require('fs').promises;
-const fsSync = require('fs');
-const http = require('http');
-const { autoUpdater } = require('electron-updater');
-const { isZipBuffer, readPackage, buildPackage, strToU8 } = require('./timelinePackage');
-const { createEngine } = require('./gitSync');
+import { app, BrowserWindow, ipcMain, dialog, Menu, shell, protocol, net, session, safeStorage } from 'electron';
+import { promises as fs } from 'node:fs';
+import * as fsSync from 'node:fs';
+import * as path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { autoUpdater } from 'electron-updater';
+import { isZipBuffer, readPackage, buildPackage, strToU8 } from './timelinePackage';
+import { createEngine } from './gitSync';
 const DEFAULT_THEME_KEY = 'parchment';
 const devServerUrl = process.env.ELECTRON_RENDERER_URL;
 
@@ -866,7 +863,7 @@ async function writeExtractedFile(baseDir, rel, contents) {
 }
 
 // Sync-pull update for an existing uid: rewrite the .timeline in place and write assets/notes where the exporter reads them; never deletes stray files
-async function overwriteExistingTimeline(data, pkg, existing, opts) {
+async function overwriteExistingTimeline(data, pkg: ReturnType<typeof readPackage> | null, existing, opts) {
   const storageId = deriveStorageId(data.file);
   if (pkg) {
     const assetsRoot = await getAssetsRootDir();
@@ -913,7 +910,7 @@ type TimelineInstallOptions = {
 
 async function installTimelineFromBuffer(buf: Uint8Array, opts: TimelineInstallOptions = {}) {
   const { sourcePath = null, resolution = null } = opts;
-  let pkg = null;
+  let pkg: ReturnType<typeof readPackage> | null = null;
   let data;
   if (isZipBuffer(buf)) {
     pkg = readPackage(buf);

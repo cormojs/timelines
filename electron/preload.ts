@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer, webUtils } = require('electron');
+import { contextBridge, ipcRenderer, webUtils } from 'electron';
 
 const electronApi = {
   saveTimeline: (data, filename, options) => ipcRenderer.invoke('save-timeline', { data, filename, create: options?.create === true }),
@@ -65,12 +65,12 @@ const electronApi = {
   onGitSyncState: (callback) => {
     const listener = (_event, data) => callback(data);
     ipcRenderer.on('git-sync-state-changed', listener);
-    return () => ipcRenderer.removeListener('git-sync-state-changed', listener);
+    return () => { ipcRenderer.removeListener('git-sync-state-changed', listener); };
   },
   onGitSyncApplied: (callback) => {
     const listener = (_event, data) => callback(data);
     ipcRenderer.on('git-sync-applied', listener);
-    return () => ipcRenderer.removeListener('git-sync-applied', listener);
+    return () => { ipcRenderer.removeListener('git-sync-applied', listener); };
   },
   // Window controls
   minimizeWindow: () => ipcRenderer.send('minimize-window'),

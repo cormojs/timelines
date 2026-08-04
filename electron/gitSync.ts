@@ -1,12 +1,11 @@
 // Git sync engine; main.ts injects all library ops. See docs/private/git_sync_plan.md
-export {};
-const path = require('path');
-const os = require('os');
-const fs = require('fs');
-const fsp = fs.promises;
-const git = require('isomorphic-git');
-const httpNode = require('isomorphic-git/http/node');
-const { readPackage } = require('./timelinePackage');
+import * as path from 'node:path';
+import * as os from 'node:os';
+import * as fs from 'node:fs';
+import { promises as fsp } from 'node:fs';
+import * as git from 'isomorphic-git';
+import httpNode from 'isomorphic-git/http/node';
+import { readPackage } from './timelinePackage';
 
 const safeName = (value) => String(value || '')
   .trim()
