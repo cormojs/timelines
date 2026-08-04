@@ -11,6 +11,7 @@ import { setViewerPackage, getPackageNote, resolvePackageAssetSrc } from '../uti
 import { ensureUniqueElementIds } from '../utils/idUtils';
 import { setActiveDateFormat, getActiveDateFormat, normalizeLegacyDateLabel } from '../utils/dateUtils';
 import { parseFilterQuery } from '../utils/filterUtils';
+import { parsePanelPreferencesJson, parseTimelineJson } from '../utils/json';
 
 const DEFAULT_GROUP_ID = 'g-main';
 const SIDEBAR_WIDTH = 350;
@@ -30,7 +31,7 @@ const panelPrefsId = (file) => String(file?.uid || file?.id || file?.title || ''
 
 function readAllPanelPrefs() {
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(PANEL_PREFS_KEY) || '{}');
+    const parsed = parsePanelPreferencesJson(window.localStorage.getItem(PANEL_PREFS_KEY) || '{}');
     return parsed && typeof parsed === 'object' ? parsed : {};
   } catch {
     return {};
@@ -343,7 +344,7 @@ export default function ViewerApp() {
   const loadTimelineText = useCallback(
     (text) => {
       setViewerPackage(null);
-      applyTimelineData(JSON.parse(text));
+      applyTimelineData(parseTimelineJson(text));
     },
     [applyTimelineData],
   );
@@ -354,7 +355,7 @@ export default function ViewerApp() {
       if (isZipBuffer(bytes)) {
         const pkg = readPackage(bytes);
         setViewerPackage(pkg);
-        applyTimelineData(JSON.parse(pkg.timelineJson));
+        applyTimelineData(parseTimelineJson(pkg.timelineJson));
       } else {
         loadTimelineText(new TextDecoder().decode(bytes));
       }

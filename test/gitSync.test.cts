@@ -10,6 +10,7 @@ const { spawnSync } = require('node:child_process');
 const { createGitHttpServer } = require('./gitHttpServer.cts');
 const { createEngine, summarizePackageDiff, isConflictCopyPath } = require('../electron/gitSync.ts');
 const { buildPackage, readPackage, strToU8 } = require('../electron/timelinePackage.ts');
+const { parseTimelineJson } = require('../src/utils/json.ts');
 
 const runGit = (args, cwd) => {
   const r = spawnSync('git', args, { cwd, encoding: 'utf8' });
@@ -51,7 +52,7 @@ function makeLibrary() {
         } = {},
       ) => {
         const pkg = readPackage(buf);
-        const data = JSON.parse(pkg.timelineJson);
+        const data = parseTimelineJson(pkg.timelineJson);
         let uid = data.file.uid;
         const existing = timelines.get(uid);
         const record = {

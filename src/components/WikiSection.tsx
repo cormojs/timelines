@@ -4,6 +4,7 @@ import DOMPurify from 'dompurify';
 import { parseMediaWikiUrl } from '../utils/validation';
 import { fetchWikipedia } from '../utils/electronApi';
 import { getWikiCacheEntry, setWikiCacheEntry } from '../utils/wikiCacheStore';
+import { parseMediaWikiResponseJson } from '../utils/json';
 
 // Outside Electron there is no IPC proxy; MediaWiki APIs allow direct
 // anonymous CORS requests when origin=* is appended.
@@ -284,7 +285,7 @@ export default function WikiSection({ wikiUrl, useWiki, isEditMode, onUrlChange 
         const q = `?action=parse&page=${encodeURIComponent(title)}&prop=sections&format=json&formatversion=2`;
         const result = await fetchWikiApi(base + q);
         if (!result?.success) return null;
-        const j = JSON.parse(result.html);
+        const j = parseMediaWikiResponseJson(result.html);
         const sections = j?.parse?.sections;
         if (!Array.isArray(sections)) return null;
         const normalizedAnchor = anchor.replace(/_/g, ' ');
@@ -310,7 +311,7 @@ export default function WikiSection({ wikiUrl, useWiki, isEditMode, onUrlChange 
         if (sectionIndex != null) q += `&section=${sectionIndex}`;
         const result = await fetchWikiApi(base + q);
         if (!result?.success) return null;
-        const j = JSON.parse(result.html);
+        const j = parseMediaWikiResponseJson(result.html);
         let text = j?.parse?.text;
         if (text && typeof text === 'object') text = text['*'] ?? null;
         return text ? { parse: { ...j.parse, text } } : null;

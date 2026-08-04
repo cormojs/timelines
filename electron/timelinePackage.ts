@@ -2,6 +2,7 @@
 // format), assets/, notes/, and manifest.json. The same shape is read in the
 // browser viewer via src/utils/packageReader.ts; keep the two in sync.
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
+import { parseTimelinePackageManifestJson } from '../src/utils/json';
 
 const PACKAGE_FORMAT_VERSION = 1;
 
@@ -51,7 +52,7 @@ function readPackage(buf: Uint8Array) {
   let manifest = null;
   if (entries['manifest.json']) {
     try {
-      manifest = JSON.parse(strFromU8(entries['manifest.json']));
+      manifest = parseTimelinePackageManifestJson(strFromU8(entries['manifest.json']));
     } catch {}
   }
 

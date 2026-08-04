@@ -14,6 +14,7 @@ import {
   type CSSProperties,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { parseFilterHistoryJson } from '../utils/json';
 import {
   pickStep,
   buildSpanChildPlacement,
@@ -464,7 +465,7 @@ const TimelineView = forwardRef(function TimelineView(
   const [historyOpen, setHistoryOpen] = useState(false);
   const [filterHistory, setFilterHistory] = useState(() => {
     try {
-      const stored = JSON.parse(window.localStorage.getItem(FILTER_HISTORY_KEY) ?? '[]');
+      const stored = parseFilterHistoryJson(window.localStorage.getItem(FILTER_HISTORY_KEY) ?? '[]');
       return Array.isArray(stored) ? stored.filter((q) => typeof q === 'string').slice(0, FILTER_HISTORY_MAX) : [];
     } catch {
       return [];

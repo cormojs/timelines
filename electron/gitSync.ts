@@ -6,6 +6,7 @@ import { promises as fsp } from 'node:fs';
 import * as git from 'isomorphic-git';
 import httpNode from 'isomorphic-git/http/node';
 import { readPackage } from './timelinePackage';
+import { parseGitSyncStateJson, parseTimelineJson } from '../src/utils/json';
 
 const safeName = (value) =>
   String(value || '')
@@ -102,8 +103,8 @@ function summarizePackageDiff(oldBuf, newBuf) {
   try {
     oldPkg = readPackage(Buffer.from(oldBuf));
     newPkg = readPackage(Buffer.from(newBuf));
-    oldData = JSON.parse(oldPkg.timelineJson);
-    newData = JSON.parse(newPkg.timelineJson);
+    oldData = parseTimelineJson(oldPkg.timelineJson);
+    newData = parseTimelineJson(newPkg.timelineJson);
   } catch {
     return null;
   }
@@ -222,7 +223,7 @@ class GitSyncEngine {
 
   async init() {
     try {
-      this.state = JSON.parse(await fsp.readFile(this.statePath, 'utf8'));
+      this.state = parseGitSyncStateJson(await fsp.readFile(this.statePath, 'utf8'));
     } catch {
       this.state = null;
     }
@@ -1109,7 +1110,7 @@ class GitSyncEngine {
       if (!buf) continue;
       try {
         const pkg = readPackage(buf);
-        const data = JSON.parse(pkg.timelineJson);
+        const data = parseTimelineJson(pkg.timelineJson);
         const uid = data?.file?.uid || data?.file?.id?.replace(/-timeline$/, '') || null;
         out.push({ rel, uid, title: data?.file?.title || stripExt(rel) });
       } catch {}

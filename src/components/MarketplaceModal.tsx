@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { saveUserTheme, deleteUserTheme } from '../utils/electronApi';
 import { formatCollectionName } from '../utils/themeLoader';
+import { parseThemeJson } from '../utils/json';
 
 const MARKETPLACE_BASE = 'https://raw.githubusercontent.com/sreegjl/timelines-marketplace/refs/heads/main/';
 
@@ -184,7 +185,7 @@ export default function MarketplaceModal({
     for (const file of files) {
       try {
         const content = await file.text();
-        JSON.parse(content);
+        parseThemeJson(content);
         const id = file.name.replace(/\.json$/i, '');
         const result = await saveUserTheme({ id, content });
         if (!result?.success) throw new Error(result?.error || 'Save failed');

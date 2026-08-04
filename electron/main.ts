@@ -6,6 +6,13 @@ import { pathToFileURL } from 'node:url';
 import { autoUpdater } from 'electron-updater';
 import { isZipBuffer, readPackage, buildPackage, strToU8 } from './timelinePackage';
 import { createEngine } from './gitSync';
+import {
+  parseAppSettingsJson,
+  parseGitSyncCredentialsEnvelopeJson,
+  parseGitSyncCredentialsJson,
+  parseThemeJson,
+  parseTimelineJson,
+} from '../src/utils/json';
 const DEFAULT_THEME_KEY = 'parchment';
 const devServerUrl = process.env.ELECTRON_RENDERER_URL;
 
@@ -16,7 +23,7 @@ app.commandLine.appendSwitch('force-color-profile', 'srgb');
 try {
   const settingsPath = path.join(app.getPath('userData'), 'app-settings.json');
   const raw = fsSync.readFileSync(settingsPath, 'utf8');
-  const settings = JSON.parse(raw);
+  const settings = parseAppSettingsJson(raw);
   if (settings?.hardwareAcceleration === false) {
     app.disableHardwareAcceleration();
   }
@@ -132,7 +139,7 @@ const readAppSettings = async () => {
   if (appSettingsCache) return appSettingsCache;
   try {
     const content = await fs.readFile(appSettingsPath(), 'utf8');
-    appSettingsCache = JSON.parse(content);
+    appSettingsCache = parseAppSettingsJson(content);
   } catch (error) {
     appSettingsCache = {};
   }
@@ -143,7 +150,7 @@ async function writeAppSettingsPartial(partial) {
   const filePath = appSettingsPath();
   let existing = {};
   try {
-    existing = JSON.parse(await fs.readFile(filePath, 'utf8'));
+    existing = parseAppSettingsJson(await fs.readFile(filePath, 'utf8'));
   } catch {}
   await writeFileAtomic(filePath, JSON.stringify({ ...existing, ...partial }, null, 2));
   invalidateAppSettingsCache();
@@ -151,7 +158,7 @@ async function writeAppSettingsPartial(partial) {
 
 async function loadGitSyncCredentials() {
   try {
-    const raw = JSON.parse(await fs.readFile(gitSyncCredsPath(), 'utf8'));
+    const raw = parseGitSyncCredentialsEnvelopeJson(await fs.readFile(gitSyncCredsPath(), 'utf8'));
     if (!raw?.data) return null;
     let json = '';
     if (raw.encrypted) {
@@ -160,7 +167,7 @@ async function loadGitSyncCredentials() {
     } else {
       json = Buffer.from(raw.data, 'base64').toString('utf8');
     }
-    return JSON.parse(json);
+    return parseGitSyncCredentialsJson(json);
   } catch {
     return null;
   }
@@ -245,7 +252,7 @@ async function getStartupBackgroundColor() {
       return fallback;
     }
 
-    const data = JSON.parse(fsSync.readFileSync(filePath, 'utf8'));
+    const data = parseTimelineJson(fsSync.readFileSync(filePath, 'utf8'));
     return data?.colors?.['secondary-bg'] || fallback;
   } catch (error) {
     console.error('Failed to resolve startup theme background:', error);
@@ -276,7 +283,7 @@ async function createWindow() {
 
   try {
     const raw = fsSync.readFileSync(appSettingsPath(), 'utf8');
-    if (JSON.parse(raw)?.startMaximized === true) mainWindow.maximize();
+    if (parseAppSettingsJson(raw).startMaximized === true) mainWindow.maximize();
   } catch {}
 
   if (isDevelopment) {
@@ -612,8 +619,8 @@ ipcMain.handle('list-timelines', async () => {
             // one runs the transparent import (see import-timeline)
             const isPackage = isZipBuffer(content);
             const data = isPackage
-              ? JSON.parse(readPackage(content).timelineJson)
-              : JSON.parse(content.toString('utf8'));
+              ? parseTimelineJson(readPackage(content).timelineJson)
+              : parseTimelineJson(content.toString('utf8'));
             const stat = await fs.stat(fullPath);
             const parts = relativeId.split('/');
             const folder = parts.length > 1 ? parts.slice(0, -1).join('/') : '';
@@ -656,7 +663,7 @@ ipcMain.handle('load-timeline', async (event, filename) => {
     const safePath = existingTimelinePath(filename);
     const filePath = path.join(userDataDir, `${safePath}.timeline`);
     const content = await fs.readFile(filePath, 'utf8');
-    const data = JSON.parse(content);
+    const data = parseTimelineJson(content);
     if (data.file && !data.file.uid) {
       // One-time migration: stamp the immutable storage uid
       data.file.uid = data.file.id?.replace(/-timeline$/, '') || safePath.split('/').pop();
@@ -855,7 +862,7 @@ async function findTimelineByUid(uid) {
   const files = await listTimelineFilesRecursive(timelinesDir, timelinesDir);
   for (const file of files) {
     try {
-      const data = JSON.parse(await fs.readFile(file.fullPath, 'utf8'));
+      const data = parseTimelineJson(await fs.readFile(file.fullPath, 'utf8'));
       if (deriveStorageId(data.file) === uid) return file;
     } catch {}
   }
@@ -943,9 +950,9 @@ async function installTimelineFromBuffer(buf: Uint8Array, opts: TimelineInstallO
   let data;
   if (isZipBuffer(buf)) {
     pkg = readPackage(buf);
-    data = JSON.parse(pkg.timelineJson);
+    data = parseTimelineJson(pkg.timelineJson);
   } else {
-    data = JSON.parse(Buffer.from(buf).toString('utf8'));
+    data = parseTimelineJson(Buffer.from(buf).toString('utf8'));
   }
   if (!data || typeof data !== 'object' || !Array.isArray(data.elements)) {
     return { success: false, error: 'Not a valid timeline file' };
@@ -1087,7 +1094,7 @@ async function listGitSyncTimelines() {
     }
     if (isZipBuffer(raw)) continue;
     try {
-      const data = JSON.parse(raw.toString('utf8'));
+      const data = parseTimelineJson(raw.toString('utf8'));
       const uid = deriveStorageId(data.file) || relativeId.split('/').pop();
       timelines.push({
         uid,
@@ -1109,7 +1116,7 @@ async function buildGitSyncPackageForTimeline(timeline) {
   if (isZipBuffer(raw)) {
     throw new Error('Packaged timelines inside the library are not syncable');
   }
-  const data = JSON.parse(raw.toString('utf8'));
+  const data = parseTimelineJson(raw.toString('utf8'));
   if (!data.file?.uid) {
     data.file = { ...(data.file || {}), uid: deriveStorageId(data.file) || timeline.uid };
   }
@@ -1213,7 +1220,7 @@ ipcMain.handle('delete-timeline', async (event, payload) => {
     // Storage key can differ from the filename, so read it before deleting the file
     let storageId = safePath.split('/').pop();
     try {
-      const data = JSON.parse(await fs.readFile(filePath, 'utf8'));
+      const data = parseTimelineJson(await fs.readFile(filePath, 'utf8'));
       const idFromFile = deriveStorageId(data.file);
       if (idFromFile) storageId = idFromFile;
     } catch {}
@@ -1282,7 +1289,7 @@ ipcMain.handle('update-timeline-title', async (event, { id, title }) => {
     const filePath = path.join(baseDir, `${safePath}.timeline`);
     const nextFilePath = path.join(baseDir, `${nextPath}.timeline`);
     const content = await fs.readFile(filePath, 'utf8');
-    const data = JSON.parse(content);
+    const data = parseTimelineJson(content);
 
     data.file = {
       ...data.file,
@@ -1319,7 +1326,7 @@ ipcMain.handle('set-timeline-never-sync', async (event, payload) => {
     const filePath = path.join(baseDir, `${safePath}.timeline`);
     const raw = await fs.readFile(filePath);
     if (isZipBuffer(raw)) return { success: false, error: 'Packaged timelines cannot be flagged' };
-    const data = JSON.parse(raw.toString('utf8'));
+    const data = parseTimelineJson(raw.toString('utf8'));
     data.file = { ...(data.file || {}), neverSync };
     await writeFileAtomic(filePath, JSON.stringify(data, null, 2));
     markGitSyncStructureDirty();
@@ -1637,7 +1644,7 @@ ipcMain.handle('get-app-settings', async () => {
   try {
     const filePath = appSettingsPath();
     const content = await fs.readFile(filePath, 'utf8');
-    return JSON.parse(content);
+    return parseAppSettingsJson(content);
   } catch (error) {
     if (error.code === 'ENOENT') {
       return {};
@@ -1678,7 +1685,7 @@ ipcMain.handle('set-app-settings', async (event, settings) => {
     let existing = {};
     try {
       const raw = await fs.readFile(filePath, 'utf8');
-      existing = JSON.parse(raw);
+      existing = parseAppSettingsJson(raw);
     } catch {
       /* first run or corrupt file — start fresh */
     }
@@ -2128,7 +2135,7 @@ async function healMissingAssets(elements, storageId, currentFilePath) {
     if (path.normalize(f.fullPath) === path.normalize(currentFilePath)) continue;
     otherIds.add(f.relativeId.split('/').pop());
     try {
-      const d = JSON.parse(await fs.readFile(f.fullPath, 'utf8'));
+      const d = parseTimelineJson(await fs.readFile(f.fullPath, 'utf8'));
       const sid = deriveStorageId(d.file);
       if (sid) otherIds.add(sid);
     } catch {}
@@ -2284,7 +2291,7 @@ ipcMain.handle('list-themes', async () => {
     for (const file of themeFiles) {
       try {
         const content = await fs.readFile(path.join(dir, file), 'utf8');
-        const data = JSON.parse(content);
+        const data = parseThemeJson(content);
         const key = file.replace('.json', '');
         themes[key] = data;
       } catch (error) {
@@ -2306,7 +2313,7 @@ ipcMain.handle('save-user-theme', async (event, { id, content }) => {
     }
     let parsed;
     try {
-      parsed = JSON.parse(content);
+      parsed = parseThemeJson(content);
     } catch {
       return { success: false, error: 'Invalid JSON' };
     }
@@ -2338,7 +2345,7 @@ ipcMain.handle('import-theme-dialog', async () => {
       const displayName = path.basename(filePath);
       try {
         const content = await fs.readFile(filePath, 'utf8');
-        const parsed = JSON.parse(content);
+        const parsed = parseThemeJson(content);
         const safeId = sanitizeId(path.basename(filePath, '.json'), 'theme');
         await fs.writeFile(path.join(dir, `${safeId}.json`), JSON.stringify(parsed, null, 2), 'utf8');
         results.push({ success: true, id: safeId });

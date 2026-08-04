@@ -22,6 +22,7 @@ import { formatYear } from '../utils/timelineUtils';
 import { parseFilterQuery, matchesFilter } from '../utils/filterUtils';
 import { ICON_MAP } from '../config/elementIcons';
 import { pickAndImportImage } from '../utils/electronApi';
+import { parseSourcesJson } from '../utils/json';
 
 const TYPE_LABEL = { event: 'Event', span: 'Span', era: 'Era' };
 
@@ -647,7 +648,7 @@ export default function SpreadsheetView({
                 if (val === undefined) return;
                 if (field === 'sources') {
                   try {
-                    const parsed = JSON.parse(val.trim());
+                    const parsed = parseSourcesJson(val.trim());
                     if (Array.isArray(parsed)) {
                       el = { ...el };
                       if (parsed.length) el.sources = parsed;

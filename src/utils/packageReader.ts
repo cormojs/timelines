@@ -2,6 +2,7 @@
 // timeline.json + assets/ + notes/ + manifest.json). Mirrors
 // electron/timelinePackage.cts; keep the two in sync.
 import { unzipSync, strFromU8 } from 'fflate';
+import { parseTimelinePackageManifestJson } from './json';
 
 export const PACKAGE_FORMAT_VERSION = 1;
 
@@ -25,7 +26,7 @@ export function readPackage(buf) {
   let manifest = null;
   if (entries['manifest.json']) {
     try {
-      manifest = JSON.parse(strFromU8(entries['manifest.json']));
+      manifest = parseTimelinePackageManifestJson(strFromU8(entries['manifest.json']));
     } catch {
       /* ignore */
     }

@@ -1,4 +1,5 @@
 const STORAGE_KEY = 'timelines-app-settings';
+import { parseAppSettingsJson } from './json';
 
 export async function getAppSettings() {
   if (window.electron?.getAppSettings) {
@@ -13,7 +14,7 @@ export async function getAppSettings() {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return {};
   try {
-    return JSON.parse(raw);
+    return parseAppSettingsJson(raw);
   } catch (error) {
     console.error('Failed to parse app settings:', error);
     return {};
