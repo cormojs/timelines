@@ -1,18 +1,35 @@
 type Rgb = readonly [number, number, number];
 
+const HEX_RGB_RE = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
+const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
+
 const parseHexRGB = (hex: unknown): Rgb | null => {
   if (typeof hex !== 'string') return null;
-  const v = hex.trim();
-  const short = /^#([0-9a-f]{3})$/i.exec(v);
-  if (short) {
-    const [r, g, b] = short[1].split('').map((c) => parseInt(c + c, 16));
-    return [r, g, b];
-  }
-  const full = /^#([0-9a-f]{6})$/i.exec(v);
-  if (full) {
-    return [parseInt(full[1].slice(0, 2), 16), parseInt(full[1].slice(2, 4), 16), parseInt(full[1].slice(4, 6), 16)];
-  }
-  return null;
+  const match = HEX_RGB_RE.exec(hex.trim());
+  if (!match) return null;
+  const channels = match[1].length === 3 ? match[1].replace(/./g, '$&$&') : match[1];
+  return [
+    Number.parseInt(channels.slice(0, 2), 16),
+    Number.parseInt(channels.slice(2, 4), 16),
+    Number.parseInt(channels.slice(4, 6), 16),
+  ];
+};
+
+const toHex = (channel: number): string => channel.toString(16).padStart(2, '0');
+
+export const colorToHex = (color: unknown): string | null => {
+  const hex = parseHexRGB(color);
+  if (hex) return `#${hex.map(toHex).join('')}`;
+
+  if (typeof color !== 'string') return null;
+  const match = /^rgba?\(([^)]+)\)$/i.exec(color.trim());
+  if (!match) return null;
+  const channels = match[1]
+    .split(',')
+    .slice(0, 3)
+    .map((part) => Number.parseFloat(part.trim()));
+  if (channels.length !== 3 || channels.some(Number.isNaN)) return null;
+  return `#${channels.map((channel) => toHex(Math.min(255, Math.max(0, Math.round(channel))))).join('')}`;
 };
 
 export const withAlpha = (hex: unknown, alpha: number): string => {
@@ -33,15 +50,13 @@ export const blendColors = (hex1: unknown, hex2: unknown, weight1 = 0.5): string
   const r = Math.round(c1[0] * w + c2[0] * (1 - w));
   const g = Math.round(c1[1] * w + c2[1] * (1 - w));
   const b = Math.round(c1[2] * w + c2[2] * (1 - w));
-  return `#${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)}`;
+  return `#${[r, g, b].map(toHex).join('')}`;
 };
-
-const isValidHexColor = (color: string): boolean => /^#[0-9A-Fa-f]{6}$/.test(color);
 
 export const normalizeColor = (color: unknown): string => {
   if (typeof color !== 'string' || !color) return '#808080';
-  if (isValidHexColor(color)) return color;
+  if (HEX_COLOR_RE.test(color)) return color;
   const cleaned = color.replace(/[^0-9A-Fa-f#]/g, '');
-  if (isValidHexColor(cleaned)) return cleaned;
+  if (HEX_COLOR_RE.test(cleaned)) return cleaned;
   return '#808080';
 };

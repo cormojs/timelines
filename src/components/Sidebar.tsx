@@ -32,6 +32,7 @@ import {
   Package,
 } from 'lucide-react';
 import { formatYear } from '../utils/timelineUtils';
+import { colorToHex } from '../utils/colorUtils';
 import { displayDateLabel } from '../utils/dateUtils';
 import { ICON_MAP as iconMap } from '../config/elementIcons';
 import type { Keybinds, TimelineData, TimelineElement, TimelineFile, TimelineGroup } from '../types/timeline';
@@ -148,36 +149,7 @@ type ScaleSection = Record<string, unknown> & {
 const isScaleSection = (value: unknown): value is ScaleSection => typeof value === 'object' && value !== null;
 const numberOrZero = (value: unknown): number => (typeof value === 'number' && Number.isFinite(value) ? value : 0);
 
-const expandShortHex = (value: string): string =>
-  value
-    .split('')
-    .map((char) => char + char)
-    .join('');
-
-const normalizeHexColor = (value: unknown): string | null => {
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  const short = /^#([0-9a-f]{3})$/i.exec(trimmed);
-  if (short) return `#${expandShortHex(short[1]).toLowerCase()}`;
-  const full = /^#([0-9a-f]{6})$/i.exec(trimmed);
-  if (full) return `#${full[1].toLowerCase()}`;
-  return null;
-};
-
-const rgbToHex = (value: unknown): string | null => {
-  if (typeof value !== 'string') return null;
-  const match = /^rgba?\(([^)]+)\)$/i.exec(value.trim());
-  if (!match) return null;
-  const channels = match[1]
-    .split(',')
-    .slice(0, 3)
-    .map((part) => Number.parseFloat(part.trim()));
-  if (channels.length !== 3 || channels.some((channel) => Number.isNaN(channel))) return null;
-  const [r, g, b] = channels.map((channel) => Math.max(0, Math.min(255, Math.round(channel))));
-  return `#${[r, g, b].map((channel) => channel.toString(16).padStart(2, '0')).join('')}`;
-};
-
-const normalizeColorForInput = (value: unknown): string | null => normalizeHexColor(value) || rgbToHex(value);
+const normalizeColorForInput = colorToHex;
 
 const resolveThemeGroupColor = () => {
   if (typeof window === 'undefined') return null;
@@ -193,7 +165,7 @@ const resolveSecondaryBg = () => {
 
 // Returns a version of eraColor that reads well on bgHex while keeping the hue recognizable.
 function getEraLabelColor(eraColor: unknown, bgHex: string | null): string | null {
-  const hex = normalizeHexColor(eraColor);
+  const hex = colorToHex(eraColor);
   if (!hex) return null;
   const eR = parseInt(hex.slice(1, 3), 16);
   const eG = parseInt(hex.slice(3, 5), 16);

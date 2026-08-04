@@ -1,4 +1,5 @@
 import { parseTimelineInput, snapToMonthGrid } from './dateUtils';
+import { slugify } from './idUtils';
 import type { TimelineData, TimelineElement } from '../types/timeline';
 
 export type ScaleSectionInput = { start?: string; end?: string; scale?: string; showBreak?: boolean };
@@ -65,13 +66,7 @@ export const parseMediaWikiUrl = (url: string): { host: string; title: string; s
 
 // --- Title sanitization (SettingsModal) ---
 
-export const sanitizeTitle = (value: unknown): string =>
-  String(value || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
+export const sanitizeTitle = slugify;
 
 // --- Scale section helpers (SettingsModal) ---
 
