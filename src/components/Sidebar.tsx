@@ -1747,7 +1747,7 @@ export default function Sidebar({
                       }
                     }}
                     onDragLeave={(e) => {
-                      if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDividerDragOver(false);
+                      if (!(e.relatedTarget instanceof Node) || !e.currentTarget.contains(e.relatedTarget)) setDividerDragOver(false);
                     }}
                     onDrop={(e) => {
                       e.preventDefault();
@@ -1795,7 +1795,7 @@ export default function Sidebar({
                         }
                       }}
                       onDragLeave={(e) => {
-                        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                        if (!(e.relatedTarget instanceof Node) || !e.currentTarget.contains(e.relatedTarget)) {
                           setDragOverPlacement((prev) => (prev?.id === group.id ? null : prev));
                         }
                       }}
@@ -1978,7 +1978,7 @@ export default function Sidebar({
                     }
                   }}
                   onDragLeave={(e) => {
-                    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDividerDragOver(false);
+                    if (!(e.relatedTarget instanceof Node) || !e.currentTarget.contains(e.relatedTarget)) setDividerDragOver(false);
                   }}
                   onDrop={(e) => {
                     e.preventDefault();

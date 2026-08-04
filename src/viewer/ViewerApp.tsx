@@ -525,7 +525,7 @@ export default function ViewerApp() {
         element.tags.forEach((tag) => { if (tag) tags.add(tag); });
       }
     });
-    return (Array.from(tags) as string[]).sort((a, b) => a.localeCompare(b));
+    return Array.from(tags).filter((tag): tag is string => typeof tag === "string").sort((a, b) => a.localeCompare(b));
   }, [timelineData]);
 
   useEffect(() => {

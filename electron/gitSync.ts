@@ -162,6 +162,11 @@ const isAuthError = (err) => err?.code === 'HttpError'
 const isEmptyRemoteError = (err) => err?.code === 'NotFoundError'
   || /could not find|no refs|empty/i.test(err?.message || '');
 
+function getChangeTarget(change: unknown): string | undefined {
+  if (typeof change !== 'object' || change === null || !('to' in change)) return undefined;
+  return typeof change.to === 'string' ? change.to : undefined;
+}
+
 class GitSyncEngine {
   [key: string]: DynamicValue;
 
@@ -865,7 +870,7 @@ class GitSyncEngine {
       const remote = remoteByPath.get(change.path);
       if (!remote) {
         localWins.push(change);
-      } else if ((remote as { to?: string }).to !== (change as { to?: string }).to) {
+      } else if (getChangeTarget(remote) !== getChangeTarget(change)) {
         // Remote wins the path, so the import pass must apply its version
         exportedPaths?.delete(change.path);
         if (change.to && change.path.endsWith('.timeline')) {

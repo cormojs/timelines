@@ -182,7 +182,7 @@ import NewTimelineModal from "./NewTimelineModal";
 import "../styles/02-homepage.css";
 import "../styles/07-modals-menus.css";
 import themeConfig from "../config/theme.json";
-import { loadThemeConfig, themeOptionLabel } from "../utils/themeLoader";
+import { isTheme, loadThemeConfig, themeOptionLabel } from "../utils/themeLoader";
 import { DEFAULT_KEYBINDS, cloneDefaultKeybinds, saveKeybinds } from "../utils/keybinds";
 import MarketplaceModal from "./MarketplaceModal";
 
@@ -1275,18 +1275,18 @@ export default function HomePage({
 
   const handleGitSyncExcludeChange = async (targetKey, nextChecked) => {
     const targetId = targetKey.endsWith("/") ? targetKey.slice(0, -1) : targetKey;
-    const next = new Set(gitSyncExcludedSet);
+    const next = new Set(Array.from(gitSyncExcludedSet).filter((value): value is string => typeof value === "string"));
     if (nextChecked) {
       next.delete(targetKey);
       next.delete(targetId);
     } else {
-      for (const e of [...next] as string[]) {
+      for (const e of next) {
         const eId = e.endsWith("/") ? e.slice(0, -1) : e;
         if (eId === targetId || eId.startsWith(`${targetId}/`)) next.delete(e);
       }
       next.add(targetKey);
     }
-    await saveGitSyncSettings({ excludedPaths: [...next] as string[] });
+    await saveGitSyncSettings({ excludedPaths: [...next] });
   };
 
   if (loading && !settingsOnly) {
@@ -1931,18 +1931,17 @@ export default function HomePage({
                               onChange={(e) => onAppThemeChange?.(e.target.value)}
                             >
                               {appThemes.map(([key, theme]) => {
+                                if (!isTheme(theme)) return null;
                                 const isDefault = key.toLowerCase() === "parchment_v2";
-                                const label = `${themeOptionLabel(key, theme as Parameters<typeof themeOptionLabel>[1])}${isDefault ? " (Default)" : ""}`;
+                                const label = `${themeOptionLabel(key, theme)}${isDefault ? " (Default)" : ""}`;
                                 return (
                                   <option key={key} value={key}>
                                     {label}
                                   </option>
                                 );
                               })}
-                              {userThemes.map(([key, theme]) => (
-                                <option key={key} value={key}>
-                                  {themeOptionLabel(key, theme as Parameters<typeof themeOptionLabel>[1])}
-                                </option>
+                              {userThemes.map(([key, theme]) => isTheme(theme) && (
+                                <option key={key} value={key}>{themeOptionLabel(key, theme)}</option>
                               ))}
                             </select>
                           </div>

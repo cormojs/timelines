@@ -1626,11 +1626,12 @@ function App() {
   };
 
   const getThemeFont = useCallback((themeKeyValue) => {
-    const theme = themeConfig.themes?.[themeKeyValue] as { font?: { family?: string; cssUrl?: string } } | undefined;
-    if (!theme?.font?.family) return null;
+    const theme = themeConfig.themes?.[themeKeyValue];
+    const font = theme?.font;
+    if (typeof font !== "object" || font === null || !("family" in font) || typeof font.family !== "string") return null;
     return {
-      family: theme.font.family,
-      cssUrl: theme.font.cssUrl,
+      family: font.family,
+      cssUrl: "cssUrl" in font && typeof font.cssUrl === "string" ? font.cssUrl : undefined,
     };
   }, [themeConfig]);
 
@@ -1995,7 +1996,7 @@ function App() {
         });
       }
     });
-    return (Array.from(tags) as string[]).sort((a, b) => a.localeCompare(b));
+    return Array.from(tags).filter((tag): tag is string => typeof tag === "string").sort((a, b) => a.localeCompare(b));
   }, [timelineData]);
 
   useEffect(() => {

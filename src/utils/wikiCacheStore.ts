@@ -41,9 +41,16 @@ function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
   });
 }
 
+function isWikiCacheEntry(value: unknown): value is WikiCacheEntry {
+  return typeof value === "object" && value !== null
+    && "key" in value && typeof value.key === "string"
+    && "html" in value && typeof value.html === "string";
+}
+
 async function prune(db: IDBDatabase) {
   const store = db.transaction(STORE_NAME, "readwrite").objectStore(STORE_NAME);
-  const entries = await requestToPromise(store.getAll()) as WikiCacheEntry[];
+  const rawEntries = await requestToPromise(store.getAll());
+  const entries = Array.isArray(rawEntries) ? rawEntries.filter(isWikiCacheEntry) : [];
   let total = entries.reduce((sum, e) => sum + (e.bytes || 0), 0);
   if (total <= MAX_TOTAL_BYTES) return;
   entries.sort((a, b) => (a.lastUsedAt || 0) - (b.lastUsedAt || 0));
@@ -58,8 +65,8 @@ export async function getWikiCacheEntry(key: string): Promise<WikiCacheEntry | n
   try {
     const db = await openDb();
     const store = db.transaction(STORE_NAME, "readwrite").objectStore(STORE_NAME);
-    const entry = await requestToPromise(store.get(key)) as WikiCacheEntry | undefined;
-    if (!entry) return null;
+    const entry = await requestToPromise(store.get(key));
+    if (!isWikiCacheEntry(entry)) return null;
     store.put({ ...entry, lastUsedAt: Date.now() });
     return entry;
   } catch {

@@ -30,9 +30,9 @@ function makeColoredIcon(color, selected, markerType = DEFAULT_MARKER_TYPE) {
     : "white";
   const strokeWidth = selected ? 4 : 1.5;
   let svg = "";
-  let iconSize = [24, 36];
-  let iconAnchor = [12, 36];
-  let tooltipAnchor = [14, -18];
+  let iconSize: L.PointExpression = [24, 36];
+  let iconAnchor: L.PointExpression = [12, 36];
+  let tooltipAnchor: L.PointExpression = [14, -18];
 
   if (markerType === "circle") {
     iconSize = [24, 24];
@@ -86,9 +86,9 @@ function makeColoredIcon(color, selected, markerType = DEFAULT_MARKER_TYPE) {
   return L.divIcon({
     html: svg,
     className: "",
-    iconSize: iconSize as L.PointExpression,
-    iconAnchor: iconAnchor as L.PointExpression,
-    tooltipAnchor: tooltipAnchor as L.PointExpression,
+    iconSize,
+    iconAnchor,
+    tooltipAnchor,
   });
 }
 
@@ -128,7 +128,7 @@ function formatElementDate(el, fileConfig) {
 function MapClickHandler({ onSelect }) {
   useMapEvents({
     click: (e) => {
-      if ((e.originalEvent?.target as Element | null)?.closest(".leaflet-marker-icon")) return;
+      if (e.originalEvent?.target instanceof Element && e.originalEvent.target.closest(".leaflet-marker-icon")) return;
       onSelect?.(null);
     }
   });
@@ -138,7 +138,7 @@ function MapClickHandler({ onSelect }) {
 function MapContextMenuHandler({ onOpenContextMenu }) {
   useMapEvents({
     contextmenu: (e) => {
-      if ((e.originalEvent?.target as Element | null)?.closest(".leaflet-marker-icon")) return;
+      if (e.originalEvent?.target instanceof Element && e.originalEvent.target.closest(".leaflet-marker-icon")) return;
       L.DomEvent.stop(e.originalEvent);
       onOpenContextMenu?.({
         x: e.originalEvent?.clientX ?? 0,
@@ -156,7 +156,9 @@ function HoverCleanupHandler({ onHoverChange }) {
 
   useMapEvents({
     mousemove: (e) => {
-      const overMarker = (e.originalEvent?.target as Element | null)?.closest(".leaflet-marker-icon");
+      const overMarker = e.originalEvent?.target instanceof Element
+        ? e.originalEvent.target.closest(".leaflet-marker-icon")
+        : null;
       if (!overMarker) onHoverChange(null);
     },
     dragstart: () => onHoverChange(null),
@@ -300,7 +302,7 @@ export default memo(forwardRef(function MapView({ elements = [], onSelect, onOpe
   );
   const [hoveredId, setHoveredId] = useState(null);
 
-  const [initialView] = useState(() => ({
+  const [initialView] = useState<{ center: L.LatLngExpression; zoom: number }>(() => ({
     center: markers.length > 0 ? [Number(markers[0].lat), Number(markers[0].lng)] : [20, 0],
     zoom: markers.length > 0 ? 5 : 2,
   }));
@@ -310,7 +312,7 @@ export default memo(forwardRef(function MapView({ elements = [], onSelect, onOpe
   return (
     <div className="timeline-map-view">
       <MapContainer
-        center={initialView.center as L.LatLngExpression}
+        center={initialView.center}
         zoom={initialView.zoom}
         style={{ width: "100%", height: "100%" }}
         zoomControl={true}

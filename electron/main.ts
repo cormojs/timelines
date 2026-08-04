@@ -705,11 +705,11 @@ ipcMain.handle('export-timeline', async (event, { data, suggestedName }) => {
 });
 
 // Image/video refs inside note markdown: ![alt](src) tokens and src="..." attributes
-function extractNoteImageSrcs(markdown) {
-  const srcs = new Set();
+function extractNoteImageSrcs(markdown): string[] {
+  const srcs = new Set<string>();
   const md = String(markdown || '');
-  for (const m of md.matchAll(/!\[[^\]]*\]\(\s*<?([^)\s>]+)/g)) srcs.add(m[1]);
-  for (const m of md.matchAll(/\bsrc\s*=\s*["']([^"']+)["']/gi)) srcs.add(m[1]);
+  for (const m of md.matchAll(/!\[[^\]]*\]\(\s*<?([^)\s>]+)/g)) if (m[1]) srcs.add(m[1]);
+  for (const m of md.matchAll(/\bsrc\s*=\s*["']([^"']+)["']/gi)) if (m[1]) srcs.add(m[1]);
   return [...srcs];
 }
 
@@ -766,7 +766,7 @@ async function collectPackageFiles(data, storageId) {
     } catch {}
     if (content === null) { skipped.push(el.noteFile); continue; }
 
-    for (const src of extractNoteImageSrcs(content) as string[]) {
+    for (const src of extractNoteImageSrcs(content)) {
       if (src.startsWith('timelines-asset://')) {
         const decoded = decodeAssetUrl(src);
         const normalizedRoot = path.normalize(assetsRoot);

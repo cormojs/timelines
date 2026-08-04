@@ -300,13 +300,13 @@ function assignEraLanes(eras, bandHeight, bandGap) {
 }
 
 function OverflowTags({ tags, tagColors, getReadableTextColor: readableColor }) {
-  const containerRef = useRef(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const [visibleCount, setVisibleCount] = useState(tags.length);
 
   useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const tagEls = Array.from((el as HTMLElement).querySelectorAll('.pinned-tag-item')) as HTMLElement[];
+    const tagEls = Array.from(el.querySelectorAll<HTMLElement>('.pinned-tag-item'));
     if (tagEls.length < 2) return;
     const firstTop = tagEls[0].getBoundingClientRect().top;
     let firstLineCount = 0;
@@ -3242,7 +3242,7 @@ const TimelineView = forwardRef(function TimelineView({
       ref={containerRef}
       className={`timeline-scroll${file?.fixedEventHeight ? ' fixed-event-height' : ''}`}
       style={file?.useSecondaryBg ? { backgroundColor: "var(--surface)" } : undefined}
-      onClick={(e) => { if (!file?.keepSelection && (e.target === e.currentTarget || (e.target as Element).closest(".timeline, .grid-year-labels-overlay"))) handleSelect(null); }}
+      onClick={(e) => { if (!file?.keepSelection && (e.target === e.currentTarget || (e.target instanceof Element && e.target.closest(".timeline, .grid-year-labels-overlay")))) handleSelect(null); }}
       onContextMenu={handleContextMenu}
     >
       {!fontReady && !showMap && <div className="timeline-loading">Loading…</div>}
@@ -3902,7 +3902,7 @@ const TimelineView = forwardRef(function TimelineView({
                         }}
                       >
                         {event.thumbnail && (event.thumbnailStyle === "square-fill" || event.thumbnailStyle === "circle-fill") ? (
-                          <img className={event.thumbnailStyle === "circle-fill" ? "event-thumbnail-circle" : "event-thumbnail-square"} src={event.thumbnail} alt="" style={{ objectFit: event.thumbnailFit || "cover" }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                          <img className={event.thumbnailStyle === "circle-fill" ? "event-thumbnail-circle" : "event-thumbnail-square"} src={event.thumbnail} alt="" style={{ objectFit: event.thumbnailFit || "cover" }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                         ) : (<>
                         {event.thumbnail && event.thumbnailStyle !== "banner" && <div className="event-thumbnail-tile" style={{ backgroundImage: `url("${event.thumbnail}")`, backgroundSize: event.thumbnailFit || "cover" }} />}
                         {event.thumbnail && event.thumbnailStyle === "banner" && <img className="event-thumbnail-banner" src={event.thumbnail} alt="" style={{ objectFit: event.thumbnailFit || "cover" }} />}
@@ -4232,7 +4232,7 @@ const TimelineView = forwardRef(function TimelineView({
                 }}
               >
                 {event.thumbnail && event.thumbnailStyle === "square-fill" ? (
-                  <img className="event-thumbnail-square" src={event.thumbnail} alt="" style={{ objectFit: event.thumbnailFit || "cover" }} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                  <img className="event-thumbnail-square" src={event.thumbnail} alt="" style={{ objectFit: event.thumbnailFit || "cover" }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                 ) : (<>
                 {event.thumbnail && event.thumbnailStyle !== "banner" && <div className="event-thumbnail-tile" style={{ backgroundImage: `url("${event.thumbnail}")`, backgroundSize: event.thumbnailFit || "cover" }} />}
                 {event.thumbnail && event.thumbnailStyle === "banner" && <img className="event-thumbnail-banner" src={event.thumbnail} alt="" style={{ objectFit: event.thumbnailFit || "cover" }} />}

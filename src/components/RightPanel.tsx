@@ -569,13 +569,13 @@ export default function RightPanel({
         });
       }
     });
-    return (Array.from(tags) as string[]).sort((a, b) => a.localeCompare(b));
+    return Array.from(tags).filter((tag): tag is string => typeof tag === "string").sort((a, b) => a.localeCompare(b));
   }, [timelineData]);
 
   const tagSuggestions = useMemo(() => {
     const needle = tagQuery.trim().toLowerCase();
     if (!needle) return tagCandidates;
-    return (tagCandidates as string[]).filter((tag) => tag.toLowerCase().includes(needle));
+    return tagCandidates.filter((tag) => tag.toLowerCase().includes(needle));
   }, [tagCandidates, tagQuery]);
 
   const setSpanParent = (spanId) => {
@@ -992,8 +992,8 @@ export default function RightPanel({
                     className="note-render"
                     ref={noteViewCallbackRef}
                     onClick={(e) => {
-                      const target = e.target as HTMLInputElement;
-                      if (target.tagName !== "INPUT" || target.type !== "checkbox") return;
+                      const target = e.target;
+                      if (!(target instanceof HTMLInputElement) || target.type !== "checkbox") return;
                       e.preventDefault();
                       const idx = parseInt(target.getAttribute("data-idx") || "", 10);
                       if (!isNaN(idx) && !readOnly) handleTaskToggle(idx);
@@ -1853,7 +1853,7 @@ export default function RightPanel({
                     } catch {
                       ext = formData.thumbnail.split('.').pop()?.split('?')[0]?.toLowerCase() ?? '';
                     }
-                    const image = e.target as HTMLImageElement;
+                    const image = e.currentTarget;
                     setThumbnailMeta({ width: image.naturalWidth, height: image.naturalHeight, ext });
                   }}
                 />

@@ -19,6 +19,8 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
       parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
         ecmaVersion: 'latest',
         ecmaFeatures: { jsx: true },
         sourceType: 'module',
@@ -32,6 +34,7 @@ export default defineConfig([
       }],
       '@typescript-eslint/ban-ts-comment': 'off',
       '@typescript-eslint/no-require-imports': 'off',
+      '@typescript-eslint/no-unsafe-type-assertion': 'error',
       'no-empty': 'off',
       'no-irregular-whitespace': 'off',
       'prefer-const': 'off',
