@@ -1,12 +1,20 @@
 // ─── Tokenizer ────────────────────────────────────────────────────────────────
 
-const SPECIAL = ' \t|()~"<>';
+import type { TimelineElement } from '../types/timeline';
 
-function tokenize(input) {
+const SPECIAL = ' \t|()~"<>';
+type DateOperator = '<' | '<=' | '>' | '>=';
+type LeafKind = 'quoted' | 'date' | 'type' | 'has' | 'contains' | 'tag' | 'text';
+type LeafToken = { t: 'LEAF'; kind: LeafKind; value: string; op?: DateOperator };
+type Token = { t: 'LPAREN' | 'RPAREN' | 'OR' | 'NOT' | 'PENDING_CONTAINS' } | LeafToken;
+type FilterNode =
+  LeafToken | { t: 'AND' | 'OR'; left: FilterNode; right: FilterNode } | { t: 'NOT'; operand: FilterNode };
+
+function tokenize(input: string): Token[] {
   const s = input;
   const len = s.length;
   let i = 0;
-  const raw = [];
+  const raw: Token[] = [];
 
   const skipWS = () => {
     while (i < len && (s[i] === ' ' || s[i] === '\t')) i++;
@@ -53,10 +61,10 @@ function tokenize(input) {
     }
 
     if (ch === '<' || ch === '>') {
-      let op = ch;
+      let op: DateOperator = ch;
       i++;
       if (i < len && s[i] === '=') {
-        op += '=';
+        op = ch === '<' ? '<=' : '>=';
         i++;
       }
       skipWS();
@@ -88,7 +96,7 @@ function tokenize(input) {
   }
 
   // Resolve "contains: text" (space between keyword and value)
-  const tokens = [];
+  const tokens: Token[] = [];
   for (let j = 0; j < raw.length; j++) {
     if (raw[j].t === 'PENDING_CONTAINS') {
       const next = raw[j + 1];
@@ -105,16 +113,16 @@ function tokenize(input) {
 
 // ─── Parser (recursive descent) ───────────────────────────────────────────────
 
-function parse(tokens) {
+function parse(tokens: Token[]): FilterNode | null {
   let pos = 0;
   const peek = () => tokens[pos];
   const consume = () => tokens[pos++];
 
-  function parseExpr() {
+  function parseExpr(): FilterNode | null {
     return parseOr();
   }
 
-  function parseOr() {
+  function parseOr(): FilterNode | null {
     let left = parseAnd();
     while (peek()?.t === 'OR') {
       consume();
@@ -124,7 +132,7 @@ function parse(tokens) {
     return left;
   }
 
-  function parseAnd() {
+  function parseAnd(): FilterNode | null {
     let left = parseNot();
     while (peek() && peek().t !== 'OR' && peek().t !== 'RPAREN') {
       const right = parseNot();
@@ -134,7 +142,7 @@ function parse(tokens) {
     return left;
   }
 
-  function parseNot() {
+  function parseNot(): FilterNode | null {
     if (peek()?.t === 'NOT') {
       consume();
       const operand = parsePrimary();
@@ -143,14 +151,18 @@ function parse(tokens) {
     return parsePrimary();
   }
 
-  function parsePrimary() {
+  function parsePrimary(): FilterNode | null {
     if (peek()?.t === 'LPAREN') {
       consume();
       const expr = parseExpr();
       if (peek()?.t === 'RPAREN') consume();
       return expr;
     }
-    if (peek()?.t === 'LEAF') return consume();
+    const token = peek();
+    if (token?.t === 'LEAF') {
+      consume();
+      return token;
+    }
     if (peek()) consume();
     return null;
   }
@@ -160,7 +172,7 @@ function parse(tokens) {
 
 // ─── Date parsing ─────────────────────────────────────────────────────────────
 
-function parseDateValue(val) {
+function parseDateValue(val: string): number | null {
   const full = /^(-?\d+)-(\d{2})-(\d{2})$/.exec(val);
   if (full) {
     const year = parseInt(full[1], 10);
@@ -174,8 +186,8 @@ function parseDateValue(val) {
 
 // ─── Evaluator ────────────────────────────────────────────────────────────────
 
-function evalLeaf(leaf, el, noteContent) {
-  const title = (el.title || el.id || '').toLowerCase();
+function evalLeaf(leaf: LeafToken, el: TimelineElement, noteContent: string | null): boolean {
+  const title = String(el.title || el.id || '').toLowerCase();
 
   switch (leaf.kind) {
     case 'text':
@@ -187,7 +199,7 @@ function evalLeaf(leaf, el, noteContent) {
 
     case 'tag': {
       const tags = Array.isArray(el.tags) ? el.tags : [];
-      return tags.some((t) => t.toLowerCase() === leaf.value);
+      return tags.some((t: string) => t.toLowerCase() === leaf.value);
     }
 
     case 'has':
@@ -222,7 +234,7 @@ function evalLeaf(leaf, el, noteContent) {
   }
 }
 
-function evalNode(node, el, noteContent) {
+function evalNode(node: FilterNode | null, el: TimelineElement, noteContent: string | null): boolean {
   if (!node) return true;
   switch (node.t) {
     case 'AND':
@@ -240,12 +252,12 @@ function evalNode(node, el, noteContent) {
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
-export function tokenizeFilterQuery(query) {
+export function tokenizeFilterQuery(query: string): Token[] {
   const q = (query || '').trim();
   return q ? tokenize(q) : [];
 }
 
-export function parseFilterQuery(query) {
+export function parseFilterQuery(query: string): FilterNode | null {
   const q = (query || '').trim();
   if (!q) return null;
   const tokens = tokenize(q);
@@ -253,7 +265,11 @@ export function parseFilterQuery(query) {
   return parse(tokens);
 }
 
-export function matchesFilter(el, parsedQuery, noteContent = null) {
+export function matchesFilter(
+  el: TimelineElement,
+  parsedQuery: FilterNode | null,
+  noteContent: string | null = null,
+): boolean {
   if (!parsedQuery) return true;
   return evalNode(parsedQuery, el, noteContent);
 }

@@ -4,7 +4,7 @@
 
 type ViewerPackage = {
   notes?: Record<string, string>;
-  assets?: Record<string, BlobPart>;
+  assets?: Record<string, Uint8Array<ArrayBufferLike>>;
 };
 
 type ViewerPackageStore = {
@@ -16,7 +16,7 @@ let current: ViewerPackageStore | null = null;
 
 // Mirrors sanitizeNoteFilename in electron/main.cts so bare noteFile refs
 // find the entry the desktop app would have written
-const sanitizeNoteFilename = (value) => {
+const sanitizeNoteFilename = (value: unknown): string => {
   const base = String(value || '').replace(/\.md$/i, '');
   const cleaned = base
     .trim()
@@ -51,7 +51,10 @@ export function setViewerPackage(pkg: ViewerPackage | null) {
   const assetUrls: Record<string, string> = {};
   for (const [rel, bytes] of Object.entries(pkg.assets || {})) {
     const ext = rel.split('.').pop()?.toLowerCase() ?? '';
-    assetUrls[rel] = URL.createObjectURL(new Blob([bytes], { type: MIME_BY_EXT[ext] || 'application/octet-stream' }));
+    const blobBytes = Uint8Array.from(bytes);
+    assetUrls[rel] = URL.createObjectURL(
+      new Blob([blobBytes], { type: MIME_BY_EXT[ext] || 'application/octet-stream' }),
+    );
   }
   current = { notes: pkg.notes || {}, assetUrls };
 }

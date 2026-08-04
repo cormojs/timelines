@@ -1,6 +1,7 @@
 import { getAppSettings, saveAppSettings } from './appSettings';
+import type { Keybind, Keybinds } from '../types/timeline';
 
-export const DEFAULT_KEYBINDS = {
+export const DEFAULT_KEYBINDS: Keybinds = {
   search: { label: 'Search', keys: ['Ctrl', 'F'] },
   play: { label: 'Play / Pause', keys: ['Space'] },
   undo: { label: 'Undo', keys: ['Ctrl', 'Z'] },
@@ -15,19 +16,19 @@ export const DEFAULT_KEYBINDS = {
   newEra: { label: 'New Era', keys: ['Ctrl', 'Shift', 'R'] },
 };
 
-export function cloneDefaultKeybinds() {
+export function cloneDefaultKeybinds(): Keybinds {
   return Object.fromEntries(
     Object.entries(DEFAULT_KEYBINDS).map(([id, bind]) => [id, { ...bind, keys: [...bind.keys] }]),
   );
 }
 
-export function matchesKeybind(event, bind) {
+export function matchesKeybind(event: KeyboardEvent, bind: Keybind | null | undefined): boolean {
   if (!bind?.keys?.length) return false;
-  const keys = bind.keys.map((key) => key.toLowerCase());
+  const keys = bind.keys.map((key: string) => key.toLowerCase());
   const needsCtrl = keys.includes('ctrl');
   const needsAlt = keys.includes('alt');
   const needsShift = keys.includes('shift');
-  const mainKey = keys.find((key) => !['ctrl', 'alt', 'shift'].includes(key));
+  const mainKey = keys.find((key: string) => !['ctrl', 'alt', 'shift'].includes(key));
   if (!mainKey) return false;
   const isMac = navigator.platform.includes('Mac');
   const ctrlOrMeta = isMac ? event.metaKey : event.ctrlKey;
@@ -38,12 +39,12 @@ export function matchesKeybind(event, bind) {
   return eventKey === mainKey;
 }
 
-function isLegacyKeybindMap(keybinds) {
+function isLegacyKeybindMap(keybinds: unknown): boolean {
   if (!keybinds || typeof keybinds !== 'object') return false;
   return Object.values(keybinds).some((value) => value && typeof value === 'object' && !Array.isArray(value));
 }
 
-function serializeKeybinds(keybinds) {
+function serializeKeybinds(keybinds: Keybinds): Record<string, string[]> {
   return Object.fromEntries(
     Object.entries(DEFAULT_KEYBINDS).map(([id, bind]) => [
       id,
@@ -52,12 +53,12 @@ function serializeKeybinds(keybinds) {
   );
 }
 
-function normalizeKeybinds(savedKeybinds) {
+function normalizeKeybinds(savedKeybinds: unknown): Keybinds {
   const keybinds = cloneDefaultKeybinds();
   if (!savedKeybinds || typeof savedKeybinds !== 'object') return keybinds;
 
   for (const [id, savedKeys] of Object.entries(savedKeybinds)) {
-    if (!keybinds[id] || !Array.isArray(savedKeys)) continue;
+    if (!keybinds[id] || !Array.isArray(savedKeys) || !savedKeys.every((key) => typeof key === 'string')) continue;
     keybinds[id] = { ...keybinds[id], keys: [...savedKeys] };
   }
 
@@ -75,7 +76,7 @@ export async function loadKeybinds() {
   return normalizeKeybinds(settings?.keybinds);
 }
 
-export async function saveKeybinds(keybinds) {
+export async function saveKeybinds(keybinds: Keybinds): Promise<void> {
   const settings = await getAppSettings();
   await saveAppSettings({
     ...settings,

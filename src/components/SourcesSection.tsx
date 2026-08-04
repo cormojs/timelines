@@ -1,15 +1,35 @@
 import { useState } from 'react';
 import { Link, ChevronDown, Pencil, Trash2, ExternalLink } from 'lucide-react';
+import type { TimelineSource } from '../types/timeline';
 
-export default function SourcesSection({ sources, sourceLink, isEditMode, onSourcesChange }) {
+type SourceEntry = {
+  title: string;
+  url?: string;
+  description?: string;
+  citation?: string;
+};
+
+type SourcesSectionProps = {
+  sources?: TimelineSource[];
+  sourceLink?: string | null;
+  isEditMode: boolean;
+  onSourcesChange: (sources: TimelineSource[], sourceLink?: string | null) => void;
+};
+
+export default function SourcesSection({ sources, sourceLink, isEditMode, onSourcesChange }: SourcesSectionProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingIndex, setEditingIndex] = useState(null);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [title, setTitle] = useState('');
   const [url, setUrl] = useState('');
   const [description, setDescription] = useState('');
 
-  const srcList = Array.isArray(sources) ? sources : [];
+  const srcList: SourceEntry[] = (Array.isArray(sources) ? sources : []).map((source) => ({
+    title: typeof source.title === 'string' ? source.title : '',
+    url: typeof source.url === 'string' ? source.url : undefined,
+    description: typeof source.description === 'string' ? source.description : undefined,
+    citation: typeof source.citation === 'string' ? source.citation : undefined,
+  }));
 
   const resetForm = () => {
     setTitle('');
@@ -25,7 +45,7 @@ export default function SourcesSection({ sources, sourceLink, isEditMode, onSour
     setIsFormOpen(false);
   };
 
-  const handleEdit = (i) => {
+  const handleEdit = (i: number) => {
     const src = srcList[i];
     setEditingIndex(i);
     setTitle(src.title || '');
@@ -44,13 +64,13 @@ export default function SourcesSection({ sources, sourceLink, isEditMode, onSour
     resetForm();
   };
 
-  const handleRemove = (index) => {
+  const handleRemove = (index: number) => {
     const next = srcList.filter((_, i) => i !== index);
     const nextLink = sourceLink && srcList[index]?.url === sourceLink ? null : sourceLink;
     onSourcesChange(next, nextLink);
   };
 
-  const handleToggleSourceLink = (src) => {
+  const handleToggleSourceLink = (src: SourceEntry) => {
     const nextLink = sourceLink === src.url ? null : src.url;
     onSourcesChange(srcList, nextLink);
   };

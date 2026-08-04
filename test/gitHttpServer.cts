@@ -4,9 +4,10 @@
 const http = require('http');
 const path = require('path');
 const { spawn } = require('child_process');
+import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 
-function createGitHttpServer(repoRoot) {
-  return http.createServer((req, res) => {
+function createGitHttpServer(repoRoot: string): Server {
+  return http.createServer((req: IncomingMessage, res: ServerResponse) => {
     const url = new URL(req.url, 'http://localhost');
     const m = url.pathname.match(/^\/(.+)\/(info\/refs|git-upload-pack|git-receive-pack)$/);
     if (!m) {

@@ -14,8 +14,9 @@ import {
   tickDensityToSlider,
   sliderToTickDensity,
 } from '../utils/sliderUtils';
-import { sanitizeTitle, loadScaleSections, validateScaleSection } from '../utils/validation';
+import { sanitizeTitle, loadScaleSections, validateScaleSection, type ScaleSectionInput } from '../utils/validation';
 import { themeOptionLabel } from '../utils/themeLoader';
+import type { TimelineData } from '../types/timeline';
 import '../styles/07-modals-menus.css';
 
 const MAP_MARKER_OPTIONS = [
@@ -28,6 +29,28 @@ const MAP_MARKER_OPTIONS = [
 const DEFAULT_EVENT_MARKER = 'pin';
 const DEFAULT_SPAN_MARKER = 'circle';
 const DEFAULT_ERA_MARKER = 'diamond';
+
+type SettingsModalProps = {
+  isOpen: boolean;
+  onClose: () => void;
+  onOpenAppSettings: () => void;
+  isCovered?: boolean;
+  timelineData: TimelineData;
+  onUpdateTimeline: (patch: Record<string, unknown>) => void;
+  renameErrorMessage?: string;
+  onClearRenameError: () => void;
+  themeKey?: string;
+  defaultThemeKey?: string;
+  themes: Record<string, { name?: string }>;
+  fonts: { name?: string }[];
+  onThemeChange: (themeKey: string) => void;
+  oldFormatThemeCount?: number;
+  onMigrateOldThemes: () => Promise<number>;
+  layoutOptions?: { value: string; label: string }[];
+};
+
+type EditableScaleSection = Required<ScaleSectionInput>;
+type OptionSettings = Record<string, unknown> & { __scaleKey: string };
 
 export default function SettingsModal({
   isOpen,
@@ -46,7 +69,7 @@ export default function SettingsModal({
   oldFormatThemeCount = 0,
   onMigrateOldThemes,
   layoutOptions = [],
-}: Record<string, DynamicValue>) {
+}: SettingsModalProps) {
   const [title, setTitle] = useState('');
   // Title drives the filename on disk, so it only commits on blur/Enter/close, not per keystroke
   const [committedTitle, setCommittedTitle] = useState('');
@@ -65,7 +88,7 @@ export default function SettingsModal({
   const [fontFamily, setFontFamily] = useState('default');
   const [useCalendar, setUseCalendar] = useState(false);
   const [dateFormat, setDateFormat] = useState('MDY');
-  const [scaleSections, setScaleSections] = useState([]);
+  const [scaleSections, setScaleSections] = useState<EditableScaleSection[]>([]);
   const [scaleType, setScaleType] = useState('default');
   const [logScaleFactor, setLogScaleFactor] = useState(10);
   const [negID, setNegID] = useState('');
@@ -98,20 +121,20 @@ export default function SettingsModal({
   const [mapEraMarker, setMapEraMarker] = useState(DEFAULT_ERA_MARKER);
   const [settingsSection, setSettingsSection] = useState('general');
   const [isInitialized, setIsInitialized] = useState(false);
-  const [validationErrors, setValidationErrors] = useState([]);
-  const [scaleSectionErrors, setScaleSectionErrors] = useState([]);
-  const [themeMigrationStatus, setThemeMigrationStatus] = useState(null); // null | 'migrating' | { count }
-  const saveTimeoutRef = useRef(null);
-  const detailSliderRef = useRef(null);
-  const tickDensitySliderRef = useRef(null);
-  const titleInputRef = useRef(null);
-  const lastFilePathRef = useRef(null);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [scaleSectionErrors, setScaleSectionErrors] = useState<Array<string | null>>([]);
+  const [themeMigrationStatus, setThemeMigrationStatus] = useState<'migrating' | { count: number } | null>(null);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const detailSliderRef = useRef<HTMLInputElement | null>(null);
+  const tickDensitySliderRef = useRef<HTMLInputElement | null>(null);
+  const titleInputRef = useRef<HTMLInputElement | null>(null);
+  const lastFilePathRef = useRef<string | undefined>(undefined);
   const backdropPointerDownRef = useRef(false);
   const onUpdateTimelineRef = useRef(onUpdateTimeline);
   // Baseline snapshot taken when the modal opens; saves diff against it.
-  const optionBaselineRef = useRef(null);
+  const optionBaselineRef = useRef<OptionSettings | null>(null);
 
-  const collectOptionSettings = () => ({
+  const collectOptionSettings = (): OptionSettings => ({
     detailLevel: Number(detailLevel),
     tickDensity: Number(tickDensity) !== 1 ? Number(tickDensity) : undefined,
     negID,
@@ -153,9 +176,9 @@ export default function SettingsModal({
   });
 
   // Convert editable scale sections (strings) to numeric for saving
-  const saveScaleSections = (editable = []) => {
-    const out = [];
-    const errors = [];
+  const saveScaleSections = (editable: EditableScaleSection[] = []) => {
+    const out: Array<{ start: number; end: number; scale: number; showBreak: boolean }> = [];
+    const errors: Array<string | null> = [];
     editable.forEach((item, index) => {
       const error = validateScaleSection(item);
       errors[index] = error;
@@ -193,12 +216,12 @@ export default function SettingsModal({
     setScaleSectionErrors((prev) => [...prev, null]);
   };
 
-  const removeScaleSection = (index) => {
+  const removeScaleSection = (index: number) => {
     setScaleSections(scaleSections.filter((_, i) => i !== index));
     setScaleSectionErrors((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const updateScaleSection = (index, field, value) => {
+  const updateScaleSection = (index: number, field: keyof EditableScaleSection, value: string | boolean) => {
     const next = scaleSections.map((s, i) => (i === index ? { ...s, [field]: value } : s));
     setScaleSections(next);
     setScaleSectionErrors((prev) => {
@@ -241,7 +264,7 @@ export default function SettingsModal({
 
   useEffect(() => {
     if (!isOpen) return;
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') handleClose();
     };
     document.addEventListener('keydown', handleKeyDown);
@@ -256,7 +279,8 @@ export default function SettingsModal({
 
   useEffect(() => {
     if (timelineData?.file) {
-      const currentPath = timelineData.path || timelineData.file.id || timelineData.file.title;
+      const rawPath = timelineData.path;
+      const currentPath = typeof rawPath === 'string' ? rawPath : timelineData.file.id || timelineData.file.title;
       const isNewFile = lastFilePathRef.current !== currentPath;
 
       if (!isNewFile) {
@@ -375,7 +399,7 @@ export default function SettingsModal({
     saveTimeoutRef.current = setTimeout(() => {
       const parsedStart = parseTimelineInput(start);
       const parsedEnd = parseTimelineInput(end);
-      const errors = [];
+      const errors: string[] = [];
 
       if (!title.trim()) {
         errors.push('Timeline name is required.');
@@ -419,7 +443,7 @@ export default function SettingsModal({
           endLabel: parsedEnd.label,
         };
         const current = collectOptionSettings();
-        const baseline = optionBaselineRef.current || {};
+        const baseline: OptionSettings = optionBaselineRef.current || { __scaleKey: '' };
         for (const key of Object.keys(current)) {
           if (key === '__scaleKey') continue;
           if (!Object.is(current[key], baseline[key])) patch[key] = current[key];
@@ -502,11 +526,11 @@ export default function SettingsModal({
     });
   }
 
-  const handleBackdropMouseDown = (e) => {
+  const handleBackdropMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     backdropPointerDownRef.current = e.target === e.currentTarget;
   };
 
-  const handleBackdropMouseUp = (e) => {
+  const handleBackdropMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
     if (backdropPointerDownRef.current && e.target === e.currentTarget) {
       handleClose();
     }
@@ -958,7 +982,7 @@ export default function SettingsModal({
                           </option>
                         ))}
                       </select>
-                      {themeMigrationStatus?.count != null ? (
+                      {typeof themeMigrationStatus === 'object' && themeMigrationStatus.count != null ? (
                         <div className="theme-migration-notice">
                           {themeMigrationStatus.count} theme{themeMigrationStatus.count === 1 ? '' : 's'} updated.
                         </div>

@@ -2,15 +2,18 @@
 // format), assets/, notes/, and manifest.json. The same shape is read in the
 // browser viewer via src/utils/packageReader.ts; keep the two in sync.
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
+import type { Zippable } from 'fflate';
+import { parseTimelinePackageManifestJson } from '../src/utils/json';
 
 const PACKAGE_FORMAT_VERSION = 1;
 
 // Zip local-file-header magic; bare timelines start with '{'
-const isZipBuffer = (buf) => Boolean(buf && buf.length >= 2 && buf[0] === 0x50 && buf[1] === 0x4b);
+const isZipBuffer = (buf: Uint8Array | null | undefined): boolean =>
+  Boolean(buf && buf.length >= 2 && buf[0] === 0x50 && buf[1] === 0x4b);
 
 // Rejects traversal and absolute segments so zip entries can't escape the
 // extraction folder; returns the normalized relative path or null
-const sanitizeEntryPath = (name) => {
+const sanitizeEntryPath = (name: string): string | null => {
   const parts = String(name || '')
     .split(/[/\\]/)
     .filter((p) => p && p !== '.');
@@ -29,21 +32,26 @@ function buildPackage(
   timelineJson: string,
   files: Record<string, Uint8Array> = {},
   opts: { deterministic?: boolean } = {},
-) {
-  const entries = {
+): Uint8Array {
+  const entries: Record<string, Uint8Array> = {
     'manifest.json': strToU8(JSON.stringify({ format: 'timeline-package', version: PACKAGE_FORMAT_VERSION }, null, 2)),
     'timeline.json': strToU8(timelineJson),
     ...files,
   };
   if (!opts.deterministic) return zipSync(entries);
-  const sorted = {};
+  const sorted: Zippable = {};
   for (const name of Object.keys(entries).sort()) {
     sorted[name] = [entries[name], { level: 0, mtime: DETERMINISTIC_MTIME }];
   }
   return zipSync(sorted);
 }
 
-function readPackage(buf: Uint8Array) {
+function readPackage(buf: Uint8Array): {
+  timelineJson: string;
+  manifest: ReturnType<typeof parseTimelinePackageManifestJson> | null;
+  assets: Record<string, Uint8Array>;
+  notes: Record<string, string>;
+} {
   const entries = unzipSync(buf instanceof Uint8Array ? buf : new Uint8Array(buf));
   const timelineRaw = entries['timeline.json'];
   if (!timelineRaw) throw new Error('Package is missing timeline.json');
@@ -51,7 +59,7 @@ function readPackage(buf: Uint8Array) {
   let manifest = null;
   if (entries['manifest.json']) {
     try {
-      manifest = JSON.parse(strFromU8(entries['manifest.json']));
+      manifest = parseTimelinePackageManifestJson(strFromU8(entries['manifest.json']));
     } catch {}
   }
 

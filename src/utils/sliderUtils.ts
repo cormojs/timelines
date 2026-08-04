@@ -6,9 +6,9 @@ export const TICK_DENSITY_MIN = 0.1;
 export const TICK_DENSITY_MID = 1;
 export const TICK_DENSITY_MAX = 2;
 
-export const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+export const clamp = (value: number, min: number, max: number): number => Math.min(Math.max(value, min), max);
 
-export const detailToSlider = (value) => {
+export const detailToSlider = (value: number): number => {
   const clamped = clamp(value, DETAIL_MIN, DETAIL_MAX);
   if (clamped <= DETAIL_MID) {
     const ratio = (clamped - DETAIL_MIN) / (DETAIL_MID - DETAIL_MIN);
@@ -18,7 +18,7 @@ export const detailToSlider = (value) => {
   return 50 + ratio * 50;
 };
 
-export const sliderToDetail = (position) => {
+export const sliderToDetail = (position: number): number => {
   const pos = clamp(position, 0, 100);
   if (pos <= 50) {
     const ratio = pos / 50;
@@ -28,7 +28,7 @@ export const sliderToDetail = (position) => {
   return DETAIL_MID + ratio * (DETAIL_MAX - DETAIL_MID);
 };
 
-export const tickDensityToSlider = (value) => {
+export const tickDensityToSlider = (value: number): number => {
   const clamped = clamp(value, TICK_DENSITY_MIN, TICK_DENSITY_MAX);
   if (clamped <= TICK_DENSITY_MID) {
     const ratio = (clamped - TICK_DENSITY_MIN) / (TICK_DENSITY_MID - TICK_DENSITY_MIN);
@@ -38,7 +38,7 @@ export const tickDensityToSlider = (value) => {
   return 50 + ratio * 50;
 };
 
-export const sliderToTickDensity = (position) => {
+export const sliderToTickDensity = (position: number): number => {
   const pos = clamp(position, 0, 100);
   if (pos <= 50) {
     const ratio = pos / 50;

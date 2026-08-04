@@ -1,5 +1,5 @@
 import { useMemo, useState, useRef, useEffect, useCallback, startTransition } from 'react';
-import TimelineView from './components/TimelineView';
+import TimelineView, { type TimelineViewHandle } from './components/TimelineView';
 import SpreadsheetView from './components/SpreadsheetView';
 import Sidebar from './components/Sidebar';
 import RightPanel from './components/RightPanel';
@@ -51,10 +51,11 @@ import {
   normalizeLegacyDateLabel,
 } from './utils/dateUtils';
 import { parseFilterQuery } from './utils/filterUtils';
+import type { TimelineData, TimelineElement, TimelineGroup, TimelineFile } from './types/timeline';
 import './styles/index.css';
 
 const DEFAULT_GROUP_ID = 'g-main';
-const DEFAULT_GROUP = {
+const DEFAULT_GROUP: TimelineGroup = {
   id: DEFAULT_GROUP_ID,
   title: 'Main',
   order: 0,
@@ -63,7 +64,11 @@ const DEFAULT_GROUP = {
   visible: true,
   locked: false,
 };
-const EMPTY_SELECTION_NAVIGATION = Object.freeze({
+const EMPTY_SELECTION_NAVIGATION: Readonly<{
+  selectedElement: TimelineElement | null;
+  prevElement: TimelineElement | null;
+  nextElement: TimelineElement | null;
+}> = Object.freeze({
   selectedElement: null,
   prevElement: null,
   nextElement: null,
@@ -72,8 +77,8 @@ const SELECTION_NAV_REPEAT_INTERVAL_MS = 140;
 const CARD_THUMBNAIL_WIDTH = 640;
 const CARD_THUMBNAIL_HEIGHT = 240;
 
-const createCardThumbnail = (imageUrl) =>
-  new Promise((resolve, reject) => {
+const createCardThumbnail = (imageUrl: string) =>
+  new Promise<string>((resolve, reject) => {
     const image = new Image();
     image.onload = () => {
       const canvas = document.createElement('canvas');
@@ -100,7 +105,7 @@ const createCardThumbnail = (imageUrl) =>
   });
 
 // Bare filename of a local thumbnail; null for external URLs
-const getLocalThumbnailFilename = (thumbnail) => {
+const getLocalThumbnailFilename = (thumbnail: unknown): string | null => {
   if (!thumbnail || typeof thumbnail !== 'string') return null;
   if (thumbnail.startsWith('timelines-asset://')) {
     try {
@@ -117,7 +122,7 @@ const getLocalThumbnailFilename = (thumbnail) => {
 };
 
 function App() {
-  const normalizeTimelineData = useCallback((data) => {
+  const normalizeTimelineData = useCallback((data: TimelineData): TimelineData => {
     if (!data || typeof data !== 'object') return data;
 
     const elements = ensureUniqueElementIds(Array.isArray(data.elements) ? data.elements : []);
@@ -141,23 +146,31 @@ function App() {
     const defaultGroupId = groups[0]?.id || DEFAULT_GROUP_ID;
 
     // Migrate old parent-defined branches/forks/merges to child-defined parent/mergeParent.
-    const branchParentMap = {};
-    const mergeParentMap = {};
+    const branchParentMap: Record<string | number, string | number> = {};
+    const mergeParentMap: Record<string | number, string | number> = {};
     for (const el of elements) {
       if (el.type !== 'span') continue;
-      const branches = Array.isArray(el.branches) ? el.branches : [];
-      const forks = Array.isArray(el.forks) ? el.forks : [];
+      const branches = Array.isArray(el.branches)
+        ? el.branches.filter(
+            (value): value is string | number => typeof value === 'string' || typeof value === 'number',
+          )
+        : [];
+      const forks = Array.isArray(el.forks)
+        ? el.forks.filter((value): value is string | number => typeof value === 'string' || typeof value === 'number')
+        : [];
       const allBranches = Array.from(new Set([...branches, ...forks]));
       for (const childId of allBranches) {
         branchParentMap[childId] = el.id;
       }
-      const merges = Array.isArray(el.merges) ? el.merges : [];
+      const merges = Array.isArray(el.merges)
+        ? el.merges.filter((value): value is string | number => typeof value === 'string' || typeof value === 'number')
+        : [];
       for (const childId of merges) {
         mergeParentMap[childId] = el.id;
       }
     }
 
-    const spanGroupById = Object.fromEntries(
+    const spanGroupById: Record<string | number, string> = Object.fromEntries(
       elements.filter((el) => el.type === 'span' && groupIdSet.has(el.groupId)).map((el) => [el.id, el.groupId]),
     );
 
@@ -192,7 +205,7 @@ function App() {
       return rest;
     });
 
-    const file = { ...(data.file || {}), groups };
+    const file: TimelineFile & { useWikipedia?: boolean } = { ...(data.file || {}), groups };
     if (typeof file.startLabel === 'string') file.startLabel = normalizeLegacyDateLabel(file.startLabel);
     if (typeof file.endLabel === 'string') file.endLabel = normalizeLegacyDateLabel(file.endLabel);
     if (file.useWikipedia && !file.useWiki) {
@@ -215,25 +228,25 @@ function App() {
   const [rightWidth, setRightWidth] = useState(DEFAULT_RIGHT_WIDTH);
   const [isLeftCollapsed, setIsLeftCollapsed] = useState(false);
   const [isRightCollapsed, setIsRightCollapsed] = useState(false);
-  const [rightLockState, setRightLockState] = useState(null); // null | "open" | "closed"
+  const [rightLockState, setRightLockState] = useState<'open' | 'closed' | null>(null); // null | "open" | "closed"
   const [viewMode, setViewMode] = useState('timeline'); // "timeline" | "spreadsheet"
   const [isRightMaximized, setIsRightMaximized] = useState(false);
-  const [lastSelectedId, setLastSelectedId] = useState(null);
+  const [lastSelectedId, setLastSelectedId] = useState<string | number | null>(null);
 
-  const [selectedId, setSelectedId] = useState(null);
+  const [selectedId, setSelectedId] = useState<string | number | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsRenameError, setSettingsRenameError] = useState('');
   const [screenshotToast, setScreenshotToast] = useState(false);
-  const [deleteElementDialog, setDeleteElementDialog] = useState(null);
+  const [deleteElementDialog, setDeleteElementDialog] = useState<TimelineElement[] | null>(null);
   const [deleteElementWithNotes, setDeleteElementWithNotes] = useState(false);
   const [deleteElementWithImage, setDeleteElementWithImage] = useState(false);
   const [downloadPngTrigger, setDownloadPngTrigger] = useState(0);
-  const [timelineData, setTimelineData] = useState(null);
+  const [timelineData, setTimelineData] = useState<TimelineData | null>(null);
   // Sync the date-format lens with the open timeline before children render.
   const fileDateFormat = timelineData?.file?.dateFormat || 'MDY';
   if (getActiveDateFormat() !== fileDateFormat) setActiveDateFormat(fileDateFormat);
-  const [currentTimelineId, setCurrentTimelineId] = useState(null);
-  const currentTimelineIdRef = useRef(null);
+  const [currentTimelineId, setCurrentTimelineId] = useState<string | null>(null);
+  const currentTimelineIdRef = useRef<string | null>(null);
   const [isNewTimelineModalOpen, setIsNewTimelineModalOpen] = useState(false);
   const [importConflict, setImportConflict] = useState(null); // { title, sourcePath }
   const [skippedFilesNotice, setSkippedFilesNotice] = useState(null); // { title, message, files }
@@ -253,14 +266,14 @@ function App() {
   const [hardwareAcceleration, setHardwareAcceleration] = useState(true);
   const [startMaximized, setStartMaximized] = useState(false);
   const [keybinds, setKeybinds] = useState(() => cloneDefaultKeybinds());
-  const [availableFonts, setAvailableFonts] = useState([]);
-  const [activeTags, setActiveTags] = useState([]);
-  const [hiddenTags, setHiddenTags] = useState([]);
-  const [pinnedTags, setPinnedTags] = useState([]);
+  const [availableFonts, setAvailableFonts] = useState<Array<{ name?: string; fileUrl?: string; format?: string }>>([]);
+  const [activeTags, setActiveTags] = useState<string[]>([]);
+  const [hiddenTags, setHiddenTags] = useState<string[]>([]);
+  const [pinnedTags, setPinnedTags] = useState<string[]>([]);
   const [chipQuery, setChipQuery] = useState('');
   const parsedChipQuery = useMemo(() => parseFilterQuery(chipQuery), [chipQuery]);
-  const [viewportYear, setViewportYear] = useState(null);
-  const handleViewportYearChange = useCallback((year) => {
+  const [viewportYear, setViewportYear] = useState<number | null>(null);
+  const handleViewportYearChange = useCallback((year: number | null) => {
     startTransition(() => {
       setViewportYear(year);
     });
@@ -276,10 +289,10 @@ function App() {
   const HISTORY_LIMIT = 100;
   const historyRef = useRef({ past: [], future: [] });
   const historyLockRef = useRef(false);
-  const prevTimelineRef = useRef(null);
-  const lastTimelineIdRef = useRef(null);
-  const timelineDataRef = useRef(null);
-  const selectedIdRef = useRef(null);
+  const prevTimelineRef = useRef<TimelineData | null>(null);
+  const lastTimelineIdRef = useRef<string | null>(null);
+  const timelineDataRef = useRef<TimelineData | null>(null);
+  const selectedIdRef = useRef<string | number | null>(null);
   const selectionNavRepeatRef = useRef({ previous: 0, next: 0 });
   const leftWidthRef = useRef(DEFAULT_LEFT_WIDTH);
   const rightWidthRef = useRef(DEFAULT_RIGHT_WIDTH);
@@ -289,12 +302,12 @@ function App() {
   const isDraggingRight = useRef(false);
   const rightMaxReachedRef = useRef(false);
   const rightReversedAfterMaxRef = useRef(false);
-  const rightLastDistanceRef = useRef(null);
-  const timelineViewRef = useRef(null);
+  const rightLastDistanceRef = useRef<number | null>(null);
+  const timelineViewRef = useRef<TimelineViewHandle | null>(null);
   const currentLeftWidth = isLeftCollapsed ? COLLAPSED_WIDTH : sidebarWidth;
 
   useEffect(() => {
-    function handleMouseMove(e) {
+    function handleMouseMove(e: MouseEvent) {
       if (isDraggingLeft.current) {
         e.preventDefault();
         const dragX = e.clientX;
@@ -389,10 +402,9 @@ function App() {
   }, [isRightCollapsed]);
 
   useEffect(() => {
-    function handleKeyDown(e) {
+    function handleKeyDown(e: KeyboardEvent) {
       if (!selectedId) return;
-      const target = e.target;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+      if (isEditableEventTarget(e.target)) return;
       const deleteBind = keybinds.delete;
       const altDeleteBind = { keys: ['Backspace'] };
       if (!matchesKeybind(e, deleteBind) && !matchesKeybind(e, altDeleteBind)) return;
@@ -503,7 +515,7 @@ function App() {
 
   useEffect(() => {
     if (!window.electron?.onGitSyncApplied) return undefined;
-    const handleApplied = (ids) => {
+    const handleApplied = (ids: unknown) => {
       if (Array.isArray(ids) && currentTimelineIdRef.current && ids.includes(currentTimelineIdRef.current)) {
         setDiskReloadNotice(true);
       }
@@ -521,7 +533,7 @@ function App() {
 
   // Saves the open timeline where it currently lives; explicit-path writes use saveTimelineToFile via enqueuePersist
   const saveCurrentTimeline = useCallback(
-    async (data) => {
+    async (data: TimelineData) => {
       const id = currentTimelineIdRef.current || data?.file?.id?.replace(/-timeline$/, '') || 'timeline';
       return enqueuePersist(() => saveTimelineToFile(data, id));
     },
@@ -533,25 +545,28 @@ function App() {
     setIsSettingsOpen(false);
   }, []);
 
-  const handleLibraryTimelineRenamed = useCallback(({ oldId, newId, title, fileId }) => {
-    if (!oldId || !newId || currentTimelineIdRef.current !== oldId) return;
-    currentTimelineIdRef.current = newId;
-    setCurrentTimelineId(newId);
-    setTimelineData((prevData) => {
-      if (!prevData) return prevData;
-      return {
-        ...prevData,
-        file: {
-          ...prevData.file,
-          id: fileId || `${newId.split('/').pop() || 'timeline'}-timeline`,
-          title: title ?? prevData.file?.title,
-        },
-      };
-    });
-  }, []);
+  const handleLibraryTimelineRenamed = useCallback(
+    ({ oldId, newId, title, fileId }: { oldId: string; newId: string; title?: string; fileId?: string }) => {
+      if (!oldId || !newId || currentTimelineIdRef.current !== oldId) return;
+      currentTimelineIdRef.current = newId;
+      setCurrentTimelineId(newId);
+      setTimelineData((prevData) => {
+        if (!prevData) return prevData;
+        return {
+          ...prevData,
+          file: {
+            ...prevData.file,
+            id: fileId || `${newId.split('/').pop() || 'timeline'}-timeline`,
+            title: title ?? prevData.file?.title,
+          },
+        };
+      });
+    },
+    [],
+  );
 
   const handleRenameTimelineFromLibrary = useCallback(
-    async (id, title) => {
+    async (id: string, title: string) => {
       if (!id) return { success: false, error: 'Missing timeline id' };
       if (!title || !String(title).trim()) return { success: false, error: 'INVALID_TITLE' };
 
@@ -640,15 +655,9 @@ function App() {
   };
 
   useEffect(() => {
-    const handleUndoRedo = (e) => {
+    const handleUndoRedo = (e: KeyboardEvent) => {
       if (!timelineData) return;
-      const target = e.target;
-      const isEditable =
-        target?.tagName === 'INPUT' ||
-        target?.tagName === 'TEXTAREA' ||
-        target?.tagName === 'SELECT' ||
-        target?.isContentEditable;
-      if (isEditable) return;
+      if (isEditableEventTarget(e.target)) return;
       if (matchesKeybind(e, keybinds.undo)) {
         e.preventDefault();
         undoTimeline();
@@ -673,15 +682,9 @@ function App() {
 
   useEffect(() => {
     if (!timelineData) return;
-    const handleSearchKey = (e) => {
+    const handleSearchKey = (e: KeyboardEvent) => {
       if (!matchesKeybind(e, keybinds.search)) return;
-      const target = e.target;
-      const isEditable =
-        target?.tagName === 'INPUT' ||
-        target?.tagName === 'TEXTAREA' ||
-        target?.tagName === 'SELECT' ||
-        target?.isContentEditable;
-      if (isEditable) return;
+      if (isEditableEventTarget(e.target)) return;
       e.preventDefault();
       setIsSearchOpen(true);
     };
@@ -691,14 +694,8 @@ function App() {
 
   useEffect(() => {
     if (!timelineData) return;
-    const handleAddShortcuts = (e) => {
-      const target = e.target;
-      const isEditable =
-        target?.tagName === 'INPUT' ||
-        target?.tagName === 'TEXTAREA' ||
-        target?.tagName === 'SELECT' ||
-        target?.isContentEditable;
-      if (isEditable) return;
+    const handleAddShortcuts = (e: KeyboardEvent) => {
+      if (isEditableEventTarget(e.target)) return;
 
       if (matchesKeybind(e, keybinds.newEvent)) {
         e.preventDefault();
@@ -716,20 +713,20 @@ function App() {
     return () => window.removeEventListener('keydown', handleAddShortcuts);
   }, [timelineData, keybinds, viewportYear]);
 
-  const handleSelect = (id) => {
+  const handleSelect = (id: string | number) => {
     setSelectedId(id);
     if (id) setLastSelectedId(id);
     if (id && rightLockState !== 'closed') setIsRightCollapsed(false);
   };
 
-  const handleSearchSelect = (id) => {
+  const handleSearchSelect = (id: string | number) => {
     handleSelect(id);
     requestAnimationFrame(() => {
       timelineViewRef.current?.scrollToElement(id);
     });
   };
 
-  const handleCenterGroup = (groupId) => {
+  const handleCenterGroup = (groupId: string) => {
     timelineViewRef.current?.scrollToGroup(groupId);
   };
 
@@ -744,7 +741,7 @@ function App() {
     }
   }, [selectedId, isRightMaximized, isRightCollapsed, rightLockState]);
 
-  const handleToggleTag = (tag) => {
+  const handleToggleTag = (tag: string) => {
     setActiveTags((prev) => {
       if (prev.includes(tag)) {
         return prev.filter((value) => value !== tag);
@@ -754,7 +751,7 @@ function App() {
     setHiddenTags((prev) => prev.filter((value) => value !== tag));
   };
 
-  const handleToggleHiddenTag = (tag) => {
+  const handleToggleHiddenTag = (tag: string) => {
     setHiddenTags((prev) => {
       if (prev.includes(tag)) {
         return prev.filter((value) => value !== tag);
@@ -802,7 +799,7 @@ function App() {
     });
   };
 
-  const handleUpdateGroup = (groupId, updates) => {
+  const handleUpdateGroup = (groupId: string, updates: Partial<TimelineGroup>) => {
     if (!groupId || !updates || typeof updates !== 'object') return;
     setTimelineData((prevData) => {
       const existing = Array.isArray(prevData.file?.groups) ? prevData.file.groups : [];
@@ -822,7 +819,7 @@ function App() {
     });
   };
 
-  const handleSetElementGroup = (elementId, groupTitle) => {
+  const handleSetElementGroup = (elementId: string | number, groupTitle: string) => {
     if (!elementId || !groupTitle?.trim()) return;
     const title = groupTitle.trim();
     setTimelineData((prevData) => {
@@ -857,7 +854,7 @@ function App() {
     });
   };
 
-  const handleUpdateTagColor = (tag, color) => {
+  const handleUpdateTagColor = (tag: string, color: string) => {
     if (!tag) return;
     setTimelineData((prevData) => {
       const prevTagColors = prevData.file?.tagColors || {};
@@ -873,7 +870,7 @@ function App() {
     });
   };
 
-  const handleDeleteGroup = (groupId) => {
+  const handleDeleteGroup = (groupId: string) => {
     if (!groupId) return;
     setTimelineData((prevData) => {
       const existing = Array.isArray(prevData.file?.groups) ? prevData.file.groups : [];
@@ -909,12 +906,12 @@ function App() {
     });
   };
 
-  const handleFilterByTag = (tag) => {
+  const handleFilterByTag = (tag: string) => {
     setActiveTags([tag]);
     setHiddenTags((prev) => prev.filter((value) => value !== tag));
   };
 
-  const handleTogglePinnedTag = (tag) => {
+  const handleTogglePinnedTag = (tag: string) => {
     if (!tag) return;
     const nextPinnedTags = pinnedTags.includes(tag)
       ? pinnedTags.filter((value) => value !== tag)
@@ -934,12 +931,12 @@ function App() {
     });
   };
 
-  const handleEditElement = (id) => {
+  const handleEditElement = (id: string | number) => {
     setSelectedId(id);
     setEditRequestId(id);
   };
 
-  const handleRequestDelete = (elementId) => {
+  const handleRequestDelete = (elementId: string | number | Array<string | number>) => {
     if (!timelineData?.elements) return;
     const ids = new Set(Array.isArray(elementId) ? elementId : [elementId]);
     const targets = timelineData.elements.filter((el) => ids.has(el.id));
@@ -977,7 +974,7 @@ function App() {
     setDeleteElementDialog(null);
   };
 
-  const handleUpdate = async (updatedElement) => {
+  const handleUpdate = async (updatedElement: TimelineElement) => {
     const originalId = updatedElement.id;
 
     setTimelineData((prevData) => {
@@ -1005,7 +1002,7 @@ function App() {
 
   const handleAddEvent = (groupId?: string, clickYear?: number, clickCoords?: { lat?: number; lng?: number }) => {
     if (!timelineData?.file) return;
-    const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+    const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
     const fallbackMid = (timelineData.file.start + timelineData.file.end) / 2;
     const baseYear = Number.isFinite(clickYear)
       ? clickYear
@@ -1015,13 +1012,13 @@ function App() {
     const clampedYear = clamp(baseYear, timelineData.file.start, timelineData.file.end);
     const snappedYear = timelineData.file.useCalendar === true ? snapToDayGrid(clampedYear) : Math.round(clampedYear);
     const eventId = generateUniqueRandomElementId(timelineData.elements, 'event');
-    const newEvent = {
+    const newEvent: TimelineElement = {
       id: eventId,
       type: 'event',
       title: 'New Event',
       date: snappedYear,
-      groupId: groupId || null,
-      parents: [],
+      groupId: groupId || undefined,
+      parents: [] as Array<string | number>,
       eventLineStyle: 'solid',
       eventBorderStyle: 'solid',
     };
@@ -1046,7 +1043,7 @@ function App() {
   };
 
   const handleAddSpan = (groupId?: string, clickYear?: number, clickCoords?: { lat?: number; lng?: number }) => {
-    const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+    const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
     const range = timelineData.file.end - timelineData.file.start;
     const duration = Math.max(1, Math.floor(range / 4));
     const fallbackStart = timelineData.file.start + Math.floor(range / 2);
@@ -1061,7 +1058,7 @@ function App() {
 
     const spanId = generateUniqueRandomElementId(timelineData.elements, 'span');
     const defaultGroupId = groupId || timelineData.file?.groups?.[0]?.id || DEFAULT_GROUP_ID;
-    const newSpan = {
+    const newSpan: TimelineElement = {
       id: spanId,
       type: 'span',
       title: 'New Span',
@@ -1090,8 +1087,8 @@ function App() {
     setEditRequestId(spanWithCoords.id);
   };
 
-  const handleAddEra = (_clickYear, clickCoords) => {
-    const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+  const handleAddEra = (_clickYear?: number, clickCoords?: { lat?: number; lng?: number }) => {
+    const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
     const tlStart = timelineData.file.start;
     const tlEnd = timelineData.file.end;
     const range = tlEnd - tlStart;
@@ -1099,7 +1096,7 @@ function App() {
 
     const topLevelEras = timelineData.elements.filter((el) => el.type === 'era').sort((a, b) => a.start - b.start);
 
-    const isFree = (s, e) => !topLevelEras.some((era) => s < era.end && e > era.start);
+    const isFree = (s: number, e: number) => !topLevelEras.some((era) => s < (era.end ?? 0) && e > (era.start ?? 0));
 
     // Try placing after each existing top-level era, then at timeline start
     const candidates = [tlStart, ...topLevelEras.map((era) => era.end)];
@@ -1116,7 +1113,7 @@ function App() {
     }
 
     const eraId = generateUniqueRandomElementId(timelineData.elements, 'era');
-    const newEra = {
+    const newEra: TimelineElement = {
       id: eraId,
       type: 'era',
       title: 'New Era',
@@ -1144,7 +1141,7 @@ function App() {
     setEditRequestId(newEra.id);
   };
 
-  const handleDuplicateElement = (elementId) => {
+  const handleDuplicateElement = (elementId: string | number) => {
     setTimelineData((prevData) => {
       const original = prevData.elements.find((el) => el.id === elementId);
       if (!original) return prevData;
@@ -1175,7 +1172,7 @@ function App() {
     });
   };
 
-  const handleDelete = (elementId) => {
+  const handleDelete = (elementId: string | number | Array<string | number>) => {
     const toDelete = new Set(Array.isArray(elementId) ? elementId : [elementId]);
     setTimelineData((prevData) => {
       const filteredElements = prevData.elements.filter((el) => !toDelete.has(el.id));
@@ -1216,7 +1213,7 @@ function App() {
   };
 
   const handleUpdateTimeline = useCallback(
-    (patch) => {
+    (patch: Partial<TimelineFile>) => {
       // Patch: only the settings the user changed are present, so untouched fields aren't clobbered.
       const { title, start, end } = patch;
       if ('dateFormat' in patch) setActiveDateFormat(patch.dateFormat || 'MDY');
@@ -1322,7 +1319,7 @@ function App() {
     [enqueuePersist, saveCurrentTimeline],
   );
 
-  const handlePatchFile = (patch) => {
+  const handlePatchFile = (patch: Partial<TimelineFile>) => {
     setTimelineData((prevData) => {
       const nextFile = { ...prevData.file, ...patch };
       if (!nextFile.panelGroupMode || nextFile.panelGroupMode === 'default') delete nextFile.panelGroupMode;
@@ -1335,7 +1332,7 @@ function App() {
     });
   };
 
-  const handleUpdateGroups = (nextGroups) => {
+  const handleUpdateGroups = (nextGroups: TimelineGroup[]) => {
     setTimelineData((prevData) => {
       const updatedData = {
         ...prevData,
@@ -1376,7 +1373,9 @@ function App() {
     }
   };
 
-  const finishImport = async (result) => {
+  const finishImport = async (
+    result: { success?: boolean; id?: string; skipped?: string[]; canceled?: boolean; error?: string } | undefined,
+  ) => {
     if (result?.success && result.id) {
       if (result.skipped?.length > 0) {
         setSkippedFilesNotice({
@@ -1392,7 +1391,7 @@ function App() {
   };
 
   // sourcePath skips the file picker
-  const handleImportTimeline = async (sourcePath) => {
+  const handleImportTimeline = async (sourcePath?: string) => {
     const result = await importTimeline(typeof sourcePath === 'string' && sourcePath ? { sourcePath } : undefined);
     if (result?.conflict) {
       setImportConflict({ title: result.title, sourcePath: result.sourcePath });
@@ -1401,7 +1400,7 @@ function App() {
     await finishImport(result);
   };
 
-  const handleResolveImportConflict = async (resolution) => {
+  const handleResolveImportConflict = async (resolution: 'copy' | 'open-existing') => {
     const conflict = importConflict;
     setImportConflict(null);
     if (!conflict) return;
@@ -1444,7 +1443,7 @@ function App() {
         <div className="confirm-content">
           <p className="confirm-text">{skippedFilesNotice.message}</p>
           <ul className="confirm-file-list">
-            {skippedFilesNotice.files.map((file, i) => (
+            {skippedFilesNotice.files.map((file: string, i: number) => (
               <li key={i}>{file}</li>
             ))}
           </ul>
@@ -1463,7 +1462,7 @@ function App() {
     setIsExportPngModalOpen(true);
   };
 
-  const handleExportPng = (options) => {
+  const handleExportPng = (options: Parameters<typeof setExportPngOptions>[0]) => {
     setExportPngOptions(options);
     setDownloadPngTrigger((prev) => prev + 1);
   };
@@ -1472,7 +1471,7 @@ function App() {
     setIsExportVideoModalOpen(true);
   };
 
-  const handleLoadTimeline = async (timelineId) => {
+  const handleLoadTimeline = async (timelineId: string) => {
     try {
       if (!window.electron?.loadTimeline) {
         throw new Error('Timeline loading is only available in the desktop app.');
@@ -1533,10 +1532,24 @@ function App() {
   };
 
   // Failures return { error } for inline display; native alerts break input focus in Electron
-  const handleCreateTimeline = async (timelineConfig) => {
+  const handleCreateTimeline = async (timelineConfig: {
+    title: string;
+    start: number;
+    end: number;
+    detailLevel?: number;
+    theme?: string;
+    startLabel?: string;
+    endLabel?: string;
+    layout?: string;
+    branchOrdering?: string;
+    useSpreadsheet?: boolean;
+    useMaps?: boolean;
+    useWiki?: boolean;
+    folder?: string;
+  }) => {
     // Create new timeline data structure
     const timelineId = generateIdFromTitle(timelineConfig.title, 'timeline').replace(/^timeline-/, '');
-    const newTimeline = {
+    const newTimeline: TimelineData = {
       file: {
         id: `${timelineId}-timeline`,
         uid: generateStorageUid(timelineId),
@@ -1556,7 +1569,7 @@ function App() {
         useWiki: timelineConfig.useWiki || undefined,
         groups: [DEFAULT_GROUP],
       },
-      elements: [],
+      elements: [] as TimelineElement[],
     };
 
     if (!timelineConfig.startLabel) delete newTimeline.file.startLabel;
@@ -1638,7 +1651,7 @@ function App() {
   const isElectron = window.electron !== undefined;
 
   const resolveThemeKey = useCallback(
-    (value, fallback = defaultThemeKey) => {
+    (value: unknown, fallback = defaultThemeKey) => {
       if (!value) return fallback;
       const lower = String(value).toLowerCase();
       if (lower === 'default') return fallback;
@@ -1648,7 +1661,7 @@ function App() {
     [defaultThemeKey, themeConfig],
   );
 
-  const resolveFontStack = (family) => {
+  const resolveFontStack = (family: unknown) => {
     const fallback = '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
     if (!family) return fallback;
     const normalized = String(family);
@@ -1662,7 +1675,7 @@ function App() {
   };
 
   const getThemeFont = useCallback(
-    (themeKeyValue) => {
+    (themeKeyValue: string) => {
       const theme = themeConfig.themes?.[themeKeyValue];
       const font = theme?.font;
       if (typeof font !== 'object' || font === null || !('family' in font) || typeof font.family !== 'string')
@@ -1675,7 +1688,7 @@ function App() {
     [themeConfig],
   );
 
-  const resolveFontChoice = (setting, themeFont) => {
+  const resolveFontChoice = (setting: unknown, themeFont: { family: string; cssUrl?: string } | null) => {
     const normalized = String(setting || '').trim();
     const lower = normalized.toLowerCase();
     if (!normalized || lower === 'default') {
@@ -1795,7 +1808,7 @@ function App() {
     setThemeKey(appThemeKey);
   }, [timelineData?.file, appThemeKey, resolveThemeKey]);
 
-  const handleAppThemeChange = async (nextThemeKey) => {
+  const handleAppThemeChange = async (nextThemeKey: string) => {
     setAppThemePreference(nextThemeKey);
     const resolved = resolveThemeKey(nextThemeKey);
     setAppThemeKey(resolved);
@@ -1825,7 +1838,7 @@ function App() {
     setReturnToProjectSettings(false);
   };
 
-  const handleTimelineStorageDirChange = async (nextDir) => {
+  const handleTimelineStorageDirChange = async (nextDir: string) => {
     setTimelineStorageDir(nextDir || '');
     await saveAppSettings({
       theme: appThemePreference,
@@ -1838,7 +1851,7 @@ function App() {
     });
   };
 
-  const handleNotesStorageDirChange = async (nextDir) => {
+  const handleNotesStorageDirChange = async (nextDir: string) => {
     setNotesStorageDir(nextDir || '');
     await saveAppSettings({
       theme: appThemePreference,
@@ -1852,7 +1865,7 @@ function App() {
     });
   };
 
-  const handleAssetsStorageDirChange = async (nextDir) => {
+  const handleAssetsStorageDirChange = async (nextDir: string) => {
     setAssetsStorageDir(nextDir || '');
     await saveAppSettings({
       theme: appThemePreference,
@@ -1866,7 +1879,7 @@ function App() {
     });
   };
 
-  const handleAppFontSizeChange = async (nextSize) => {
+  const handleAppFontSizeChange = async (nextSize: number | string) => {
     const next = Number(nextSize) || 14;
     setAppFontSize(next);
     await saveAppSettings({
@@ -1879,7 +1892,7 @@ function App() {
     });
   };
 
-  const handleAppFontChange = async (nextFont) => {
+  const handleAppFontChange = async (nextFont: string) => {
     setAppFontFamily(nextFont);
     await saveAppSettings({
       theme: appThemePreference,
@@ -1892,7 +1905,7 @@ function App() {
     });
   };
 
-  const handleHardwareAccelerationChange = async (next) => {
+  const handleHardwareAccelerationChange = async (next: boolean) => {
     setHardwareAcceleration(next);
     await saveAppSettings({
       theme: appThemePreference,
@@ -1909,7 +1922,7 @@ function App() {
     }
   };
 
-  const handleStartMaximizedChange = async (next) => {
+  const handleStartMaximizedChange = async (next: boolean) => {
     setStartMaximized(next);
     await saveAppSettings({
       theme: appThemePreference,
@@ -2041,7 +2054,7 @@ function App() {
     }
   }, [viewMode, timelineData?.file?.useSpreadsheet]);
 
-  const compareElementsByTimelineOrder = useCallback((a, b) => {
+  const compareElementsByTimelineOrder = useCallback((a: TimelineElement, b: TimelineElement) => {
     if (a.type === 'event' && b.type === 'event') {
       if ((a.date ?? 0) !== (b.date ?? 0)) return (a.date ?? 0) - (b.date ?? 0);
       return String(a.id).localeCompare(String(b.id));
@@ -2090,13 +2103,13 @@ function App() {
 
   const TYPE_ORDER = ['event', 'span', 'era'];
 
-  const elementRepDate = (el) => {
+  const elementRepDate = (el: TimelineElement) => {
     if (el.type === 'event') return el.date ?? 0;
     return el.start ?? 0;
   };
 
   const selectByTypeDelta = useCallback(
-    (delta) => {
+    (delta: number) => {
       const selectedElement = selectionNavigation.selectedElement;
       if (!selectedElement) return;
       const currentTypeIdx = TYPE_ORDER.indexOf(selectedElement.type);
@@ -2125,14 +2138,8 @@ function App() {
   useEffect(() => {
     if (!selectedId || !timelineData) return;
 
-    const handleSelectionNavigation = (e) => {
-      const target = e.target;
-      const isEditable =
-        target?.tagName === 'INPUT' ||
-        target?.tagName === 'TEXTAREA' ||
-        target?.tagName === 'SELECT' ||
-        target?.isContentEditable;
-      if (isEditable) return;
+    const handleSelectionNavigation = (e: KeyboardEvent) => {
+      if (isEditableEventTarget(e.target)) return;
 
       if (matchesKeybind(e, keybinds.selectPrevious)) {
         if (!selectionNavigation.prevElement) return;
@@ -2665,3 +2672,9 @@ function App() {
 }
 
 export default App;
+const isEditableEventTarget = (target: EventTarget | null): boolean =>
+  target instanceof HTMLElement &&
+  (target.tagName === 'INPUT' ||
+    target.tagName === 'TEXTAREA' ||
+    target.tagName === 'SELECT' ||
+    target.isContentEditable);

@@ -2,6 +2,15 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { Search } from 'lucide-react';
 import { formatYear } from '../utils/timelineUtils';
 import { parseFilterQuery, matchesFilter } from '../utils/filterUtils';
+import type { TimelineElement, TimelineFile, TimelineElementType } from '../types/timeline';
+
+type SearchOverlayProps = {
+  isOpen: boolean;
+  onClose: () => void;
+  elements: TimelineElement[];
+  onSelect: (id: TimelineElement['id']) => void;
+  fileSettings?: TimelineFile;
+};
 
 const TypeDot = () => (
   <span
@@ -40,15 +49,15 @@ const TypeBox = () => (
   />
 );
 
-function formatElementDate(el, fileSettings) {
+function formatElementDate(el: TimelineElement, fileSettings?: TimelineFile): string {
   const negID = fileSettings?.negID || 'BCE';
   const posID = fileSettings?.posID || '';
   const useCalendar = fileSettings?.useCalendar === true;
   const hideDecimals = fileSettings?.hideDecimals;
 
-  const fmtYear = (year, label) => {
+  const fmtYear = (year: unknown, label: unknown): string => {
     if (label && typeof label === 'string') return label;
-    if (!Number.isFinite(year)) return '';
+    if (typeof year !== 'number' || !Number.isFinite(year)) return '';
     return formatYear(year, negID, posID, useCalendar, hideDecimals);
   };
 
@@ -61,25 +70,25 @@ function formatElementDate(el, fileSettings) {
   return start || end || '';
 }
 
-const TYPE_ICONS = {
+const TYPE_ICONS: Record<TimelineElementType, React.ReactNode> = {
   event: <TypeDot />,
   span: <TypeBar />,
   era: <TypeBox />,
 };
 
-const TYPE_LABELS = { event: 'Event', span: 'Span', era: 'Era' };
+const TYPE_LABELS: Record<TimelineElementType, string> = { event: 'Event', span: 'Span', era: 'Era' };
 
-export default function SearchOverlay({ isOpen, onClose, elements, onSelect, fileSettings }) {
+export default function SearchOverlay({ isOpen, onClose, elements, onSelect, fileSettings }: SearchOverlayProps) {
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
-  const inputRef = useRef(null);
-  const listRef = useRef(null);
-  const activeItemRef = useRef(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const activeItemRef = useRef<HTMLButtonElement | null>(null);
 
   const parsedFilter = useMemo(() => parseFilterQuery(query), [query]);
   const results = useMemo(() => {
     if (!query.trim()) return elements.slice(0, 50);
-    return elements.filter((el) => matchesFilter(el, parsedFilter));
+    return elements.filter((el: TimelineElement) => matchesFilter(el, parsedFilter));
   }, [query, elements, parsedFilter]);
 
   useEffect(() => {
@@ -103,7 +112,7 @@ export default function SearchOverlay({ isOpen, onClose, elements, onSelect, fil
 
   useEffect(() => {
     if (!isOpen) return;
-    const handleKey = (e) => {
+    const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
         onClose();
@@ -130,7 +139,7 @@ export default function SearchOverlay({ isOpen, onClose, elements, onSelect, fil
 
   return (
     <div className="search-overlay-backdrop" onMouseDown={onClose}>
-      <div className="search-overlay-panel" onMouseDown={(e) => e.stopPropagation()}>
+      <div className="search-overlay-panel" onMouseDown={(e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation()}>
         <div className="search-overlay-input-row">
           <Search size={15} className="search-overlay-icon" />
           <input
@@ -147,7 +156,7 @@ export default function SearchOverlay({ isOpen, onClose, elements, onSelect, fil
 
         {results.length > 0 && (
           <div className="search-overlay-results" ref={listRef}>
-            {results.map((el, i) => (
+            {results.map((el: TimelineElement, i: number) => (
               <button
                 key={el.id}
                 ref={i === activeIndex ? activeItemRef : null}

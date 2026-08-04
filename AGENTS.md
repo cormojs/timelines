@@ -42,6 +42,10 @@ logic with applicable tests.
   `.tsx` for React UI, and `.cts` for Bun test modules.
 - Preserve the existing style of the file you edit. Most newer configuration and
   utility modules omit semicolons, while some older React files use them.
+- Do not use `any`, directly or indirectly. This includes aliases or utility
+  types that resolve to `any` (for example `ReturnType<typeof JSON.parse>`,
+  `z.any()`, or a broad global fallback). Define a concrete type, validate an
+  unknown value at its boundary, or narrow it with a type guard instead.
 - Keep reusable state and data transformations in `src/utils/` or hooks rather
   than embedding them in large components.
 - Treat timeline files as user data: keep changes backward-compatible, validate

@@ -1,6 +1,9 @@
 const STORAGE_KEY = 'timelines-app-settings';
+import { parseAppSettingsJson } from './json';
 
-export async function getAppSettings() {
+type AppSettings = ReturnType<typeof parseAppSettingsJson>;
+
+export async function getAppSettings(): Promise<AppSettings> {
   if (window.electron?.getAppSettings) {
     try {
       return await window.electron.getAppSettings();
@@ -13,14 +16,14 @@ export async function getAppSettings() {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) return {};
   try {
-    return JSON.parse(raw);
+    return parseAppSettingsJson(raw);
   } catch (error) {
     console.error('Failed to parse app settings:', error);
     return {};
   }
 }
 
-export async function saveAppSettings(settings) {
+export async function saveAppSettings(settings: Partial<AppSettings>): Promise<void> {
   if (window.electron?.setAppSettings) {
     try {
       await window.electron.setAppSettings(settings);

@@ -1,6 +1,9 @@
 // gitSync engine tests against a real local bare repo (no GitHub): export
 // pass, delete tracking, commit summaries, reconcile with conflict copies,
 // and the import pass, using two fake machine libraries A and B.
+import type { TestContext } from 'node:test';
+import type { Server } from 'node:http';
+
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const os = require('node:os');
@@ -10,34 +13,61 @@ const { spawnSync } = require('node:child_process');
 const { createGitHttpServer } = require('./gitHttpServer.cts');
 const { createEngine, summarizePackageDiff, isConflictCopyPath } = require('../electron/gitSync.ts');
 const { buildPackage, readPackage, strToU8 } = require('../electron/timelinePackage.ts');
+const { parseTimelineJson } = require('../src/utils/json.ts');
 
-const runGit = (args, cwd) => {
+type LibraryTimeline = {
+  uid: string;
+  relativeId: string;
+  title: string;
+  elements: Array<Record<string, unknown>>;
+  notes: Record<string, string>;
+  assets: Record<string, Uint8Array>;
+  neverSync?: boolean;
+};
+type Library = {
+  timelines: Map<string, LibraryTimeline>;
+  add: (timeline: Partial<LibraryTimeline> & Pick<LibraryTimeline, 'uid' | 'relativeId'>) => void;
+  get: (uid: string) => LibraryTimeline | undefined;
+  byRelId: (relativeId: string) => LibraryTimeline | undefined;
+  ops: Record<string, unknown>;
+};
+type GitTestContext = {
+  root: string;
+  remoteDir: string;
+  url: string;
+  server: Server;
+  remoteFiles: () => string[];
+  lastMessage: () => string;
+  mergeCount: () => string;
+};
+
+const runGit = (args: string[], cwd: string): string => {
   const r = spawnSync('git', args, { cwd, encoding: 'utf8' });
   assert.equal(r.status, 0, `git ${args.join(' ')} failed: ${r.stderr}`);
   return r.stdout;
 };
 
 // In-memory stand-in for the library ops main.ts will inject
-function makeLibrary() {
-  const timelines = new Map(); // uid -> { uid, relativeId, title, elements, notes, assets, neverSync }
+function makeLibrary(): Library {
+  const timelines = new Map<string, LibraryTimeline>();
   const lib = {
     timelines,
-    add(t) {
+    add(t: Partial<LibraryTimeline> & Pick<LibraryTimeline, 'uid' | 'relativeId'>) {
       timelines.set(t.uid, { title: t.uid, elements: [], notes: {}, assets: {}, ...t });
     },
-    get(uid) {
+    get(uid: string) {
       return timelines.get(uid);
     },
-    byRelId(relId) {
+    byRelId(relId: string) {
       return [...timelines.values()].find((t) => t.relativeId === relId);
     },
     ops: {
       listTimelines: async () =>
         [...timelines.values()].map(({ uid, relativeId, neverSync }) => ({ uid, relativeId, neverSync })),
-      buildPackageForTimeline: async ({ uid }) => {
+      buildPackageForTimeline: async ({ uid }: { uid: string }) => {
         const t = timelines.get(uid);
         const data = { file: { uid: t.uid, title: t.title }, elements: t.elements };
-        const files = {};
+        const files: Record<string, Uint8Array> = {};
         for (const [k, v] of Object.entries(t.assets)) files[`assets/${k}`] = v;
         for (const [k, v] of Object.entries(t.notes)) files[`notes/${k}`] = strToU8(v);
         return buildPackage(JSON.stringify(data, null, 2), files, { deterministic: true });
@@ -51,7 +81,7 @@ function makeLibrary() {
         } = {},
       ) => {
         const pkg = readPackage(buf);
-        const data = JSON.parse(pkg.timelineJson);
+        const data = parseTimelineJson(pkg.timelineJson);
         let uid = data.file.uid;
         const existing = timelines.get(uid);
         const record = {
@@ -78,7 +108,7 @@ function makeLibrary() {
         timelines.set(uid, record);
         return { success: true, id: record.relativeId, uid, imported: true };
       },
-      removeLocalTimeline: async (uid) => {
+      removeLocalTimeline: async (uid: string) => {
         timelines.delete(uid);
       },
     },
@@ -86,7 +116,7 @@ function makeLibrary() {
   return lib;
 }
 
-async function makeCtx(t) {
+async function makeCtx(t: TestContext): Promise<GitTestContext> {
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'tl-gitsync-'));
   t.after(() => fsp.rm(root, { recursive: true, force: true }).catch(() => {}));
   const remoteDir = path.join(root, 'remote.git');
@@ -102,7 +132,7 @@ async function makeCtx(t) {
   return { root, remoteDir, url, server, remoteFiles, lastMessage, mergeCount };
 }
 
-function makeEngine(ctx, name, lib, extra = {}) {
+function makeEngine(ctx: GitTestContext, name: string, lib: Library, extra: Record<string, unknown> = {}) {
   return createEngine({
     repoDir: path.join(ctx.root, `${name}-mirror`),
     statePath: path.join(ctx.root, `${name}-state.json`),
@@ -115,7 +145,7 @@ function makeEngine(ctx, name, lib, extra = {}) {
 }
 
 test('summarizePackageDiff reports element, note, and asset changes', () => {
-  const mk = (elements, notes) =>
+  const mk = (elements: Array<Record<string, unknown>>, notes: Record<string, string>) =>
     buildPackage(
       JSON.stringify({ file: { uid: 'x', title: 'World' }, elements }, null, 2),
       Object.fromEntries(Object.entries(notes).map(([k, v]) => [`notes/${k}`, strToU8(v)])),
@@ -143,7 +173,7 @@ test('summarizePackageDiff reports element, note, and asset changes', () => {
   assert.equal(summarizePackageDiff(oldBuf, oldBuf), null);
 });
 
-test('connect exports the library to an empty remote', async (t) => {
+test('connect exports the library to an empty remote', async (t: TestContext) => {
   const ctx = await makeCtx(t);
   const libA = makeLibrary();
   libA.add({
@@ -172,7 +202,7 @@ test('connect exports the library to an empty remote', async (t) => {
   assert.equal(runGit(['--git-dir', ctx.remoteDir, 'rev-parse', 'main'], ctx.root), before);
 });
 
-test('second machine connect imports the remote library', async (t) => {
+test('second machine connect imports the remote library', async (t: TestContext) => {
   const ctx = await makeCtx(t);
   const libA = makeLibrary();
   libA.add({
@@ -198,7 +228,7 @@ test('second machine connect imports the remote library', async (t) => {
   assert.equal(got.notes['alpha.md'], '# Alpha');
 });
 
-test('edits propagate with commit body summaries', async (t) => {
+test('edits propagate with commit body summaries', async (t: TestContext) => {
   const ctx = await makeCtx(t);
   const libA = makeLibrary();
   const libB = makeLibrary();
@@ -220,7 +250,7 @@ test('edits propagate with commit body summaries', async (t) => {
   assert.equal(libB.get('alpha').elements.length, 2);
 });
 
-test('renames move the mirror file and follow on other machines', async (t) => {
+test('renames move the mirror file and follow on other machines', async (t: TestContext) => {
   const ctx = await makeCtx(t);
   const libA = makeLibrary();
   const libB = makeLibrary();
@@ -244,7 +274,7 @@ test('renames move the mirror file and follow on other machines', async (t) => {
   assert.equal(libB.timelines.size, 1);
 });
 
-test('local deletions propagate to other machines', async (t) => {
+test('local deletions propagate to other machines', async (t: TestContext) => {
   const ctx = await makeCtx(t);
   const libA = makeLibrary();
   const libB = makeLibrary();
@@ -268,7 +298,7 @@ test('local deletions propagate to other machines', async (t) => {
   assert.ok(libB.get('alpha'));
 });
 
-test('divergent edits keep both versions via a conflict copy, history stays linear', async (t) => {
+test('divergent edits keep both versions via a conflict copy, history stays linear', async (t: TestContext) => {
   const ctx = await makeCtx(t);
   const libA = makeLibrary();
   const libB = makeLibrary();
@@ -310,7 +340,7 @@ test('divergent edits keep both versions via a conflict copy, history stays line
   assert.equal(ctx.mergeCount(), '0');
 });
 
-test('excluded paths are not exported, imported, or deleted', async (t) => {
+test('excluded paths are not exported, imported, or deleted', async (t: TestContext) => {
   const ctx = await makeCtx(t);
   const libA = makeLibrary();
   const libB = makeLibrary();
@@ -341,7 +371,7 @@ test('excluded paths are not exported, imported, or deleted', async (t) => {
   assert.ok(ctx.remoteFiles().includes('private/secret.timeline'));
 });
 
-test('a folder and a same-named timeline are excluded independently', async (t) => {
+test('a folder and a same-named timeline are excluded independently', async (t: TestContext) => {
   const ctx = await makeCtx(t);
   const libA = makeLibrary();
   // "test" is both a timeline (test.timeline) and a folder (test/) holding "test/child"
@@ -365,7 +395,7 @@ test('a folder and a same-named timeline are excluded independently', async (t) 
   assert.ok(!ctx.remoteFiles().includes('test/child.timeline'));
 });
 
-test('neverSync timelines never reach the repo', async (t) => {
+test('neverSync timelines never reach the repo', async (t: TestContext) => {
   const ctx = await makeCtx(t);
   const libA = makeLibrary();
   libA.add({ uid: 'alpha', relativeId: 'alpha', title: 'Alpha' });
@@ -378,7 +408,7 @@ test('neverSync timelines never reach the repo', async (t) => {
   assert.ok(!ctx.remoteFiles().includes('diary.timeline'));
 });
 
-test('connecting over a remote that already has the same uid keeps both versions', async (t) => {
+test('connecting over a remote that already has the same uid keeps both versions', async (t: TestContext) => {
   const ctx = await makeCtx(t);
   const libA = makeLibrary();
   const libB = makeLibrary();
@@ -398,7 +428,7 @@ test('connecting over a remote that already has the same uid keeps both versions
   assert.ok(ctx.remoteFiles().some((f) => isConflictCopyPath(f)));
 });
 
-test('offline edits are kept locally and pushed when the remote returns', async (t) => {
+test('offline edits are kept locally and pushed when the remote returns', async (t: TestContext) => {
   const ctx = await makeCtx(t);
   const libA = makeLibrary();
   libA.add({ uid: 'alpha', relativeId: 'alpha', title: 'Alpha', elements: [{ id: 1, title: 'One' }] });
@@ -406,20 +436,22 @@ test('offline edits are kept locally and pushed when the remote returns', async 
   await A.init();
   await A.connect({ url: ctx.url, branch: 'main' });
 
-  const port = ctx.server.address().port;
+  const address = ctx.server.address();
+  if (!address || typeof address === 'string') throw new Error('Test server does not expose a TCP port');
+  const port = address.port;
   await new Promise((resolve) => ctx.server.close(resolve));
   libA.get('alpha').elements.push({ id: 2, title: 'Offline edit' });
   A.markDirty('alpha');
   const status = await A.syncNow();
   assert.equal(status.state, 'offline');
 
-  await new Promise((resolve) => ctx.server.listen(port, '127.0.0.1', resolve));
+  await new Promise<void>((resolve) => ctx.server.listen(port, '127.0.0.1', () => resolve()));
   const after = await A.syncNow();
   assert.equal(after.state, 'idle');
   assert.match(ctx.lastMessage(), /alpha: \+1 element/);
 });
 
-test('shareInfo builds viewer links and reports pending local changes', async (t) => {
+test('shareInfo builds viewer links and reports pending local changes', async (t: TestContext) => {
   const ctx = await makeCtx(t);
   const libA = makeLibrary();
   libA.add({ uid: 'alpha', relativeId: 'alpha', title: 'Alpha' });
@@ -446,7 +478,7 @@ test('shareInfo builds viewer links and reports pending local changes', async (t
   assert.equal(pending.isPublic, false);
 });
 
-test('fileHistory lists commits and restoreVersion imports a copy', async (t) => {
+test('fileHistory lists commits and restoreVersion imports a copy', async (t: TestContext) => {
   const ctx = await makeCtx(t);
   const libA = makeLibrary();
   libA.add({ uid: 'alpha', relativeId: 'alpha', title: 'Alpha', elements: [{ id: 1, title: 'Base' }] });
@@ -473,7 +505,7 @@ test('fileHistory lists commits and restoreVersion imports a copy', async (t) =>
   assert.equal(A.getStatus().state, 'dirty');
 });
 
-test('a hand-written README is never rewritten or removed', async (t) => {
+test('a hand-written README is never rewritten or removed', async (t: TestContext) => {
   const ctx = await makeCtx(t);
   const libA = makeLibrary();
   libA.add({ uid: 'alpha', relativeId: 'alpha', title: 'Alpha' });
@@ -499,7 +531,7 @@ test('a hand-written README is never rewritten or removed', async (t) => {
   assert.ok(ctx.remoteFiles().includes('README.md'));
 });
 
-test('turning off README generation removes the generated one', async (t) => {
+test('turning off README generation removes the generated one', async (t: TestContext) => {
   const ctx = await makeCtx(t);
   const libA = makeLibrary();
   libA.add({ uid: 'alpha', relativeId: 'alpha', title: 'Alpha' });
@@ -519,7 +551,7 @@ test('turning off README generation removes the generated one', async (t) => {
   assert.ok(!ctx.remoteFiles().includes('README.md'));
 });
 
-test('a README generated before the marker is still adopted', async (t) => {
+test('a README generated before the marker is still adopted', async (t: TestContext) => {
   const ctx = await makeCtx(t);
   const libA = makeLibrary();
   libA.add({ uid: 'alpha', relativeId: 'alpha', title: 'Alpha' });

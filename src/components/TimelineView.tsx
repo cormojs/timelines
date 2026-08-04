@@ -14,6 +14,7 @@ import {
   type CSSProperties,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { parseFilterHistoryJson } from '../utils/json';
 import {
   pickStep,
   buildSpanChildPlacement,
@@ -64,12 +65,172 @@ import {
   History,
 } from 'lucide-react';
 import { ICON_MAP } from '../config/elementIcons';
+import type { Keybind, Keybinds, TimelineData, TimelineElement, TimelineGroup } from '../types/timeline';
 
 const FILTER_HISTORY_KEY = 'timelines-filter-query-history';
 const FILTER_HISTORY_MAX = 8;
 
 const FONT_FALLBACK_STACK = '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 const FONT_WAIT_MS = 3000;
+
+type ElementId = TimelineElement['id'];
+
+type ElementCoordinates = {
+  lat?: number;
+  lng?: number;
+};
+type EraElement = TimelineElement & { type: 'era'; start: number; end: number };
+type FilterChip = {
+  id: string;
+  kind: 'date' | 'tag' | 'text' | 'type';
+  value: string;
+  op?: keyof typeof FILTER_OP_GLYPH;
+  negated: boolean;
+  join: 'and' | 'or';
+};
+type MenuPosition = { x: number; y: number; align?: string; anchorLeft?: number; ready?: boolean };
+type ContextMenuPosition = MenuPosition & {
+  element: TimelineElement | null;
+  groupId: string | null;
+  clickYear: number | null;
+  lat?: number;
+  lng?: number;
+};
+type ScaleSection = { start: number; end: number; scale: number; showBreak: boolean };
+type PositionedElement = TimelineElement & { start?: number; end?: number; date?: number; groupId: string };
+type SpanPlacement = ReturnType<typeof buildSpanChildPlacement>;
+type SpanMergePlacement = ReturnType<typeof buildSpanMergePlacement>;
+type PositionedSpan = ReturnType<typeof layoutSpans>['finalSpans'][number] & { groupId: string };
+type PositionedEvent = ReturnType<typeof layoutEvents>[number] & { groupId: string };
+type GroupLayout = TimelineGroup & {
+  id: string;
+  order: number;
+  stack: number;
+  visible: boolean;
+  belowLine: boolean;
+  hideBand: boolean;
+  yOffset: number;
+  spanBandHeight: number;
+  spanChildPlacement: SpanPlacement;
+  spanMergePlacement: SpanMergePlacement;
+  finalSpans: PositionedSpan[];
+  finalEvents: PositionedEvent[];
+  extentTop?: number;
+  extentBottom?: number;
+};
+type PositionedEra = EraElement & {
+  height: number;
+  left: number;
+  width: number;
+  top: number;
+  fuzz: { left: number; width: number; fadeInPx: number; fadeOutPx: number } | null;
+};
+type TimelineLayout = {
+  file: TimelineData['file'];
+  groupLayouts: GroupLayout[];
+  spanChildPlacement: SpanPlacement;
+  spanMergePlacement: SpanMergePlacement;
+  finalSpans: PositionedSpan[];
+  finalEvents: PositionedEvent[];
+  finalEras: PositionedEra[];
+  PX_PER_YEAR: number;
+  timelineWidth: number;
+  yearToPx: (year: number) => number;
+  calculatedHeight: number;
+  BASE_LINE_Y: number;
+  normalizedScaleSections: ScaleSection[];
+  compressedMin: number;
+  compressedMax: number;
+  TIMELINE_PADDING: number;
+  decompressYear: (year: number) => number;
+  evFontSize?: number;
+};
+type TimelineTick = { value: number; label?: string };
+type WheelPanInput = { deltaX?: number; deltaY?: number; shiftKey?: boolean };
+type WheelZoomInput = { deltaY: number; clientX: number; clientY: number };
+
+export type TimelineViewExportPngOptions = {
+  transparentBg?: boolean;
+  customBg?: string;
+  filename?: string;
+  targetWidth?: number | null;
+  targetHeight?: number | null;
+  exportStartYear?: number;
+  exportEndYear?: number;
+  showTitle?: boolean;
+  titlePosition?: string;
+  titleStyle?: string;
+  title?: string;
+};
+
+export type TimelinePreviewOptions = {
+  transparentBg?: boolean;
+  customBg?: string;
+  maxWidth?: number;
+  maxHeight?: number;
+  simplifyContent?: boolean;
+};
+
+export type TimelinePreview = {
+  imageUrl: string;
+  canvasWidth: number;
+  canvasHeight: number;
+  elementWidth: number;
+  elementHeight: number;
+  timelineWidth: number;
+  minYear: number;
+  maxYear: number;
+  yearToPercent: (year: number) => number;
+  percentToYear: (percent: number) => number;
+};
+
+export type TimelineViewHandle = {
+  generatePreview: (options?: TimelinePreviewOptions) => Promise<TimelinePreview | null>;
+  scrollToElement: (elementId: ElementId) => void;
+  scrollToGroup: (groupId: string) => void;
+};
+
+export type TimelineViewProps = {
+  selectedId: ElementId | null;
+  onSelect: (elementId: ElementId) => void;
+  timelineData: TimelineData;
+  onZoomChange?: (scale: number) => void;
+  onHeightChange?: (height: number) => void;
+  onAddEvent?: (groupId: string | null, clickYear: number | null, coordinates: ElementCoordinates) => void;
+  onAddSpan?: (groupId: string | null, clickYear: number | null, coordinates: ElementCoordinates) => void;
+  onAddEra?: (clickYear: number | null, coordinates: ElementCoordinates) => void;
+  onOpenSettings?: () => void;
+  onDelete?: (elementId: ElementId) => void;
+  onDuplicateElement?: (elementId: ElementId) => void;
+  onEditElement?: (elementId: ElementId) => void;
+  downloadPngTrigger?: number;
+  exportPngOptions?: TimelineViewExportPngOptions | null;
+  onExportPng?: () => void;
+  onExportVideo?: () => void;
+  rightPanelWidth?: number;
+  isRightPanelOpen?: boolean;
+  leftPanelWidth?: number;
+  isLeftPanelOpen?: boolean;
+  activeTags?: string[];
+  hiddenTags?: string[];
+  allTags?: string[];
+  onToggleTag?: (tag: string) => void;
+  onToggleHiddenTag?: (tag: string) => void;
+  onClearTags?: () => void;
+  pinnedTags?: string[];
+  onTogglePinnedTag?: (tag: string) => void;
+  onViewportYearChange?: (year: number) => void;
+  onChipQueryChange?: (query: string) => void;
+  tagColors?: Record<string, string>;
+  keybinds?: Keybinds;
+  onSetViewMode?: (mode: 'spreadsheet') => void;
+  readOnly?: boolean;
+};
+
+type GroupLayoutSummary = {
+  bgColor?: string;
+  belowLine?: boolean;
+};
 
 const readAppFontStack = () => {
   const root = document.documentElement;
@@ -80,13 +241,17 @@ const readAppFontStack = () => {
 };
 
 const FILTER_TYPE_TERMS = ['is:event', 'is:span', 'is:era', 'has:coords'];
-const FILTER_DATE_OPS = [
+const FILTER_DATE_OPS: Array<[keyof typeof FILTER_OP_GLYPH, string]> = [
   ['>', '>'],
   ['>=', '≥'],
   ['<', '<'],
   ['<=', '≤'],
 ];
 const FILTER_OP_GLYPH = { '>': '>', '>=': '≥', '<': '<', '<=': '≤' };
+const getObjectFit = (value: unknown): CSSProperties['objectFit'] =>
+  value === 'contain' || value === 'cover' || value === 'fill' || value === 'none' || value === 'scale-down'
+    ? value
+    : 'cover';
 
 const HTML2CANVAS_COLOR_PROPERTIES = [
   'color',
@@ -107,15 +272,15 @@ const HTML2CANVAS_COLOR_PROPERTIES = [
 const UNSUPPORTED_COLOR_FUNCTION = /(?:color|color-mix|lab|lch|oklab|oklch)\(/i;
 
 // html2canvas 1.4 can't parse color-mix()/color(srgb ...) values, so rasterize them to rgba() in its detached clone
-const normalizeHtml2CanvasColors = (clonedDocument, clonedRoot) => {
+const normalizeHtml2CanvasColors = (clonedDocument: Document, clonedRoot: HTMLElement | null) => {
   const canvas = clonedDocument.createElement('canvas');
   canvas.width = 1;
   canvas.height = 1;
   const context = canvas.getContext('2d', { willReadFrequently: true });
   if (!context || !clonedRoot) return;
 
-  const cache = new Map();
-  const toRgba = (value) => {
+  const cache = new Map<string, string>();
+  const toRgba = (value: string): string => {
     if (cache.has(value)) return cache.get(value);
     context.clearRect(0, 0, 1, 1);
     context.fillStyle = value;
@@ -126,7 +291,7 @@ const normalizeHtml2CanvasColors = (clonedDocument, clonedRoot) => {
     return resolved;
   };
 
-  const replaceColorFunctions = (value) => {
+  const replaceColorFunctions = (value: string): string => {
     let output = value;
     let searchFrom = 0;
     while (searchFrom < output.length) {
@@ -161,18 +326,19 @@ const normalizeHtml2CanvasColors = (clonedDocument, clonedRoot) => {
     for (const property of HTML2CANVAS_COLOR_PROPERTIES) {
       const value = styles.getPropertyValue(property);
       if (UNSUPPORTED_COLOR_FUNCTION.test(value)) {
-        element.style.setProperty(property, replaceColorFunctions(value), 'important');
+        if (element instanceof HTMLElement)
+          element.style.setProperty(property, replaceColorFunctions(value), 'important');
       }
     }
   }
 };
 
-const simplifyTimelinePreview = (clonedDocument, clonedTimeline) => {
+const simplifyTimelinePreview = (clonedDocument: Document, clonedTimeline: HTMLElement) => {
   const walker = clonedDocument.createTreeWalker(
     clonedTimeline,
     clonedDocument.defaultView?.NodeFilter?.SHOW_TEXT ?? 4,
   );
-  const textNodes = [];
+  const textNodes: Node[] = [];
   while (walker.nextNode()) textNodes.push(walker.currentNode);
   for (const node of textNodes) node.nodeValue = '';
 
@@ -197,12 +363,12 @@ const simplifyTimelinePreview = (clonedDocument, clonedTimeline) => {
   for (const element of [clonedTimeline, ...clonedTimeline.querySelectorAll('*')]) {
     const backgroundImage = clonedDocument.defaultView?.getComputedStyle(element).backgroundImage;
     if (backgroundImage?.includes('url(')) {
-      element.style.setProperty('background-image', 'none', 'important');
+      if (element instanceof HTMLElement) element.style.setProperty('background-image', 'none', 'important');
     }
   }
 };
 
-const filterChipTerm = (chip) => {
+const filterChipTerm = (chip: FilterChip): string => {
   let term;
   if (chip.kind === 'date') term = `${chip.op}${chip.value}`;
   else if (chip.kind === 'tag') term = `#${chip.value}`;
@@ -211,19 +377,19 @@ const filterChipTerm = (chip) => {
   return (chip.negated ? '~' : '') + term;
 };
 
-const filterChipLabel = (chip) =>
+const filterChipLabel = (chip: FilterChip): string =>
   chip.kind === 'date'
     ? `${FILTER_OP_GLYPH[chip.op] ?? chip.op} ${chip.value}`
     : chip.kind === 'tag'
       ? `#${chip.value}`
       : chip.value;
 
-const buildChipQuery = (chips) =>
-  chips.map((c, i) => (i > 0 && c.join === 'or' ? '| ' : '') + filterChipTerm(c)).join(' ');
+const buildChipQuery = (chips: FilterChip[]): string =>
+  chips.map((c: FilterChip, i: number) => (i > 0 && c.join === 'or' ? '| ' : '') + filterChipTerm(c)).join(' ');
 
-const chipsFromQuery = (query, nextId) => {
-  const chips = [];
-  let join = 'and';
+const chipsFromQuery = (query: string, nextId: () => string): FilterChip[] => {
+  const chips: FilterChip[] = [];
+  let join: 'and' | 'or' = 'and';
   let negated = false;
   for (const tok of tokenizeFilterQuery(query)) {
     if (tok.t === 'OR') {
@@ -235,7 +401,7 @@ const chipsFromQuery = (query, nextId) => {
       continue;
     }
     if (tok.t !== 'LEAF') continue;
-    let chip;
+    let chip: Pick<FilterChip, 'kind' | 'value'> & Partial<Pick<FilterChip, 'op'>>;
     if (tok.kind === 'type') chip = { kind: 'type', value: `is:${tok.value}` };
     else if (tok.kind === 'has') chip = { kind: 'type', value: `has:${tok.value}` };
     else if (tok.kind === 'tag') chip = { kind: 'tag', value: tok.value };
@@ -252,23 +418,24 @@ const MapView = lazy(() => import('./MapView'));
 import '../styles/04-timeline.css';
 import '../styles/07-modals-menus.css';
 
-function assignEraLanes(eras, bandHeight, bandGap) {
+function assignEraLanes(eras: EraElement[], bandHeight: number, bandGap: number): Map<string | number, number> {
   if (eras.length === 0) return new Map();
-  const byId = new Map(eras.map((e) => [e.id, e]));
+  const byId = new Map<string | number, EraElement>(eras.map((e: EraElement) => [e.id, e]));
   const stride = bandHeight + bandGap;
-  const dur = (e) => e.end - e.start;
-  const overlaps = (a, b) => a.start < b.end && a.end > b.start;
-  const getEraHeight = (era) => {
+  const dur = (e: EraElement) => e.end - e.start;
+  const overlaps = (a: EraElement, b: EraElement) => a.start < b.end && a.end > b.start;
+  const getEraHeight = (era: EraElement) => {
     const size = era?.eraSize || 'normal';
     if (size === 'extra-thick') return bandHeight * 3;
     if (size === 'thick') return bandHeight * 2;
     return bandHeight;
   };
-  const verticalOverlap = (topA, heightA, topB, heightB) => topA < topB + heightB && topA + heightA > topB;
+  const verticalOverlap = (topA: number, heightA: number, topB: number, heightB: number) =>
+    topA < topB + heightB && topA + heightA > topB;
 
   // Implicit parent = the shortest strictly-longer era that overlaps this one.
   // Overlapping eras are stacked automatically: shorter above longer, touching.
-  const implicitParentOf = new Map();
+  const implicitParentOf = new Map<string | number, EraElement>();
   for (const era of eras) {
     let parent = null;
     for (const other of eras) {
@@ -281,10 +448,10 @@ function assignEraLanes(eras, bandHeight, bandGap) {
   }
 
   // Height above the root's own top edge used by its deepest implicit child chain.
-  const aboveHeightOf = new Map();
-  const getAboveHeight = (era) => {
+  const aboveHeightOf = new Map<string | number, number>();
+  const getAboveHeight = (era: EraElement): number => {
     if (aboveHeightOf.has(era.id)) return aboveHeightOf.get(era.id);
-    const children = eras.filter((e) => implicitParentOf.get(e.id)?.id === era.id);
+    const children = eras.filter((e: EraElement) => implicitParentOf.get(e.id)?.id === era.id);
     const h =
       children.length === 0 ? 0 : Math.max(...children.map((child) => getEraHeight(child) + getAboveHeight(child)));
     aboveHeightOf.set(era.id, h);
@@ -292,21 +459,24 @@ function assignEraLanes(eras, bandHeight, bandGap) {
   };
   eras.forEach(getAboveHeight);
 
-  const visited = new Set();
-  const ordered = [];
-  const visit = (era) => {
+  const visited = new Set<string | number>();
+  const ordered: EraElement[] = [];
+  const visit = (era: EraElement) => {
     if (visited.has(era.id)) return;
     const parent = implicitParentOf.get(era.id);
     if (parent) visit(parent);
     visited.add(era.id);
     ordered.push(era);
   };
-  [...eras].sort((a, b) => a.start - b.start).forEach(visit);
+  [...eras].sort((a: EraElement, b: EraElement) => a.start - b.start).forEach(visit);
 
   // All root eras share the same base offset so they sit in the same bottommost lane.
-  const commonRootBottom = Math.max(0, ...eras.filter((e) => !implicitParentOf.has(e.id)).map((e) => getEraHeight(e)));
+  const commonRootBottom = Math.max(
+    0,
+    ...eras.filter((e: EraElement) => !implicitParentOf.has(e.id)).map((e: EraElement) => getEraHeight(e)),
+  );
 
-  const offsetOf = new Map();
+  const offsetOf = new Map<string | number, number>();
 
   for (const era of ordered) {
     const eraHeight = getEraHeight(era);
@@ -356,7 +526,15 @@ function assignEraLanes(eras, bandHeight, bandGap) {
   return offsetOf;
 }
 
-function OverflowTags({ tags, tagColors, getReadableTextColor: readableColor }) {
+function OverflowTags({
+  tags,
+  tagColors,
+  getReadableTextColor: readableColor,
+}: {
+  tags: string[];
+  tagColors?: Record<string, string>;
+  getReadableTextColor: (color: string) => string;
+}) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [visibleCount, setVisibleCount] = useState(tags.length);
 
@@ -381,7 +559,7 @@ function OverflowTags({ tags, tagColors, getReadableTextColor: readableColor }) 
 
   return (
     <span className="pinned-tags" ref={containerRef}>
-      {tags.slice(0, visibleCount).map((tag) => (
+      {tags.slice(0, visibleCount).map((tag: string) => (
         <span
           key={tag}
           className="pinned-tag pinned-tag-item"
@@ -395,7 +573,7 @@ function OverflowTags({ tags, tagColors, getReadableTextColor: readableColor }) 
   );
 }
 
-const TimelineView = forwardRef(function TimelineView(
+const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(function TimelineView(
   {
     selectedId,
     onSelect,
@@ -431,46 +609,46 @@ const TimelineView = forwardRef(function TimelineView(
     keybinds = {},
     onSetViewMode,
     readOnly = false,
-  }: Record<string, DynamicValue>,
-  ref: DynamicValue,
+  }: TimelineViewProps,
+  ref,
 ) {
   const isMac = navigator.userAgent?.includes('Mac');
-  const fmtKey = (bind) => {
+  const fmtKey = (bind?: Keybind) => {
     if (!bind?.keys?.length) return '';
     return bind.keys
       .map((k) => (k === 'Ctrl' ? (isMac ? 'Cmd' : 'Ctrl') : k === 'Alt' ? (isMac ? 'Option' : 'Alt') : k))
       .join('+');
   };
-  const btnTip = (label, bind) => {
+  const btnTip = (label: string, bind?: Keybind) => {
     const s = fmtKey(bind);
     return s ? `${label} (${s})` : label;
   };
 
-  const containerRef = useRef(null);
-  const timelineRef = useRef(null);
-  const gridLabelsRef = useRef(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const timelineRef = useRef<HTMLDivElement | null>(null);
+  const gridLabelsRef = useRef<HTMLDivElement | null>(null);
   const scaleRef = useRef(1);
   const translateRef = useRef({ x: 0, y: 0 });
-  const prevCalculatedHeightRef = useRef(null);
+  const prevCalculatedHeightRef = useRef<number | null>(null);
   const isPanningRef = useRef(false);
   const lastPanPositionRef = useRef({ x: 0, y: 0 });
-  const [contextMenu, setContextMenu] = useState(null);
-  const [filterMenu, setFilterMenu] = useState(null);
+  const [contextMenu, setContextMenu] = useState<ContextMenuPosition | null>(null);
+  const [filterMenu, setFilterMenu] = useState<MenuPosition | null>(null);
   const [filterModalOpen, setFilterModalOpen] = useState(false);
-  const [filterChips, setFilterChips] = useState([]);
+  const [filterChips, setFilterChips] = useState<FilterChip[]>([]);
   const [filterText, setFilterText] = useState('');
-  const [filterDateOp, setFilterDateOp] = useState('>=');
+  const [filterDateOp, setFilterDateOp] = useState<keyof typeof FILTER_OP_GLYPH>('>=');
   const [filterDateVal, setFilterDateVal] = useState('');
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [filterHistory, setFilterHistory] = useState(() => {
+  const [filterHistory, setFilterHistory] = useState<string[]>(() => {
     try {
-      const stored = JSON.parse(window.localStorage.getItem(FILTER_HISTORY_KEY) ?? '[]');
+      const stored = parseFilterHistoryJson(window.localStorage.getItem(FILTER_HISTORY_KEY) ?? '[]');
       return Array.isArray(stored) ? stored.filter((q) => typeof q === 'string').slice(0, FILTER_HISTORY_MAX) : [];
     } catch {
       return [];
     }
   });
-  const filterInputRef = useRef(null);
+  const filterInputRef = useRef<HTMLInputElement | null>(null);
   const filterQueryRef = useRef('');
   const filterChipIdRef = useRef(0);
 
@@ -494,37 +672,39 @@ const TimelineView = forwardRef(function TimelineView(
   }, [timelineData?.elements, parsedChipQuery]);
   const hasAnyFilter = filterChips.length > 0 || activeTags.length > 0 || hiddenTags.length > 0;
   const [showMap, setShowMap] = useState(false);
-  const mapViewRef = useRef(null);
+  const mapViewRef = useRef<{ centerOnYear: (year: number) => void; zoomIn: () => void; zoomOut: () => void } | null>(
+    null,
+  );
   const [sliderValue, setSliderValue] = useState(0);
   const [sliderYearLabel, setSliderYearLabel] = useState('');
   const [currentScale, setCurrentScale] = useState(1);
   const [isPlaying, setIsPlaying] = useState(false);
-  const filterMenuRef = useRef(null);
-  const filterButtonRef = useRef(null);
-  const animationFrameRef = useRef(null);
-  const lastPlayTimeRef = useRef(null);
+  const filterMenuRef = useRef<HTMLDivElement | null>(null);
+  const filterButtonRef = useRef<HTMLButtonElement | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const lastPlayTimeRef = useRef<number | null>(null);
   const sliderInputRef = useRef(false);
-  const lastViewportYearRef = useRef(null);
-  const [mapViewportYear, setMapViewportYear] = useState(null);
+  const lastViewportYearRef = useRef<number | null>(null);
+  const [mapViewportYear, setMapViewportYear] = useState<number | null>(null);
   const deferredMapViewportYear = useDeferredValue(mapViewportYear);
   const lastSliderLabelRef = useRef('');
-  const sliderRafRef = useRef(null);
+  const sliderRafRef = useRef<number | null>(null);
   const zoomVelocityRef = useRef(0);
-  const zoomMomentumRafRef = useRef(null);
+  const zoomMomentumRafRef = useRef<number | null>(null);
   const zoomMomentumOriginRef = useRef({ x: 0, y: 0 });
   const panVelocityRef = useRef({ x: 0, y: 0 });
-  const panMomentumRafRef = useRef(null);
-  const pendingSliderValueRef = useRef(null);
+  const panMomentumRafRef = useRef<number | null>(null);
+  const pendingSliderValueRef = useRef<number | null>(null);
   const sliderValueRef = useRef(0);
-  const sliderElementRef = useRef(null);
-  const yearLabelRef = useRef(null);
-  const viewportIndicatorRef = useRef(null);
-  const lastGridScaleRef = useRef(null);
+  const sliderElementRef = useRef<HTMLInputElement | null>(null);
+  const yearLabelRef = useRef<HTMLDivElement | null>(null);
+  const viewportIndicatorRef = useRef<HTMLDivElement | null>(null);
+  const lastGridScaleRef = useRef<number | null>(null);
   const zoomButtonOffset = isRightPanelOpen ? rightPanelWidth + 20 : 20;
   const sliderOffset = (isLeftPanelOpen ? leftPanelWidth : 0) - (isRightPanelOpen ? rightPanelWidth : 0);
 
   const publishViewportYear = useCallback(
-    (nextYear) => {
+    (nextYear: number) => {
       setMapViewportYear((current) => (current === nextYear ? current : nextYear));
       onViewportYearChange?.(nextYear);
     },
@@ -593,14 +773,22 @@ const TimelineView = forwardRef(function TimelineView(
     TIMELINE_PADDING,
     decompressYear,
     evFontSize,
-  } = useMemo(() => {
+  } = useMemo<TimelineLayout>(() => {
     const file = timelineData.file;
-    const passesQuery = (el) => !parsedChipQuery || matchesFilter(el, parsedChipQuery);
-    const events = timelineData.elements.filter((e) => e.type === 'event' && passesQuery(e));
-    const spans = timelineData.elements.filter((e) => e.type === 'span' && passesQuery(e));
-    const eras = timelineData.elements.filter((e) => e.type === 'era' && passesQuery(e));
+    const passesQuery = (el: TimelineElement) => !parsedChipQuery || matchesFilter(el, parsedChipQuery);
+    const events = timelineData.elements.filter(
+      (e): e is TimelineElement & { type: 'event'; date: number } =>
+        e.type === 'event' && passesQuery(e) && Number.isFinite(e.date),
+    );
+    const spans = timelineData.elements.filter(
+      (e): e is TimelineElement & { type: 'span'; start: number; end: number } =>
+        e.type === 'span' && passesQuery(e) && Number.isFinite(e.start) && Number.isFinite(e.end),
+    );
+    const eras = timelineData.elements.filter(
+      (e): e is EraElement => e.type === 'era' && passesQuery(e) && Number.isFinite(e.start) && Number.isFinite(e.end),
+    );
     const useCalendar = file?.useCalendar === true;
-    const hasDayPrecision = (label) => {
+    const hasDayPrecision = (label: unknown) => {
       if (!label || typeof label !== 'string') return false;
       const parts = label
         .split('/')
@@ -608,7 +796,7 @@ const TimelineView = forwardRef(function TimelineView(
         .filter(Boolean);
       return parts.length === 3;
     };
-    const adjustDate = (value, label) => {
+    const adjustDate = (value: number | undefined, label: unknown): number => {
       if (!useCalendar) return value;
       if (!Number.isFinite(value)) return value;
       if (hasDayPrecision(label)) return value;
@@ -617,7 +805,7 @@ const TimelineView = forwardRef(function TimelineView(
       if (!isOnMonthGrid) return value;
       return snapToMonthGrid(value);
     };
-    const resolveDate = (value, label) => {
+    const resolveDate = (value: number | undefined, label: unknown): number => {
       if (!label || typeof label !== 'string') {
         return adjustDate(value, label);
       }
@@ -628,7 +816,7 @@ const TimelineView = forwardRef(function TimelineView(
       return adjustDate(value, label);
     };
 
-    const DEFAULT_GROUP = {
+    const DEFAULT_GROUP: TimelineGroup = {
       id: 'g-main',
       title: 'Main',
       order: 0,
@@ -636,7 +824,7 @@ const TimelineView = forwardRef(function TimelineView(
       visible: true,
       locked: false,
     };
-    const DEFAULT_BELOW_GROUP = {
+    const DEFAULT_BELOW_GROUP: TimelineGroup = {
       id: 'g-main-below',
       title: 'Main (Below)',
       order: 1,
@@ -645,13 +833,14 @@ const TimelineView = forwardRef(function TimelineView(
       locked: false,
       belowLine: true,
     };
-    const sourceGroups = Array.isArray(file?.groups) && file.groups.length > 0 ? file.groups : [DEFAULT_GROUP];
-    let disabledGroupIdMap = null;
+    const sourceGroups: TimelineGroup[] =
+      Array.isArray(file?.groups) && file.groups.length > 0 ? file.groups : [DEFAULT_GROUP];
+    let disabledGroupIdMap: Map<string, string> | null = null;
     const configuredGroups = (() => {
       if (!file?.disableGroups) return sourceGroups;
       const hasBelowLineSource = sourceGroups.some((g) => g?.belowLine);
-      disabledGroupIdMap = new Map(
-        sourceGroups.map((g, index) => [
+      disabledGroupIdMap = new Map<string, string>(
+        sourceGroups.map((g, index): [string, string] => [
           g?.id || `g-${index}`,
           hasBelowLineSource && g?.belowLine ? DEFAULT_BELOW_GROUP.id : DEFAULT_GROUP.id,
         ]),
@@ -668,25 +857,28 @@ const TimelineView = forwardRef(function TimelineView(
     const visibleGroupIds = new Set(groups.filter((group) => group.visible !== false).map((group) => group.id));
     const groupIdSet = new Set(groups.map((group) => group.id));
     const defaultGroupId = groups[0]?.id || 'g-main';
-    const getSafeGroupId = (groupId) => {
+    const getSafeGroupId = (groupId: string | undefined): string => {
       if (disabledGroupIdMap) return disabledGroupIdMap.get(groupId) ?? defaultGroupId;
       return groupIdSet.has(groupId) ? groupId : defaultGroupId;
     };
 
-    const adjustedEvents = events.map((event) => ({
-      ...event,
-      groupId: getSafeGroupId(event.groupId),
-      date: resolveDate(event.date, event.dateLabel),
-    }));
-    const adjustedSpans = spans.map((span) => ({
-      ...span,
-      groupId: getSafeGroupId(span.groupId),
-      start: resolveDate(span.start, span.startLabel),
-      end: resolveDate(span.end, span.endLabel),
-    }));
+    const adjustedEvents: Array<TimelineElement & { type: 'event'; groupId: string; date: number }> = events.map(
+      (event) => ({
+        ...event,
+        groupId: getSafeGroupId(event.groupId),
+        date: resolveDate(event.date, event.dateLabel),
+      }),
+    );
+    const adjustedSpans: Array<TimelineElement & { type: 'span'; groupId: string; start: number; end: number }> =
+      spans.map((span) => ({
+        ...span,
+        groupId: getSafeGroupId(span.groupId),
+        start: resolveDate(span.start, span.startLabel),
+        end: resolveDate(span.end, span.endLabel),
+      }));
     const visibleAdjustedEvents = adjustedEvents.filter((event) => visibleGroupIds.has(event.groupId));
     const visibleAdjustedSpans = adjustedSpans.filter((span) => visibleGroupIds.has(span.groupId));
-    const adjustedEras = eras.map((era) => ({
+    const adjustedEras: EraElement[] = eras.map((era) => ({
       ...era,
       start: resolveDate(era.start, era.startLabel),
       end: resolveDate(era.end, era.endLabel),
@@ -704,7 +896,7 @@ const TimelineView = forwardRef(function TimelineView(
     const minYear = file?.start ?? rawMin;
     const maxYear = file?.end ?? rawMax;
 
-    const parseScaleValue = (value) => {
+    const parseScaleValue = (value: unknown): number | null => {
       if (typeof value === 'number') return value;
       if (typeof value === 'string') {
         const parsed = parseTimelineInput(value);
@@ -713,7 +905,12 @@ const TimelineView = forwardRef(function TimelineView(
       return null;
     };
 
-    const normalizeScaleSections = (sections, legacyBreaks, min, max) => {
+    const normalizeScaleSections = (
+      sections: unknown,
+      legacyBreaks: unknown,
+      min: number,
+      max: number,
+    ): ScaleSection[] => {
       // Support old breaks format as scale=0 sections
       let raw =
         Array.isArray(sections) && sections.length > 0
@@ -741,8 +938,8 @@ const TimelineView = forwardRef(function TimelineView(
         .sort((a, b) => a.start - b.start);
 
       // Merge overlapping sections with the same scale
-      const merged = [];
-      cleaned.forEach((current) => {
+      const merged: ScaleSection[] = [];
+      cleaned.forEach((current: ScaleSection) => {
         const last = merged[merged.length - 1];
         if (!last || current.start > last.end || current.scale !== last.scale) {
           merged.push({ ...current });
@@ -761,7 +958,7 @@ const TimelineView = forwardRef(function TimelineView(
       ? []
       : normalizeScaleSections(file?.scaleSections, file?.breaks, minYear, maxYear);
 
-    const compressYear = (year) => {
+    const compressYear = (year: number): number => {
       if (isLogScale) {
         if (logSpan <= 0) return year;
         const t = (year - minYear) / logSpan;
@@ -787,7 +984,7 @@ const TimelineView = forwardRef(function TimelineView(
     const compressedMax = compressYear(maxYear);
     const range = Math.max(1e-9, compressedMax - compressedMin);
 
-    const decompressYear = (compressedYear) => {
+    const decompressYear = (compressedYear: number): number => {
       if (isLogScale) {
         if (logSpan <= 0) return compressedYear;
         const u = (compressedYear - minYear) / logSpan;
@@ -819,7 +1016,7 @@ const TimelineView = forwardRef(function TimelineView(
     const TIMELINE_PADDING = 200; // px padding on each end
     const timelineWidth = range * PX_PER_YEAR + TIMELINE_PADDING * 2;
 
-    const yearToPx = (year) => (compressYear(year) - compressedMin) * PX_PER_YEAR + TIMELINE_PADDING;
+    const yearToPx = (year: number) => (compressYear(year) - compressedMin) * PX_PER_YEAR + TIMELINE_PADDING;
 
     if (showMap || !fontReady) {
       return {
@@ -922,14 +1119,12 @@ const TimelineView = forwardRef(function TimelineView(
       const spanIdsInGroup = new Set(spansInGroup.map((span) => span.id));
       const groupSpanChildPlacement = Object.fromEntries(
         Object.entries(globalSpanChildPlacement).filter(
-          ([childId, placement]) =>
-            spanIdsInGroup.has(childId) && spanIdsInGroup.has((placement as { parentId?: string }).parentId),
+          ([childId, placement]) => spanIdsInGroup.has(childId) && spanIdsInGroup.has(placement.parentId),
         ),
       );
       const groupSpanMergePlacement = Object.fromEntries(
         Object.entries(globalSpanMergePlacement).filter(
-          ([childId, placement]) =>
-            spanIdsInGroup.has(childId) && spanIdsInGroup.has((placement as { parentId?: string }).parentId),
+          ([childId, placement]) => spanIdsInGroup.has(childId) && spanIdsInGroup.has(placement.parentId),
         ),
       );
 
@@ -1024,6 +1219,7 @@ const TimelineView = forwardRef(function TimelineView(
         ...group,
         yOffset: -cumulativeAbove,
         topExtent: group.contentTop - cumulativeAbove,
+        bottomExtent: undefined as number | undefined,
       };
       cumulativeAbove += group.contentHeight + interGroupGap;
       return next;
@@ -1034,6 +1230,7 @@ const TimelineView = forwardRef(function TimelineView(
       const next = {
         ...group,
         yOffset: +cumulativeBelow,
+        topExtent: undefined as number | undefined,
         bottomExtent: group.contentBottom + cumulativeBelow,
       };
       cumulativeBelow += group.contentHeight + interGroupGap;
@@ -1072,7 +1269,7 @@ const TimelineView = forwardRef(function TimelineView(
     const calculatedHeight = aboveBaseline + belowBaseline;
     const BASE_LINE_Y = calculatedHeight;
 
-    const groupLayoutsRaw = tempGroupLayouts.map((group) => {
+    const groupLayoutsRaw: GroupLayout[] = tempGroupLayouts.map((group) => {
       const { finalSpans: rawFinalSpans } = layoutSpans({
         spans: group.spansInGroup,
         yearToPx,
@@ -1121,12 +1318,14 @@ const TimelineView = forwardRef(function TimelineView(
 
       return {
         ...group,
+        extentTop: undefined as number | undefined,
+        extentBottom: undefined as number | undefined,
         finalSpans,
         finalEvents,
       };
     });
 
-    const getGroupExtent = (group) => {
+    const getGroupExtent = (group: GroupLayout): { top: number; bottom: number } => {
       const MIN_GROUP_BAND_HEIGHT = EVENT_MIN_HEIGHT;
       const tops = [...group.finalSpans.map((span) => span.top), ...group.finalEvents.map((event) => event.top)];
       const bottoms = [
@@ -1151,7 +1350,7 @@ const TimelineView = forwardRef(function TimelineView(
       };
     };
 
-    const stackSort = (a, b) => {
+    const stackSort = (a: GroupLayout, b: GroupLayout) => {
       const stackDiff = (a.stack ?? 0) - (b.stack ?? 0);
       if (stackDiff !== 0) return stackDiff;
       return (a.order ?? 0) - (b.order ?? 0);
@@ -1161,7 +1360,7 @@ const TimelineView = forwardRef(function TimelineView(
 
     const extentById = new Map(groupLayoutsRaw.map((group) => [group.id, getGroupExtent(group)]));
 
-    const shiftGroup = (group, delta) => {
+    const shiftGroup = (group: GroupLayout, delta: number) => {
       group.yOffset += delta;
       group.finalSpans = group.finalSpans.map((span) => ({ ...span, top: span.top + delta }));
       group.finalEvents = group.finalEvents.map((event) => ({ ...event, top: event.top + delta }));
@@ -1206,8 +1405,8 @@ const TimelineView = forwardRef(function TimelineView(
 
     const spanChildPlacement = globalSpanChildPlacement;
     const spanMergePlacement = globalSpanMergePlacement;
-    const finalSpans = [];
-    const finalEvents = [];
+    const finalSpans: PositionedSpan[] = [];
+    const finalEvents: PositionedEvent[] = [];
     groupLayouts.forEach((group) => {
       finalSpans.push(...group.finalSpans);
       finalEvents.push(...group.finalEvents);
@@ -1297,7 +1496,7 @@ const TimelineView = forwardRef(function TimelineView(
       return [];
     }
 
-    const nextTicks = [];
+    const nextTicks: TimelineTick[] = [];
     const safeScale = Math.max(currentScale, 0.01);
     const screenPxPerYear = PX_PER_YEAR * safeScale;
     const screenPxPerMonth = screenPxPerYear / 12;
@@ -1310,7 +1509,7 @@ const TimelineView = forwardRef(function TimelineView(
     const targetYearTickPx = useCalendar ? targetTickPx : 96 / tickDensityMult;
     const maxDayInterval = 7;
     const epsilon = 1e-6;
-    const visibleSegments = [];
+    const visibleSegments: Array<{ start: number; end: number; scale: number }> = [];
     let cursor = minYear;
     normalizedScaleSections.forEach((section) => {
       const start = Math.max(minYear, section.start);
@@ -1329,7 +1528,7 @@ const TimelineView = forwardRef(function TimelineView(
       visibleSegments.push({ start: minYear, end: maxYear, scale: 1 });
     }
 
-    const pushTick = (tick) => {
+    const pushTick = (tick: TimelineTick) => {
       const value = Number(tick.value);
       if (!Number.isFinite(value) || value < minYear - epsilon || value > maxYear + epsilon) return;
       const normalizedValue = Number(value.toFixed(9));
@@ -1341,7 +1540,7 @@ const TimelineView = forwardRef(function TimelineView(
     if (file?.scaleType === 'logarithmic') {
       const lf = Math.max(1, Number(file?.logScaleFactor) || 10);
       const ls = maxYear - minYear;
-      const logDecompress = (c) => {
+      const logDecompress = (c: number) => {
         if (ls <= 0) return c;
         const u = (c - minYear) / ls;
         return minYear + ls * (1 - (Math.pow(1 + lf, 1 - u) - 1) / lf);
@@ -1415,8 +1614,20 @@ const TimelineView = forwardRef(function TimelineView(
     return nextTicks;
   }, [file, PX_PER_YEAR, currentScale, normalizedScaleSections]);
 
-  const finalSpanById = useMemo(() => new Map(finalSpans.map((span) => [span.id, span])), [finalSpans]);
-  const groupLayoutById = useMemo(() => new Map(groupLayouts.map((group) => [group.id, group])), [groupLayouts]);
+  const finalSpanById = useMemo(() => {
+    type FinalSpan = (typeof finalSpans)[number];
+    return new Map<ElementId, FinalSpan>(finalSpans.map((span): [ElementId, FinalSpan] => [span.id, span]));
+  }, [finalSpans]);
+  const groupLayoutById = useMemo(
+    () =>
+      new Map<string, GroupLayoutSummary>(
+        groupLayouts.map((group): [string, GroupLayoutSummary] => [
+          String(group.id),
+          { bgColor: group.bgColor, belowLine: group.belowLine },
+        ]),
+      ),
+    [groupLayouts],
+  );
   const extensionParentRoundedSet = useMemo(() => {
     const ids = new Set();
     finalSpans.forEach((childSpan) => {
@@ -1446,17 +1657,17 @@ const TimelineView = forwardRef(function TimelineView(
       adjacency.get(parentId)?.add(span.id);
     });
 
-    const visited = new Set();
+    const visited = new Set<ElementId>();
     finalSpans.forEach((startSpan) => {
       if (visited.has(startSpan.id)) return;
       const stack = [startSpan.id];
-      const componentIds = [];
+      const componentIds: ElementId[] = [];
       while (stack.length > 0) {
         const id = stack.pop();
         if (!id || visited.has(id)) continue;
         visited.add(id);
         componentIds.push(id);
-        adjacency.get(id)?.forEach((nextId) => {
+        adjacency.get(id)?.forEach((nextId: ElementId) => {
           if (!visited.has(nextId)) stack.push(nextId);
         });
       }
@@ -1620,6 +1831,7 @@ const TimelineView = forwardRef(function TimelineView(
         const labels = overlay.children;
         for (let i = 0; i < labels.length; i++) {
           const el = labels[i];
+          if (!(el instanceof HTMLElement)) continue;
           const basePx = Number(el.dataset.px);
           el.style.left = `${basePx * scale + 4}px`;
         }
@@ -1628,7 +1840,7 @@ const TimelineView = forwardRef(function TimelineView(
     }
   };
 
-  const queueSliderValue = (nextValue) => {
+  const queueSliderValue = (nextValue: number) => {
     pendingSliderValueRef.current = nextValue;
     if (sliderRafRef.current) return;
     sliderRafRef.current = requestAnimationFrame(() => {
@@ -1645,7 +1857,7 @@ const TimelineView = forwardRef(function TimelineView(
     });
   };
 
-  const getPanBounds = (container) => {
+  const getPanBounds = (container: HTMLDivElement) => {
     const scale = scaleRef.current;
     const scaledTimelineWidth = timelineWidth * scale;
     const viewportWidth = container.clientWidth;
@@ -1658,7 +1870,12 @@ const TimelineView = forwardRef(function TimelineView(
     };
   };
 
-  const zoomToPoint = (zoomFactor, mouseX, mouseY, { commitState = true, skipLabels = false } = {}) => {
+  const zoomToPoint = (
+    zoomFactor: number,
+    mouseX: number,
+    mouseY: number,
+    { commitState = true, skipLabels = false }: { commitState?: boolean; skipLabels?: boolean } = {},
+  ) => {
     const container = containerRef.current;
     if (!container) return;
 
@@ -1686,13 +1903,19 @@ const TimelineView = forwardRef(function TimelineView(
     }
   };
 
-  const panTimelineFromWheelRef = useRef(null);
-  const zoomTimelineFromWheelRef = useRef(null);
+  const panTimelineFromWheelRef = useRef<((input: WheelPanInput) => void) | null>(null);
+  const zoomTimelineFromWheelRef = useRef<((input: WheelZoomInput) => void) | null>(null);
   // Stable wrappers so MapView (and its WheelShortcutHandler effect) never re-run due to new function refs
-  const stablePanTimelineFromWheel = useCallback((...args) => panTimelineFromWheelRef.current?.(...args), []);
-  const stableZoomTimelineFromWheel = useCallback((...args) => zoomTimelineFromWheelRef.current?.(...args), []);
+  const stablePanTimelineFromWheel = useCallback(
+    (input: WheelPanInput) => panTimelineFromWheelRef.current?.(input),
+    [],
+  );
+  const stableZoomTimelineFromWheel = useCallback(
+    (input: WheelZoomInput) => zoomTimelineFromWheelRef.current?.(input),
+    [],
+  );
 
-  const panTimelineFromWheel = ({ deltaX = 0, deltaY = 0, shiftKey = false }) => {
+  const panTimelineFromWheel = ({ deltaX = 0, deltaY = 0, shiftKey = false }: WheelPanInput) => {
     const container = containerRef.current;
     if (!container) return;
 
@@ -1748,7 +1971,7 @@ const TimelineView = forwardRef(function TimelineView(
     panMomentumRafRef.current = requestAnimationFrame(tick);
   };
 
-  const zoomTimelineFromWheel = ({ deltaY = 0, clientX, clientY }) => {
+  const zoomTimelineFromWheel = ({ deltaY = 0, clientX, clientY }: WheelZoomInput) => {
     zoomVelocityRef.current += deltaY * 0.3;
     zoomMomentumOriginRef.current = { x: clientX, y: clientY };
 
@@ -1795,7 +2018,7 @@ const TimelineView = forwardRef(function TimelineView(
     zoomToPoint(0.9, rect.left + rect.width / 2, rect.top + rect.height / 2);
   };
 
-  const handleToggleFilterMenu = (e) => {
+  const handleToggleFilterMenu = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
     if (filterMenu) {
       setFilterMenu(null);
@@ -1832,14 +2055,14 @@ const TimelineView = forwardRef(function TimelineView(
   useEffect(() => {
     if (!filterMenu) return;
 
-    const handleClickOutside = (e) => {
-      const clickedInsideMenu = filterMenuRef.current?.contains(e.target);
-      const clickedFilterButton = filterButtonRef.current?.contains(e.target);
+    const handleClickOutside = (e: MouseEvent) => {
+      const clickedInsideMenu = e.target instanceof Node && filterMenuRef.current?.contains(e.target);
+      const clickedFilterButton = e.target instanceof Node && filterButtonRef.current?.contains(e.target);
       if (!clickedInsideMenu && !clickedFilterButton) {
         setFilterMenu(null);
       }
     };
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setFilterMenu(null);
     };
 
@@ -1853,14 +2076,14 @@ const TimelineView = forwardRef(function TimelineView(
 
   useEffect(() => {
     if (!filterModalOpen) return;
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setFilterModalOpen(false);
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [filterModalOpen]);
 
-  const commitFilterHistory = useCallback((q) => {
+  const commitFilterHistory = useCallback((q: string) => {
     const query = (q ?? '').trim();
     if (!query) return;
     setFilterHistory((prev) => {
@@ -1875,7 +2098,7 @@ const TimelineView = forwardRef(function TimelineView(
     });
   }, []);
 
-  const removeFilterHistory = useCallback((q) => {
+  const removeFilterHistory = useCallback((q: string) => {
     setFilterHistory((prev) => {
       const next = prev.filter((x) => x !== q);
       try {
@@ -1908,14 +2131,14 @@ const TimelineView = forwardRef(function TimelineView(
     filterChipIdRef.current += 1;
     return `chip-${filterChipIdRef.current}`;
   };
-  const addFilterChip = (chip) =>
+  const addFilterChip = (chip: Pick<FilterChip, 'kind' | 'value'> & Partial<Pick<FilterChip, 'op'>>) =>
     setFilterChips((prev) => [...prev, { id: nextChipId(), negated: false, join: 'and', ...chip }]);
-  const removeFilterChip = (id) => setFilterChips((prev) => prev.filter((c) => c.id !== id));
-  const toggleChipNegate = (id) =>
+  const removeFilterChip = (id: string) => setFilterChips((prev) => prev.filter((c) => c.id !== id));
+  const toggleChipNegate = (id: string) =>
     setFilterChips((prev) => prev.map((c) => (c.id === id ? { ...c, negated: !c.negated } : c)));
-  const toggleChipJoin = (id) =>
+  const toggleChipJoin = (id: string) =>
     setFilterChips((prev) => prev.map((c) => (c.id === id ? { ...c, join: c.join === 'or' ? 'and' : 'or' } : c)));
-  const toggleTypeChip = (value) =>
+  const toggleTypeChip = (value: string) =>
     setFilterChips((prev) =>
       prev.some((c) => c.kind === 'type' && c.value === value)
         ? prev.filter((c) => !(c.kind === 'type' && c.value === value))
@@ -1937,7 +2160,7 @@ const TimelineView = forwardRef(function TimelineView(
     onClearTags?.();
   };
 
-  const renderFilterMenuContent = (isModal) => {
+  const renderFilterMenuContent = (isModal: boolean) => {
     const hasOr = filterChips.some((c, i) => i > 0 && c.join === 'or');
     const historyNeedle = filterText.trim().toLowerCase();
     const historyMatches = filterHistory.filter((q) => !historyNeedle || q.toLowerCase().includes(historyNeedle));
@@ -2259,12 +2482,12 @@ const TimelineView = forwardRef(function TimelineView(
     }
 
     // Zoom to cursor with transforms
-    const handleWheel = (e) => {
-      if (e.target?.closest?.('.timeline-context-menu')) {
+    const handleWheel = (e: WheelEvent) => {
+      if (e.target instanceof Element && e.target.closest('.timeline-context-menu')) {
         return;
       }
 
-      const insideLeaflet = e.target.closest('.leaflet-container');
+      const insideLeaflet = e.target instanceof Element && e.target.closest('.leaflet-container');
       if (insideLeaflet) {
         if (e.altKey) {
           e.preventDefault();
@@ -2306,7 +2529,7 @@ const TimelineView = forwardRef(function TimelineView(
     };
 
     // Pan with mouse drag
-    const handleMouseDown = (e) => {
+    const handleMouseDown = (e: MouseEvent) => {
       const isMiddleClick = e.button === 1;
       const isLeftClick = e.button === 0;
       const isShiftPan = isLeftClick && e.shiftKey;
@@ -2321,8 +2544,8 @@ const TimelineView = forwardRef(function TimelineView(
         '.timeline-slider-container',
         '.timeline-context-menu',
       ].join(', ');
-      const clickedInteractive = e.target.closest(interactiveSelector);
-      const clickedFormControl = e.target.closest('input, textarea, button, select, a');
+      const clickedInteractive = e.target instanceof Element && e.target.closest(interactiveSelector);
+      const clickedFormControl = e.target instanceof Element && e.target.closest('input, textarea, button, select, a');
       const allowLeftDrag = isLeftClick && !clickedInteractive && !clickedFormControl;
 
       // Allow middle mouse, shift+left, or left-drag on empty canvas.
@@ -2334,7 +2557,7 @@ const TimelineView = forwardRef(function TimelineView(
       }
     };
 
-    const handleMouseMove = (e) => {
+    const handleMouseMove = (e: MouseEvent) => {
       if (!isPanningRef.current) return;
 
       const dx = e.clientX - lastPanPositionRef.current.x;
@@ -2381,10 +2604,10 @@ const TimelineView = forwardRef(function TimelineView(
     let lastTouch = { x: 0, y: 0 };
     let pinchDist = 0;
     let pinchMid = { x: 0, y: 0 };
-    const midpointOf = (a, b) => ({ x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2 });
-    const distanceOf = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    const midpointOf = (a: Touch, b: Touch) => ({ x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2 });
+    const distanceOf = (a: Touch, b: Touch) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
 
-    const applyTouchPan = (dx, dy) => {
+    const applyTouchPan = (dx: number, dy: number) => {
       translateRef.current.x += dx;
       translateRef.current.y += dy;
       const { minX, maxX, range } = getPanBounds(container);
@@ -2396,8 +2619,8 @@ const TimelineView = forwardRef(function TimelineView(
       }
     };
 
-    const handleTouchStart = (e) => {
-      if (e.target.closest(touchExcludeSelector)) return;
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.target instanceof Element && e.target.closest(touchExcludeSelector)) return;
       if (e.touches.length === 2) {
         pinching = true;
         touchPanning = false;
@@ -2409,7 +2632,7 @@ const TimelineView = forwardRef(function TimelineView(
       }
     };
 
-    const handleTouchMove = (e) => {
+    const handleTouchMove = (e: TouchEvent) => {
       if (pinching && e.touches.length >= 2) {
         e.preventDefault();
         const dist = distanceOf(e.touches[0], e.touches[1]);
@@ -2428,7 +2651,7 @@ const TimelineView = forwardRef(function TimelineView(
       }
     };
 
-    const handleTouchEnd = (e) => {
+    const handleTouchEnd = (e: TouchEvent) => {
       if (pinching && e.touches.length < 2) {
         pinching = false;
         setCurrentScale(scaleRef.current);
@@ -2514,7 +2737,7 @@ const TimelineView = forwardRef(function TimelineView(
     const duration = 500; // ms
     const startTime = performance.now();
 
-    const animate = (currentTime) => {
+    const animate = (currentTime: number) => {
       const elapsed = currentTime - startTime;
       const progress = Math.min(elapsed / duration, 1);
 
@@ -2569,13 +2792,13 @@ const TimelineView = forwardRef(function TimelineView(
   useEffect(() => {
     if (!contextMenu) return;
 
-    const handleClickOutside = (e) => {
+    const handleClickOutside = (e: MouseEvent) => {
       const menu = document.querySelector('.timeline-context-menu');
-      if (menu && !menu.contains(e.target)) {
+      if (menu && (!(e.target instanceof Node) || !menu.contains(e.target))) {
         setContextMenu(null);
       }
     };
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setContextMenu(null);
     };
 
@@ -2587,10 +2810,10 @@ const TimelineView = forwardRef(function TimelineView(
     };
   }, [contextMenu]);
 
-  const handleContextMenu = (e) => {
+  const handleContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
     if (readOnly) return;
     const target = e.target;
-    if (target?.closest?.('.leaflet-container')) {
+    if (!(target instanceof Element) || target.closest('.leaflet-container')) {
       return;
     }
     const elementNode = target.closest('.event, .span-item, .era-item');
@@ -2627,7 +2850,7 @@ const TimelineView = forwardRef(function TimelineView(
   };
 
   const handleMapContextMenu = useCallback(
-    ({ x, y, lat, lng }) => {
+    ({ x, y, lat, lng }: { x: number; y: number; lat: number; lng: number }) => {
       if (readOnly) return;
       setContextMenu({
         x,
@@ -2642,7 +2865,7 @@ const TimelineView = forwardRef(function TimelineView(
     [readOnly],
   );
 
-  const handleMenuAction = (action) => {
+  const handleMenuAction = (action: () => void) => {
     setContextMenu(null);
     action();
   };
@@ -2886,7 +3109,7 @@ const TimelineView = forwardRef(function TimelineView(
     }
   };
 
-  const applySliderValue = (value) => {
+  const applySliderValue = (value: number) => {
     if (!Number.isFinite(value)) return;
     if (Math.abs(value - sliderValueRef.current) < 0.01) return;
     sliderValueRef.current = value;
@@ -2903,13 +3126,13 @@ const TimelineView = forwardRef(function TimelineView(
     applyTransform();
   };
 
-  const handleSliderChange = (e) => {
+  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e?.nativeEvent && e.nativeEvent.isTrusted === false) return;
     applySliderValue(parseFloat(e.target.value));
   };
 
   // Touch drags never reach the range input (its thumb is hidden), so map touch X to a value directly
-  const handleSliderTouch = (e) => {
+  const handleSliderTouch = (e: React.TouchEvent<HTMLInputElement>) => {
     const touch = e.touches[0];
     const rect = sliderElementRef.current?.getBoundingClientRect();
     if (!touch || !rect || rect.width <= 0) return;
@@ -2931,8 +3154,9 @@ const TimelineView = forwardRef(function TimelineView(
   }, [isPlaying, publishViewportYear]);
 
   useEffect(() => {
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target;
+      if (!(target instanceof HTMLElement)) return;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
       const bind = keybinds.play ?? { keys: ['Space'] };
       const keys = bind.keys.map((k) => k.toLowerCase());
@@ -2955,8 +3179,9 @@ const TimelineView = forwardRef(function TimelineView(
   }, [handlePlayPause, keybinds]);
 
   useEffect(() => {
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target;
+      if (!(target instanceof HTMLElement)) return;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const key = e.key?.toLowerCase();
@@ -2974,7 +3199,7 @@ const TimelineView = forwardRef(function TimelineView(
   }, [handleZoomIn, handleZoomOut]);
 
   // Stop animation and select an element
-  const handleSelect = (id) => {
+  const handleSelect = (id: ElementId) => {
     if (isPlaying) {
       // Stop animation and sync state
       setSliderValue(sliderValueRef.current);
@@ -3009,7 +3234,7 @@ const TimelineView = forwardRef(function TimelineView(
     const capturedFile = file;
     const capturedTimelineWidth = timelineWidth;
 
-    const animate = (time) => {
+    const animate = (time: number) => {
       const container = containerRef.current;
       if (!container) return;
 
@@ -3040,7 +3265,7 @@ const TimelineView = forwardRef(function TimelineView(
 
       // Update slider directly via DOM during animation
       if (sliderElementRef.current) {
-        sliderElementRef.current.value = clampedPercentage;
+        sliderElementRef.current.value = String(clampedPercentage);
       }
       sliderValueRef.current = clampedPercentage;
 
@@ -3323,7 +3548,7 @@ const TimelineView = forwardRef(function TimelineView(
   useEffect(() => {
     sliderValueRef.current = sliderValue;
     if (sliderElementRef.current && !isPlaying && !sliderInputRef.current) {
-      sliderElementRef.current.value = sliderValue;
+      sliderElementRef.current.value = String(sliderValue);
     }
   }, [sliderValue, isPlaying]);
 
@@ -3339,11 +3564,11 @@ const TimelineView = forwardRef(function TimelineView(
 
   const tickDensityMult = Math.max(0.01, file?.tickDensity ?? 1);
   const MIN_TICK_GAP = (file?.useCalendar === true ? 6 : 24) / tickDensityMult;
-  const getLocalYearScale = (year) => {
+  const getLocalYearScale = (year: number) => {
     const section = normalizedScaleSections.find((s) => year >= s.start && year <= s.end);
     return section ? Math.max(section.scale, 0.0001) : 1;
   };
-  const tickGapForYear = (year) => {
+  const tickGapForYear = (year: number) => {
     const ls = getLocalYearScale(year);
     return ls < 1 ? MIN_TICK_GAP / ls : MIN_TICK_GAP;
   };
@@ -3351,10 +3576,17 @@ const TimelineView = forwardRef(function TimelineView(
     const GAP_WIDTH = 24;
     const GAP_OVERLAP = 2;
     const EPSILON = 0.5;
-    const zeroScaleBreaks = [];
-    const axisBreakMarkers = [];
+    const zeroScaleBreaks: Array<{
+      key: string;
+      px: number;
+      width: number;
+      overlap: number;
+      startLabel: string;
+      endLabel: string;
+    }> = [];
+    const axisBreakMarkers: Array<{ px: number; key: string }> = [];
 
-    const pushAxisBreak = (px, key) => {
+    const pushAxisBreak = (px: number, key: string) => {
       if (!Number.isFinite(px)) return;
       if (axisBreakMarkers.some((item) => Math.abs(item.px - px) < EPSILON)) return;
       axisBreakMarkers.push({ px, key });
@@ -4128,7 +4360,7 @@ const TimelineView = forwardRef(function TimelineView(
                                   }
                                   src={event.thumbnail}
                                   alt=""
-                                  style={{ objectFit: event.thumbnailFit || 'cover' }}
+                                  style={{ objectFit: getObjectFit(event.thumbnailFit) }}
                                   onError={(e) => {
                                     e.currentTarget.style.display = 'none';
                                   }}
@@ -4149,7 +4381,9 @@ const TimelineView = forwardRef(function TimelineView(
                                       className="event-thumbnail-banner"
                                       src={event.thumbnail}
                                       alt=""
-                                      style={{ objectFit: event.thumbnailFit || 'cover' }}
+                                      style={{
+                                        objectFit: getObjectFit(event.thumbnailFit),
+                                      }}
                                     />
                                   )}
                                   <div
@@ -4554,7 +4788,7 @@ const TimelineView = forwardRef(function TimelineView(
                             className="event-thumbnail-square"
                             src={event.thumbnail}
                             alt=""
-                            style={{ objectFit: event.thumbnailFit || 'cover' }}
+                            style={{ objectFit: getObjectFit(event.thumbnailFit) }}
                             onError={(e) => {
                               e.currentTarget.style.display = 'none';
                             }}
@@ -4575,7 +4809,7 @@ const TimelineView = forwardRef(function TimelineView(
                                 className="event-thumbnail-banner"
                                 src={event.thumbnail}
                                 alt=""
-                                style={{ objectFit: event.thumbnailFit || 'cover' }}
+                                style={{ objectFit: getObjectFit(event.thumbnailFit) }}
                               />
                             )}
                             <div
@@ -4734,7 +4968,7 @@ const TimelineView = forwardRef(function TimelineView(
               className="context-menu-item"
               onClick={() =>
                 handleMenuAction(() =>
-                  onAddEvent(contextMenu.groupId, contextMenu.clickYear, {
+                  onAddEvent?.(contextMenu.groupId, contextMenu.clickYear, {
                     lat: contextMenu.lat,
                     lng: contextMenu.lng,
                   }),
@@ -4758,7 +4992,10 @@ const TimelineView = forwardRef(function TimelineView(
               className="context-menu-item"
               onClick={() =>
                 handleMenuAction(() =>
-                  onAddSpan(contextMenu.groupId, contextMenu.clickYear, { lat: contextMenu.lat, lng: contextMenu.lng }),
+                  onAddSpan?.(contextMenu.groupId, contextMenu.clickYear, {
+                    lat: contextMenu.lat,
+                    lng: contextMenu.lng,
+                  }),
                 )
               }
             >
@@ -4772,7 +5009,9 @@ const TimelineView = forwardRef(function TimelineView(
             <button
               className="context-menu-item"
               onClick={() =>
-                handleMenuAction(() => onAddEra(contextMenu.clickYear, { lat: contextMenu.lat, lng: contextMenu.lng }))
+                handleMenuAction(() =>
+                  onAddEra?.(contextMenu.clickYear, { lat: contextMenu.lat, lng: contextMenu.lng }),
+                )
               }
             >
               <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16 }}>

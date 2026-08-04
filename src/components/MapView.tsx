@@ -1,4 +1,15 @@
-import { useMemo, useEffect, useRef, useState, memo, forwardRef, useImperativeHandle } from 'react';
+import {
+  useMemo,
+  useEffect,
+  useRef,
+  useState,
+  memo,
+  forwardRef,
+  useImperativeHandle,
+  type ForwardedRef,
+  type ReactElement,
+} from 'react';
+import type { TimelineElement, TimelineFile } from '../types/timeline';
 import { MapContainer, TileLayer, Marker, Tooltip, Rectangle, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -13,8 +24,18 @@ const DEFAULT_MARKER_TYPES = {
   span: 'circle',
   era: 'diamond',
 };
+type MapMarker = TimelineElement & { resolvedColor: string };
+type MapClickHandlerProps = { onSelect: (id: string | number | null) => void };
+type MapContextMenuHandlerProps = {
+  onOpenContextMenu: (position: { x: number; y: number; lat: number; lng: number }) => void;
+};
+type HoverCleanupHandlerProps = { onHoverChange: (id: string | number | null) => void };
+type WheelShortcutHandlerProps = {
+  onAltWheelPan?: (event: { deltaX: number; deltaY: number; shiftKey: boolean }) => void;
+  onCtrlWheelZoom?: (event: { deltaY: number; clientX: number; clientY: number }) => void;
+};
 
-function resolveElementColor(el, spanById) {
+function resolveElementColor(el: TimelineElement, spanById: Map<TimelineElement['id'], TimelineElement>): string {
   if (el.type === 'event') {
     const parentId = el.parents?.[0];
     const parentSpan = parentId ? spanById.get(parentId) : null;
@@ -24,7 +45,7 @@ function resolveElementColor(el, spanById) {
   return DEFAULT_COLOR;
 }
 
-function makeColoredIcon(color, selected, markerType = DEFAULT_MARKER_TYPE) {
+function makeColoredIcon(color: string, selected: boolean, markerType = DEFAULT_MARKER_TYPE): L.DivIcon {
   const stroke = selected
     ? getComputedStyle(document.documentElement).getPropertyValue('--selection-color').trim() || '#5282DB'
     : 'white';
@@ -92,13 +113,17 @@ function makeColoredIcon(color, selected, markerType = DEFAULT_MARKER_TYPE) {
   });
 }
 
-function resolveMarkerType(elType, fileConfig) {
+function resolveMarkerType(elType: TimelineElement['type'], fileConfig?: TimelineFile): string {
   if (elType === 'span') return fileConfig?.mapSpanMarker || DEFAULT_MARKER_TYPES.span;
   if (elType === 'era') return fileConfig?.mapEraMarker || DEFAULT_MARKER_TYPES.era;
   return fileConfig?.mapEventMarker || DEFAULT_MARKER_TYPES.event;
 }
 
-function isMarkerVisibleAtViewportYear(el, viewportYear, fileConfig) {
+function isMarkerVisibleAtViewportYear(
+  el: TimelineElement,
+  viewportYear: number | undefined,
+  fileConfig?: TimelineFile,
+): boolean {
   if (!fileConfig?.mapLimitToViewportYear || !Number.isFinite(viewportYear)) return true;
 
   if (el.type === 'event') {
@@ -113,7 +138,7 @@ function isMarkerVisibleAtViewportYear(el, viewportYear, fileConfig) {
   return viewportYear >= start && viewportYear <= end;
 }
 
-function formatElementDate(el, fileConfig) {
+function formatElementDate(el: TimelineElement, fileConfig?: TimelineFile): string {
   const { negID, posID, useCalendar, hideDecimals } = fileConfig ?? {};
   if (el.type === 'event') {
     const year =
@@ -131,9 +156,9 @@ function formatElementDate(el, fileConfig) {
   return start ?? end ?? '';
 }
 
-function MapClickHandler({ onSelect }) {
+function MapClickHandler({ onSelect }: MapClickHandlerProps): ReactElement | null {
   useMapEvents({
-    click: (e) => {
+    click: (e: L.LeafletMouseEvent) => {
       if (e.originalEvent?.target instanceof Element && e.originalEvent.target.closest('.leaflet-marker-icon')) return;
       onSelect?.(null);
     },
@@ -141,9 +166,9 @@ function MapClickHandler({ onSelect }) {
   return null;
 }
 
-function MapContextMenuHandler({ onOpenContextMenu }) {
+function MapContextMenuHandler({ onOpenContextMenu }: MapContextMenuHandlerProps): ReactElement | null {
   useMapEvents({
-    contextmenu: (e) => {
+    contextmenu: (e: L.LeafletMouseEvent) => {
       if (e.originalEvent?.target instanceof Element && e.originalEvent.target.closest('.leaflet-marker-icon')) return;
       L.DomEvent.stop(e.originalEvent);
       onOpenContextMenu?.({
@@ -157,11 +182,11 @@ function MapContextMenuHandler({ onOpenContextMenu }) {
   return null;
 }
 
-function HoverCleanupHandler({ onHoverChange }) {
+function HoverCleanupHandler({ onHoverChange }: HoverCleanupHandlerProps): ReactElement | null {
   const map = useMap();
 
   useMapEvents({
-    mousemove: (e) => {
+    mousemove: (e: L.LeafletMouseEvent) => {
       const overMarker =
         e.originalEvent?.target instanceof Element ? e.originalEvent.target.closest('.leaflet-marker-icon') : null;
       if (!overMarker) onHoverChange(null);
@@ -181,7 +206,7 @@ function HoverCleanupHandler({ onHoverChange }) {
   return null;
 }
 
-function MapControls({ controlRef }) {
+function MapControls({ controlRef }: { controlRef: ForwardedRef<MapViewHandle> }): ReactElement | null {
   const map = useMap();
   useImperativeHandle(
     controlRef,
@@ -194,7 +219,7 @@ function MapControls({ controlRef }) {
   return null;
 }
 
-function MinZoomEnforcer() {
+function MinZoomEnforcer(): ReactElement | null {
   const map = useMap();
 
   useEffect(() => {
@@ -215,14 +240,14 @@ function MinZoomEnforcer() {
   return null;
 }
 
-function WheelShortcutHandler({ onAltWheelPan, onCtrlWheelZoom }) {
+function WheelShortcutHandler({ onAltWheelPan, onCtrlWheelZoom }: WheelShortcutHandlerProps): ReactElement | null {
   const map = useMap();
 
   useEffect(() => {
     if (!onAltWheelPan && !onCtrlWheelZoom) return undefined;
 
     const container = map.getContainer();
-    const handleWheel = (e) => {
+    const handleWheel = (e: WheelEvent) => {
       if (e.altKey && onAltWheelPan) {
         e.preventDefault();
         e.stopPropagation();
@@ -250,7 +275,7 @@ function WheelShortcutHandler({ onAltWheelPan, onCtrlWheelZoom }) {
   return null;
 }
 
-function MapAttribution({ attribution }) {
+function MapAttribution({ attribution }: { attribution: string }): ReactElement | null {
   const map = useMap();
   useEffect(() => {
     const control = new L.Control.Attribution({ prefix: false, position: 'bottomright' });
@@ -264,9 +289,15 @@ function MapAttribution({ attribution }) {
   return null;
 }
 
-function FlyToSelected({ markers, selectedId }) {
+function FlyToSelected({
+  markers,
+  selectedId,
+}: {
+  markers: MapMarker[];
+  selectedId?: string | number | null;
+}): ReactElement | null {
   const map = useMap();
-  const lastSnappedId = useRef(null);
+  const lastSnappedId = useRef<string | number | null>(null);
   useEffect(() => {
     if (!selectedId || selectedId === lastSnappedId.current) return;
     const el = markers.find((m) => m.id === selectedId);
@@ -304,7 +335,19 @@ function RepeatOverlay() {
 const DEFAULT_TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 const DEFAULT_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
-function isOpenStreetMapTileUrl(url) {
+type MapViewHandle = { zoomIn: () => void; zoomOut: () => void };
+type MapViewProps = {
+  elements?: TimelineElement[];
+  onSelect: (id: string | number | null) => void;
+  onOpenContextMenu: (position: { x: number; y: number; lat: number; lng: number }) => void;
+  onAltWheelPan?: (event: { deltaX: number; deltaY: number; shiftKey: boolean }) => void;
+  onCtrlWheelZoom?: (event: { deltaY: number; clientX: number; clientY: number }) => void;
+  viewportYear?: number;
+  selectedId?: string | number | null;
+  fileConfig?: TimelineFile;
+};
+
+function isOpenStreetMapTileUrl(url: string | undefined): boolean {
   if (!url) return true;
   return /^https:\/\/(?:[a-z0-9-]+\.)*tile\.openstreetmap\.org\//i.test(url);
 }
@@ -320,11 +363,11 @@ export default memo(
       viewportYear,
       selectedId,
       fileConfig,
-    }: Record<string, DynamicValue>,
-    ref: DynamicValue,
+    }: MapViewProps,
+    ref: ForwardedRef<MapViewHandle>,
   ) {
     const spanById = useMemo(() => {
-      const map = new Map();
+      const map = new Map<TimelineElement['id'], TimelineElement>();
       elements.forEach((el) => {
         if (el.type === 'span') map.set(el.id, el);
       });
@@ -339,7 +382,7 @@ export default memo(
           .map((el) => ({ ...el, resolvedColor: resolveElementColor(el, spanById) })),
       [elements, spanById, viewportYear, fileConfig],
     );
-    const [hoveredId, setHoveredId] = useState(null);
+    const [hoveredId, setHoveredId] = useState<string | number | null>(null);
 
     const [initialView] = useState<{ center: L.LatLngExpression; zoom: number }>(() => ({
       center: markers.length > 0 ? [Number(markers[0].lat), Number(markers[0].lng)] : [20, 0],

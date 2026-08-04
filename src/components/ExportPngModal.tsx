@@ -1,6 +1,9 @@
 import { ArrowLeft } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
+import type { MouseEvent as ReactMouseEvent, ChangeEvent } from 'react';
 import { formatYear } from '../utils/timelineUtils';
+import type { TimelineData } from '../types/timeline';
+import type { TimelinePreviewOptions, TimelineViewHandle } from './TimelineView';
 import '../styles/07-modals-menus.css';
 
 const RESOLUTION_OPTIONS = [
@@ -13,9 +16,15 @@ const RESOLUTION_OPTIONS = [
   { value: 'custom', label: 'Custom', width: null, height: null },
 ];
 
-type PreviewOptions = {
-  transparentBg?: boolean;
-  customBg?: string;
+type PreviewOptions = TimelinePreviewOptions;
+type PreviewOffset = { x: number; y: number };
+
+type ExportPngModalProps = {
+  isOpen: boolean;
+  onClose: () => void;
+  onExport: (options: Record<string, unknown>) => void;
+  timelineData?: TimelineData;
+  timelineViewRef?: { current?: TimelineViewHandle | null };
 };
 
 export default function ExportPngModal({
@@ -24,7 +33,7 @@ export default function ExportPngModal({
   onExport,
   timelineData,
   timelineViewRef,
-}: Record<string, DynamicValue>) {
+}: ExportPngModalProps) {
   const [filename, setFilename] = useState('');
   const [previewData, setPreviewData] = useState(null);
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
@@ -58,7 +67,7 @@ export default function ExportPngModal({
   const maxStartPercent = 100 - effectiveRangeSpanPercent;
 
   const clampPreviewOffset = useCallback(
-    (nextOffset, scaleValue = previewScale) => {
+    (nextOffset: PreviewOffset, scaleValue = previewScale): PreviewOffset => {
       const container = previewContainerRef.current;
       const containerWidth = container?.clientWidth;
       if (!container || !containerWidth) return nextOffset;
@@ -141,7 +150,7 @@ export default function ExportPngModal({
   }, [isOpen, bgOption, timelineViewRef]);
 
   const handleWheel = useCallback(
-    (e) => {
+    (e: globalThis.WheelEvent) => {
       e.preventDefault();
       const delta = e.deltaY > 0 ? -0.12 : 0.12;
       setPreviewScale((current) => {
@@ -155,7 +164,7 @@ export default function ExportPngModal({
 
   useEffect(() => {
     if (!isOpen) return;
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: globalThis.KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', handleKeyDown);
@@ -172,7 +181,7 @@ export default function ExportPngModal({
   useEffect(() => {
     if (!isDraggingPreview) return;
 
-    const handleMouseMove = (e) => {
+    const handleMouseMove = (e: globalThis.MouseEvent) => {
       const drag = previewDragRef.current;
       const nextOffset = {
         x: drag.startOffsetX + (e.clientX - drag.startX),
@@ -199,18 +208,18 @@ export default function ExportPngModal({
 
   if (!isOpen) return null;
 
-  const handleBackdropMouseDown = (e) => {
+  const handleBackdropMouseDown = (e: ReactMouseEvent<HTMLDivElement>) => {
     backdropPointerDownRef.current = e.target === e.currentTarget;
   };
 
-  const handleBackdropMouseUp = (e) => {
+  const handleBackdropMouseUp = (e: ReactMouseEvent<HTMLDivElement>) => {
     if (backdropPointerDownRef.current && e.target === e.currentTarget) {
       onClose();
     }
     backdropPointerDownRef.current = false;
   };
 
-  const handlePreviewMouseDown = (e) => {
+  const handlePreviewMouseDown = (e: ReactMouseEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
     e.preventDefault();
     previewDragRef.current = {
@@ -329,7 +338,7 @@ export default function ExportPngModal({
   const previewBgColor =
     bgOption === 'secondary' ? 'var(--surface)' : bgOption === 'tertiary' ? 'var(--inset-bg)' : undefined;
   const file = timelineData?.file;
-  const displayYear = (value) => {
+  const displayYear = (value: number | undefined): string => {
     if (!Number.isFinite(value)) return '--';
     return formatYear(value, file?.negID, file?.posID, file?.useCalendar === true, file?.hideDecimals);
   };
@@ -353,7 +362,7 @@ export default function ExportPngModal({
     marginLeft: `-${(effectiveStartPercent / effectiveRangeSpanPercent) * 100}%`,
   };
 
-  const handleStartRangeChange = (e) => {
+  const handleStartRangeChange = (e: ChangeEvent<HTMLInputElement>) => {
     const raw = Number(e.target.value);
     if (!Number.isFinite(raw)) return;
     setExportRange((current) => ({
@@ -362,7 +371,7 @@ export default function ExportPngModal({
     }));
   };
 
-  const handleEndRangeChange = (e) => {
+  const handleEndRangeChange = (e: ChangeEvent<HTMLInputElement>) => {
     const raw = Number(e.target.value);
     if (!Number.isFinite(raw)) return;
     setExportRange((current) => ({

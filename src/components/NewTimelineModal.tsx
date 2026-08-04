@@ -1,10 +1,28 @@
 import { ArrowLeft } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
+import type { MouseEvent } from 'react';
 import { parseTimelineInput } from '../utils/dateUtils';
 import { DETAIL_MIN, DETAIL_MID, DETAIL_MAX, detailToSlider, sliderToDetail } from '../utils/sliderUtils';
 import '../styles/07-modals-menus.css';
 
-export default function NewTimelineModal({ isOpen, onClose, onCreate }) {
+type NewTimelineInput = {
+  title: string;
+  start: number | null;
+  end: number | null;
+  detailLevel: number;
+  startLabel: string | null;
+  endLabel: string | null;
+  useSpreadsheet: boolean;
+  useMaps: boolean;
+  useWiki: boolean;
+};
+type NewTimelineModalProps = {
+  isOpen: boolean;
+  onClose: () => void;
+  onCreate: (input: NewTimelineInput) => Promise<{ error?: string; success?: boolean } | void>;
+};
+
+export default function NewTimelineModal({ isOpen, onClose, onCreate }: NewTimelineModalProps) {
   const [title, setTitle] = useState('');
   const [start, setStart] = useState('0');
   const [end, setEnd] = useState('2024');
@@ -15,13 +33,13 @@ export default function NewTimelineModal({ isOpen, onClose, onCreate }) {
   const [useWiki, setUseWiki] = useState(false);
   const [showDetailTooltip, setShowDetailTooltip] = useState(false);
   const [detailTooltipLeft, setDetailTooltipLeft] = useState(0);
-  const [validationErrors, setValidationErrors] = useState([]);
-  const detailSliderRef = useRef(null);
-  const titleInputRef = useRef(null);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const detailSliderRef = useRef<HTMLInputElement | null>(null);
+  const titleInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: globalThis.KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', handleKeyDown);
@@ -45,13 +63,13 @@ export default function NewTimelineModal({ isOpen, onClose, onCreate }) {
 
   if (!isOpen) return null;
 
-  const handleBackdropClick = (e) => {
+  const handleBackdropClick = (e: MouseEvent<HTMLDivElement>) => {
     if (e.target === e.currentTarget) {
       onClose();
     }
   };
 
-  const sanitizeFilename = (name) => {
+  const sanitizeFilename = (name: string): string => {
     return name
       .toLowerCase()
       .replace(/[^a-z0-9\s-]/g, '')
@@ -105,7 +123,7 @@ export default function NewTimelineModal({ isOpen, onClose, onCreate }) {
       useWiki,
     });
 
-    if (result?.error) {
+    if (result && result.error) {
       setValidationErrors([result.error]);
       titleInputRef.current?.focus();
       titleInputRef.current?.select();
