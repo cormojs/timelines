@@ -5,13 +5,16 @@ import Sidebar from '../components/Sidebar';
 import RightPanel from '../components/RightPanel';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { applyTheme, getInitialThemeKey } from '../utils/theme';
-import { loadThemeConfig } from '../utils/themeLoader';
+import { loadThemeConfig, isTheme } from '../utils/themeLoader';
+import type { Theme } from '../utils/themeLoader';
 import { isZipBuffer, readPackage } from '../utils/packageReader';
 import { setViewerPackage, getPackageNote, resolvePackageAssetSrc } from '../utils/viewerPackageStore';
 import { ensureUniqueElementIds } from '../utils/idUtils';
 import { setActiveDateFormat, getActiveDateFormat, normalizeLegacyDateLabel } from '../utils/dateUtils';
 import { parseFilterQuery } from '../utils/filterUtils';
 import { parsePanelPreferencesJson, parseTimelineJson } from '../utils/json';
+import type { TimelineData, TimelineElement, TimelineFile, TimelineGroup } from '../types/timeline';
+import type { TimelineViewHandle } from '../components/TimelineView';
 
 const DEFAULT_GROUP_ID = 'g-main';
 const SIDEBAR_WIDTH = 350;
@@ -26,10 +29,25 @@ const GH_RAW_BASE = 'https://raw.githubusercontent.com/';
 // The app stores these on the file; the viewer can't write files, so they live in localStorage
 const PANEL_PREFS_KEY = 'timelines-viewer-panel-prefs';
 const PANEL_PREF_KEYS = ['panelSortField', 'panelSortOrder', 'panelGroupMode', 'nestEraSubGroups'];
+type ViewerTimelineData = TimelineData;
+type PanelPreferences = Record<string, unknown>;
+type PanelPreferencesStore = Record<string, PanelPreferences>;
+type GitHubSegments = string[];
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
+const isTimelineData = (value: unknown): value is TimelineData =>
+  isRecord(value) &&
+  isRecord(value.file) &&
+  Array.isArray(value.elements) &&
+  value.elements.every(
+    (element) =>
+      isRecord(element) &&
+      (typeof element.id === 'string' || typeof element.id === 'number') &&
+      (element.type === 'event' || element.type === 'span' || element.type === 'era'),
+  );
 
-const panelPrefsId = (file) => String(file?.uid || file?.id || file?.title || '');
+const panelPrefsId = (file?: TimelineFile): string => String(file?.uid || file?.id || file?.title || '');
 
-function readAllPanelPrefs() {
+function readAllPanelPrefs(): PanelPreferencesStore {
   try {
     const parsed = parsePanelPreferencesJson(window.localStorage.getItem(PANEL_PREFS_KEY) || '{}');
     return parsed && typeof parsed === 'object' ? parsed : {};
@@ -38,13 +56,13 @@ function readAllPanelPrefs() {
   }
 }
 
-function readPanelPrefs(id) {
+function readPanelPrefs(id: string): PanelPreferences | null {
   if (!id) return null;
   const stored = readAllPanelPrefs()[id];
   return stored && typeof stored === 'object' ? stored : null;
 }
 
-function writePanelPrefs(id, prefs) {
+function writePanelPrefs(id: string, prefs: PanelPreferences): void {
   if (!id) return;
   try {
     window.localStorage.setItem(PANEL_PREFS_KEY, JSON.stringify({ ...readAllPanelPrefs(), [id]: prefs }));
@@ -55,7 +73,7 @@ function writePanelPrefs(id, prefs) {
 
 // Accepts raw.githubusercontent.com and github.com blob/raw links; returns
 // [user, repo, ref, ...path] or null
-function parseGitHubLink(input) {
+function parseGitHubLink(input: unknown): GitHubSegments | null {
   let url;
   try {
     url = new URL(String(input).trim());
@@ -98,7 +116,7 @@ function viewerBasePath() {
 // Deep links read /viewer/gh/{user}/{repo}/{ref}/{path} or #gh/… — the hash
 // form is what static hosting can serve directly; the path form needs the
 // website's 404 page to rewrite it onto the hash form.
-function parseDeepLink() {
+function parseDeepLink(): GitHubSegments | null {
   const { pathname, hash } = window.location;
   const i = pathname.indexOf('/gh/');
   const raw =
@@ -123,7 +141,7 @@ function parseDeepLink() {
   return segments.length >= 4 ? segments : null;
 }
 
-function deepLinkUrl(segments) {
+function deepLinkUrl(segments: GitHubSegments): string {
   const encoded = 'gh/' + segments.map(encodeURIComponent).join('/');
   const base = viewerBasePath();
   const search = window.location.search || '';
@@ -144,7 +162,7 @@ const FONT_FALLBACK = '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "S
 
 const FONT_CSS_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com', 'fonts.bunny.net', 'raw.githubusercontent.com'];
 
-function safeFontCssUrl(value) {
+function safeFontCssUrl(value: unknown): string | null {
   if (!value) return null;
   try {
     const url = new URL(String(value));
@@ -156,10 +174,10 @@ function safeFontCssUrl(value) {
 
 // Colors plus the font handling App.tsx does outside applyTheme (theme font
 // stylesheet + --app-font-family, overridable by file.font)
-function applyViewerTheme(themes, key, fileFont) {
+function applyViewerTheme(themes: Record<string, Theme>, key: string, fileFont: unknown): void {
   applyTheme({ themes, activeTheme: key }, key);
 
-  const themeFont = themes[key]?.font;
+  const themeFont = isRecord(themes[key]?.font) ? themes[key].font : {};
   const useFileFont = fileFont && String(fileFont).toLowerCase() !== 'default';
   const family = useFileFont ? String(fileFont) : themeFont?.family;
   const cssUrl = useFileFont ? null : safeFontCssUrl(themeFont?.cssUrl);
@@ -211,7 +229,7 @@ applyLandingTheme();
 // the browser. When a packaged .timeline is loaded they're served from the
 // in-memory package store (blob URLs / zipped markdown); otherwise those
 // references are dropped. Remote thumbnails and wiki links always work.
-function sanitizeForBrowser(data) {
+function sanitizeForBrowser(data: ViewerTimelineData): ViewerTimelineData {
   const elements = ensureUniqueElementIds(data.elements ?? []).map((el) => {
     let next = el;
     if (
@@ -234,20 +252,20 @@ function sanitizeForBrowser(data) {
         next = rest;
       }
     }
-    if (next.noteFile && getPackageNote(next.noteFile) === null) {
+    if (typeof next.noteFile === 'string' && getPackageNote(next.noteFile) === null) {
       const { noteFile: _noteFile, ...rest } = next;
       next = rest;
     }
     return next;
   });
-  const file = { ...(data.file ?? {}) };
+  const file = data.file;
   if (typeof file.startLabel === 'string') file.startLabel = normalizeLegacyDateLabel(file.startLabel);
   if (typeof file.endLabel === 'string') file.endLabel = normalizeLegacyDateLabel(file.endLabel);
   return { ...data, file, elements };
 }
 
 export default function ViewerApp() {
-  const [timelineData, setTimelineData] = useState(null);
+  const [timelineData, setTimelineData] = useState<ViewerTimelineData | null>(null);
   const [isThemeReady, setIsThemeReady] = useState(true);
   // Sync the date-format lens with the loaded timeline before children render.
   const viewerDateFormat = timelineData?.file?.dateFormat || 'MDY';
@@ -256,18 +274,18 @@ export default function ViewerApp() {
   const [isDragOver, setIsDragOver] = useState(false);
   const [ghInput, setGhInput] = useState('');
   const [isRemoteLoading, setIsRemoteLoading] = useState(false);
-  const [selectedId, setSelectedId] = useState(null);
+  const [selectedId, setSelectedId] = useState<TimelineElement['id'] | null>(null);
   const [viewMode, setViewMode] = useState('timeline');
-  const [activeTags, setActiveTags] = useState([]);
-  const [hiddenTags, setHiddenTags] = useState([]);
-  const [pinnedTags, setPinnedTags] = useState([]);
+  const [activeTags, setActiveTags] = useState<string[]>([]);
+  const [hiddenTags, setHiddenTags] = useState<string[]>([]);
+  const [pinnedTags, setPinnedTags] = useState<string[]>([]);
   const [isLeftCollapsed, setIsLeftCollapsed] = useState(false);
   const [isRightMaximized, setIsRightMaximized] = useState(false);
   const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
-  const [chipQuery, setChipQuery] = useState(null);
-  const fileInputRef = useRef(null);
-  const timelineViewRef = useRef(null);
-  const restoredPanelKeyRef = useRef(null);
+  const [chipQuery, setChipQuery] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const timelineViewRef = useRef<TimelineViewHandle | null>(null);
+  const restoredPanelKeyRef = useRef<string | null>(null);
 
   const parsedChipQuery = useMemo(() => parseFilterQuery(chipQuery), [chipQuery]);
 
@@ -304,10 +322,13 @@ export default function ViewerApp() {
     (async () => {
       try {
         const index = await (await fetch(`${MARKETPLACE_BASE}index.json`)).json();
-        const entry = (index.themes || []).find((t) => String(t.id).toLowerCase() === lower);
-        if (!entry?.paths?.theme) throw new Error('not in marketplace');
-        const theme = await (await fetch(MARKETPLACE_BASE + entry.paths.theme)).json();
-        if (!theme?.colors) throw new Error('unsupported theme format');
+        const entries = isRecord(index) && Array.isArray(index.themes) ? index.themes.filter(isRecord) : [];
+        const entry = entries.find((t) => String(t.id).toLowerCase() === lower);
+        const paths = entry && isRecord(entry.paths) ? entry.paths : null;
+        const themePath = paths && typeof paths.theme === 'string' ? paths.theme : null;
+        if (!themePath) throw new Error('not in marketplace');
+        const theme: unknown = await (await fetch(MARKETPLACE_BASE + themePath)).json();
+        if (!isTheme(theme) || !theme.colors) throw new Error('unsupported theme format');
         if (!cancelled) {
           applyViewerTheme({ [requested]: theme }, requested, fileFont);
           setIsThemeReady(true);
@@ -326,7 +347,7 @@ export default function ViewerApp() {
     };
   }, [timelineData]);
 
-  const applyTimelineData = useCallback((data) => {
+  const applyTimelineData = useCallback((data: ViewerTimelineData) => {
     if (!data || !Array.isArray(data.elements)) {
       throw new Error('no elements array found');
     }
@@ -342,20 +363,24 @@ export default function ViewerApp() {
   }, []);
 
   const loadTimelineText = useCallback(
-    (text) => {
+    (text: string) => {
       setViewerPackage(null);
-      applyTimelineData(parseTimelineJson(text));
+      const data = parseTimelineJson(text);
+      if (!isTimelineData(data)) throw new Error('invalid timeline data');
+      applyTimelineData(data);
     },
     [applyTimelineData],
   );
 
   const loadTimelineBuffer = useCallback(
-    (buffer) => {
+    (buffer: ArrayBuffer | Uint8Array) => {
       const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
       if (isZipBuffer(bytes)) {
         const pkg = readPackage(bytes);
         setViewerPackage(pkg);
-        applyTimelineData(parseTimelineJson(pkg.timelineJson));
+        const data = parseTimelineJson(pkg.timelineJson);
+        if (!isTimelineData(data)) throw new Error('invalid timeline data');
+        applyTimelineData(data);
       } else {
         loadTimelineText(new TextDecoder().decode(bytes));
       }
@@ -364,7 +389,7 @@ export default function ViewerApp() {
   );
 
   const handleFile = useCallback(
-    (file) => {
+    (file: File | undefined) => {
       if (!file) return;
       if (!/\.(timeline|json)$/i.test(file.name)) {
         setLoadError('Unsupported file type — drop a .timeline file.');
@@ -373,6 +398,7 @@ export default function ViewerApp() {
       const reader = new FileReader();
       reader.onload = () => {
         try {
+          if (!(reader.result instanceof ArrayBuffer)) throw new Error('invalid file content');
           loadTimelineBuffer(reader.result);
           window.history.replaceState(null, '', viewerBasePath() + window.location.search);
         } catch (err) {
@@ -386,7 +412,7 @@ export default function ViewerApp() {
   );
 
   const loadFromGitHub = useCallback(
-    async (segments) => {
+    async (segments: GitHubSegments) => {
       if (!/\.(timeline|json)$/i.test(segments[segments.length - 1])) {
         setLoadError('The link must point to a .timeline file.');
         return;
@@ -443,14 +469,14 @@ export default function ViewerApp() {
 
   // preventDefault on window keeps the browser from navigating to dropped files
   useEffect(() => {
-    const onDragOver = (e) => {
+    const onDragOver = (e: DragEvent) => {
       e.preventDefault();
       setIsDragOver(true);
     };
-    const onDragLeave = (e) => {
+    const onDragLeave = (e: DragEvent) => {
       if (!e.relatedTarget) setIsDragOver(false);
     };
-    const onDrop = (e) => {
+    const onDrop = (e: DragEvent) => {
       e.preventDefault();
       setIsDragOver(false);
       handleFile(e.dataTransfer?.files?.[0]);
@@ -465,13 +491,13 @@ export default function ViewerApp() {
     };
   }, [handleFile]);
 
-  const handleSelect = useCallback((id) => setSelectedId(id), []);
+  const handleSelect = useCallback((id: TimelineElement['id'] | null) => setSelectedId(id), []);
 
-  const handlePatchFile = useCallback((patch) => {
+  const handlePatchFile = useCallback((patch: Record<string, unknown>) => {
     setTimelineData((prev) => (prev ? { ...prev, file: { ...(prev.file ?? {}), ...patch } } : prev));
   }, []);
 
-  const handleCenterGroup = useCallback((groupId) => {
+  const handleCenterGroup = useCallback((groupId: string) => {
     timelineViewRef.current?.scrollToGroup(groupId);
   }, []);
 
@@ -488,14 +514,14 @@ export default function ViewerApp() {
   // Guarded on the restore above, or the first pass saves defaults over the stored prefs
   useEffect(() => {
     if (!panelPrefsKey || restoredPanelKeyRef.current !== panelPrefsKey) return;
-    const prefs = {};
+    const prefs: PanelPreferences = {};
     for (const [key, value] of Object.entries({ panelSortField, panelSortOrder, panelGroupMode, nestEraSubGroups })) {
       if (value !== undefined) prefs[key] = value;
     }
     writePanelPrefs(panelPrefsKey, prefs);
   }, [panelPrefsKey, panelSortField, panelSortOrder, panelGroupMode, nestEraSubGroups]);
 
-  const handleUpdateGroup = useCallback((groupId, patch) => {
+  const handleUpdateGroup = useCallback((groupId: string, patch: Partial<TimelineGroup>) => {
     setTimelineData((prev) => {
       if (!prev) return prev;
       const groups = (prev.file?.groups ?? []).map((g) => (g.id === groupId ? { ...g, ...patch } : g));
@@ -503,15 +529,15 @@ export default function ViewerApp() {
     });
   }, []);
 
-  const handleToggleTag = useCallback((tag) => {
+  const handleToggleTag = useCallback((tag: string) => {
     setActiveTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
   }, []);
 
-  const handleToggleHiddenTag = useCallback((tag) => {
+  const handleToggleHiddenTag = useCallback((tag: string) => {
     setHiddenTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
   }, []);
 
-  const handleTogglePinnedTag = useCallback((tag) => {
+  const handleTogglePinnedTag = useCallback((tag: string) => {
     setPinnedTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
   }, []);
 
@@ -558,7 +584,7 @@ export default function ViewerApp() {
 
   const allTags = useMemo(() => {
     if (!timelineData?.elements) return [];
-    const tags = new Set();
+    const tags = new Set<string>();
     timelineData.elements.forEach((element) => {
       if (element.type !== 'event' && element.type !== 'span') return;
       if (Array.isArray(element.tags)) {
@@ -583,7 +609,7 @@ export default function ViewerApp() {
     }
   }, [viewMode, timelineData?.file?.useSpreadsheet]);
 
-  const compareElementsByTimelineOrder = useCallback((a, b) => {
+  const compareElementsByTimelineOrder = useCallback((a: TimelineElement, b: TimelineElement) => {
     if (a.type === 'event' && b.type === 'event') {
       if ((a.date ?? 0) !== (b.date ?? 0)) return (a.date ?? 0) - (b.date ?? 0);
       return String(a.id).localeCompare(String(b.id));

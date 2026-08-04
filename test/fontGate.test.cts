@@ -2,14 +2,17 @@ const { test } = require('node:test');
 const assert = require('node:assert');
 const path = require('node:path');
 
-const pathToFileUrl = (p) => require('node:url').pathToFileURL(p).href;
+type FontFaceFixture = { family: string; status: string };
+type FontFixtureOptions = { faces?: FontFaceFixture[]; notIterable?: boolean };
+
+const pathToFileUrl = (p: string): string => require('node:url').pathToFileURL(p).href;
 const load = () => import(pathToFileUrl(path.join(__dirname, '..', 'src', 'utils', 'fontGate.ts')));
 
-function makeFonts({ faces = [], notIterable = false } = {}) {
+function makeFonts({ faces = [], notIterable = false }: FontFixtureOptions = {}) {
   const fonts = {
     faces,
     check: () => true,
-    arrive: (family, status = 'loaded') => {
+    arrive: (family: string, status = 'loaded') => {
       fonts.faces.push({ family, status });
     },
     [Symbol.iterator]: function* iterate() {
@@ -20,7 +23,7 @@ function makeFonts({ faces = [], notIterable = false } = {}) {
   return fonts;
 }
 
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 const STACK = '"Lexend", "Inter", sans-serif';
 
 test('isFontReady is false while the family is absent', async () => {

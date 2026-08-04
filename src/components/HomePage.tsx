@@ -42,8 +42,45 @@ import {
 import { generateIdFromTitle, generateStorageUid } from '../utils/idUtils.ts';
 import { getAppSettings, saveAppSettings } from '../utils/appSettings.ts';
 
-function MovePicker({ folders, currentFolder, onConfirm, onCancel }) {
-  const [dest, setDest] = useState(null);
+type LibraryFile = {
+  id: string;
+  name: string;
+  uid?: string;
+  folder?: string;
+  modifiedAt?: number;
+  isPackage?: boolean;
+  packagePath?: string;
+  neverSync?: boolean;
+  thumbnailUrl?: string;
+  storageType?: string;
+  conflict?: boolean;
+};
+type GitSyncStatus = {
+  state?: string; machineLabel?: string; autoSync?: boolean; debounceMs?: number; lastSyncedAt?: string;
+  error?: string; excludedPaths?: string[]; writeReadme?: boolean | string; exportErrors?: Array<{ error?: string; path?: string }>;
+  importErrors?: Array<{ error?: string; path?: string }>; repo?: { url?: string; branch?: string; owner?: string; repo?: string; htmlUrl?: string };
+};
+type GitSyncShareInfo = {
+  canShareViewer?: boolean;
+  isPublic?: boolean;
+  pending?: boolean;
+  githubBlobUrl?: string;
+  viewerUrl?: string;
+  exactViewerUrl?: string;
+  github?: { htmlUrl?: string };
+  [key: string]: string | boolean | { htmlUrl?: string } | undefined;
+};
+type GitSyncShareDialog = { file: LibraryFile; info: GitSyncShareInfo | null; loading: boolean; error: string; copied: string };
+type GitSyncLinkKind = 'githubBlobUrl' | 'viewerUrl' | 'exactViewerUrl';
+type GitSyncHistoryEntry = { oid: string; subject?: string; committedAt?: string; authorName?: string; summary?: string; viewerUrl?: string };
+type GitSyncHistoryDialog = { file: LibraryFile; history: { entries: GitSyncHistoryEntry[] } | null; loading: boolean; error: string; restoringOid: string };
+type FolderTarget = { folderPath: string; folderName?: string; nearRight?: boolean; x?: number; y?: number; fileCount?: number };
+type SyncFolderNode = { type: 'folder'; id: string; label: string; children: SyncNode[]; sortKey: string };
+type SyncTimelineNode = { type: 'timeline'; id: string; label: string; sortKey: string; conflict: boolean; neverSync: boolean };
+type SyncNode = SyncFolderNode | SyncTimelineNode;
+
+function MovePicker({ folders, currentFolder, onConfirm, onCancel }: { folders: string[]; currentFolder: string; onConfirm: (folder: string) => void; onCancel: () => void }) {
+  const [dest, setDest] = useState<string | null>(null);
   return (
     <div className="folder-modal folder-modal-pick" onClick={(e) => e.stopPropagation()}>
       <FolderTree folders={folders} currentFolder={currentFolder} selected={dest} onSelect={setDest} />
@@ -63,23 +100,23 @@ function MovePicker({ folders, currentFolder, onConfirm, onCancel }) {
   );
 }
 
-function FolderTree({ folders, currentFolder, selected, onSelect }) {
-  const [collapsed, setCollapsed] = useState({});
+function FolderTree({ folders, currentFolder, selected, onSelect }: { folders: string[]; currentFolder: string; selected: string | null; onSelect: (folder: string) => void }) {
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
-  const toggle = (path) => setCollapsed((prev) => ({ ...prev, [path]: !prev[path] }));
+  const toggle = (path: string) => setCollapsed((prev) => ({ ...prev, [path]: !prev[path] }));
 
-  const hasChildren = (path) =>
-    folders.some((f) => f.startsWith(path + '/') && f.split('/').length === path.split('/').length + 1);
+  const hasChildren = (path: string) =>
+    folders.some((f: string) => f.startsWith(path + '/') && f.split('/').length === path.split('/').length + 1);
 
-  const renderLevel = (parentPath, depth) => {
+  const renderLevel = (parentPath: string, depth: number) => {
     const prefix = parentPath ? parentPath + '/' : '';
-    const items = folders.filter((f) => {
+    const items = folders.filter((f: string) => {
       const parts = f.split('/');
       const parentParts = parentPath ? parentPath.split('/') : [];
       return parts.length === parentParts.length + 1 && f.startsWith(prefix);
     });
 
-    return items.map((f) => {
+    return items.map((f: string) => {
       const label = f.split('/').pop();
       const isOpen = !collapsed[f];
       const children = hasChildren(f);
@@ -129,7 +166,7 @@ function FolderTree({ folders, currentFolder, selected, onSelect }) {
   );
 }
 
-function relativeTime(ms) {
+function relativeTime(ms: number | null | undefined) {
   if (!ms) return null;
   const days = Math.floor((Date.now() - ms) / 86400000);
   if (days === 0) return 'today';
@@ -139,16 +176,16 @@ function relativeTime(ms) {
   return `${Math.floor(days / 7)} weeks ago`;
 }
 
-const isConflictCopyId = (value) => /-conflict-\d{8}-[\w.-]+(?:-\d+)?$/i.test(String(value || ''));
+const isConflictCopyId = (value: unknown) => /-conflict-\d{8}-[\w.-]+(?:-\d+)?$/i.test(String(value || ''));
 
-function formatSyncTime(value) {
+function formatSyncTime(value: string | null | undefined) {
   if (!value) return 'Not synced yet';
   const ms = Date.parse(value);
   if (!Number.isFinite(ms)) return 'Not synced yet';
   return `Synced ${relativeTime(ms)}`;
 }
 
-function formatDateTime(value) {
+function formatDateTime(value: string | null | undefined) {
   if (!value) return '';
   const ms = Date.parse(value);
   if (!Number.isFinite(ms)) return '';
@@ -156,7 +193,7 @@ function formatDateTime(value) {
 }
 
 // Version history stamps: minutes/hours today, "Yesterday", then a short date
-function formatHistoryTime(value) {
+function formatHistoryTime(value: string | null | undefined) {
   if (!value) return '';
   const ms = Date.parse(value);
   if (!Number.isFinite(ms)) return '';
@@ -176,7 +213,7 @@ function formatHistoryTime(value) {
   );
 }
 
-function formatMirrorBytes(n) {
+function formatMirrorBytes(n: number | null | undefined) {
   if (n == null) return '';
   const kb = 1024;
   const mb = kb * 1024;
@@ -187,10 +224,10 @@ function formatMirrorBytes(n) {
   return `${n} B`;
 }
 
-function buildSyncTree(files) {
-  const root = { type: 'folder', id: '', label: 'Library', children: [], sortKey: '' };
-  const folderMap = new Map([['', root]]);
-  const sorted = [...files].filter((file) => !file.isPackage).sort((a, b) => a.id.localeCompare(b.id));
+function buildSyncTree(files: LibraryFile[]): SyncFolderNode {
+  const root: SyncFolderNode = { type: 'folder', id: '', label: 'Library', children: [], sortKey: '' };
+  const folderMap = new Map<string, SyncFolderNode>([['', root]]);
+  const sorted = [...files].filter((file: LibraryFile) => !file.isPackage).sort((a: LibraryFile, b: LibraryFile) => a.id.localeCompare(b.id));
 
   for (const file of sorted) {
     const parts = String(file.id || '').split('/');
@@ -198,7 +235,7 @@ function buildSyncTree(files) {
     for (let i = 0; i < parts.length - 1; i += 1) {
       const folderId = parts.slice(0, i + 1).join('/');
       if (!folderMap.has(folderId)) {
-        const folderNode = {
+        const folderNode: SyncFolderNode = {
           type: 'folder',
           id: folderId,
           label: parts[i],
@@ -206,11 +243,11 @@ function buildSyncTree(files) {
           sortKey: folderId,
         };
         folderMap.set(folderId, folderNode);
-        folderMap.get(parentId).children.push(folderNode);
+        folderMap.get(parentId)?.children.push(folderNode);
       }
       parentId = folderId;
     }
-    folderMap.get(parentId).children.push({
+    folderMap.get(parentId)?.children.push({
       type: 'timeline',
       id: file.id,
       label: file.name,
@@ -220,12 +257,12 @@ function buildSyncTree(files) {
     });
   }
 
-  const sortNode = (node) => {
-    node.children.sort((a, b) => {
+  const sortNode = (node: SyncFolderNode) => {
+    node.children.sort((a: SyncNode, b: SyncNode) => {
       if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
       return a.sortKey.localeCompare(b.sortKey);
     });
-    node.children.forEach((child) => {
+    node.children.forEach((child: SyncNode) => {
       if (child.type === 'folder') sortNode(child);
     });
   };
@@ -249,15 +286,15 @@ const HOME_SIDEBAR_HARD_MIN = 160;
 const HOME_SIDEBAR_MAX = 600;
 const HOME_SIDEBAR_DEFAULT = 350;
 const HOME_MAIN_MIN = 320;
-const getHomeShellWidth = (node) => node?.getBoundingClientRect?.().width ?? NaN;
-const getHomeSidebarBounds = (shellWidth) => {
+const getHomeShellWidth = (node: Element | null | undefined) => node?.getBoundingClientRect?.().width ?? NaN;
+const getHomeSidebarBounds = (shellWidth: number) => {
   if (!Number.isFinite(shellWidth) || shellWidth <= 0) {
     return { min: HOME_SIDEBAR_MIN, max: HOME_SIDEBAR_MAX };
   }
   const max = Math.min(HOME_SIDEBAR_MAX, Math.max(HOME_SIDEBAR_HARD_MIN, shellWidth - HOME_MAIN_MIN));
   return { min: Math.min(HOME_SIDEBAR_MIN, max), max };
 };
-const clampHomeSidebar = (w, shellWidth = NaN) => {
+const clampHomeSidebar = (w: number, shellWidth = NaN) => {
   const { min, max } = getHomeSidebarBounds(shellWidth);
   return Math.min(Math.max(w, min), max);
 };
@@ -325,7 +362,7 @@ export default function HomePage({
   onKeybindsChange,
   thumbnailRefreshSignal = 0,
 }: HomePageProps) {
-  const [timelineFiles, setTimelineFiles] = useState([]);
+  const [timelineFiles, setTimelineFiles] = useState<LibraryFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [isNewTimelineModalOpen, setIsNewTimelineModalOpen] = useState(false);
   const [contextMenu, setContextMenu] = useState(null);
@@ -335,26 +372,26 @@ export default function HomePage({
   const [sortMode, setSortMode] = useState('date');
   const [librarySection, setLibrarySection] = useState('home');
   const [currentFolder, setCurrentFolder] = useState('');
-  const [allFolders, setAllFolders] = useState([]);
+  const [allFolders, setAllFolders] = useState<string[]>([]);
   const [newFolderDialogOpen, setNewFolderDialogOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
-  const [moveDialogFile, setMoveDialogFile] = useState(null);
-  const [availableFolders, setAvailableFolders] = useState([]);
-  const [renameTarget, setRenameTarget] = useState(null);
+  const [moveDialogFile, setMoveDialogFile] = useState<LibraryFile | null>(null);
+  const [availableFolders, setAvailableFolders] = useState<string[]>([]);
+  const [renameTarget, setRenameTarget] = useState<{ type: 'folder' | 'timeline'; id: string; currentName?: string } | null>(null);
   const [renameName, setRenameName] = useState('');
   const [renameError, setRenameError] = useState('');
-  const [folderContextMenu, setFolderContextMenu] = useState(null);
-  const [deleteFolderTarget, setDeleteFolderTarget] = useState(null);
-  const [moveFolderTarget, setMoveFolderTarget] = useState(null);
+  const [folderContextMenu, setFolderContextMenu] = useState<FolderTarget | null>(null);
+  const [deleteFolderTarget, setDeleteFolderTarget] = useState<FolderTarget | null>(null);
+  const [moveFolderTarget, setMoveFolderTarget] = useState<FolderTarget | null>(null);
   const [isMarketplaceOpen, setIsMarketplaceOpen] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
-  const [deleteDialogFile, setDeleteDialogFile] = useState(null);
+  const [deleteDialogFile, setDeleteDialogFile] = useState<LibraryFile | null>(null);
   const [deleteDialogWithNotes, setDeleteDialogWithNotes] = useState(false);
   const [deleteDialogWithAssets, setDeleteDialogWithAssets] = useState(false);
   const [settingsSection, setSettingsSection] = useState('general');
   const [updateStatus, setUpdateStatus] = useState(null); // null | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error' | 'dev'
   const [themeMigrationStatus, setThemeMigrationStatus] = useState(null); // null | 'migrating' | { count }
-  const [gitSyncStatus, setGitSyncStatus] = useState(null);
+  const [gitSyncStatus, setGitSyncStatus] = useState<GitSyncStatus | null>(null);
   const [gitSyncRemoteUrl, setGitSyncRemoteUrl] = useState('');
   const [gitSyncPat, setGitSyncPat] = useState('');
   const [gitSyncBranch, setGitSyncBranch] = useState('main');
@@ -363,18 +400,18 @@ export default function HomePage({
   const [gitSyncMachineLabel, setGitSyncMachineLabel] = useState('');
   const [gitSyncBusy, setGitSyncBusy] = useState('');
   const [gitSyncError, setGitSyncError] = useState('');
-  const [gitSyncShareDialog, setGitSyncShareDialog] = useState(null);
-  const [gitSyncHistoryDialog, setGitSyncHistoryDialog] = useState(null);
-  const [gitSyncMirrorBytes, setGitSyncMirrorBytes] = useState(null);
+  const [gitSyncShareDialog, setGitSyncShareDialog] = useState<GitSyncShareDialog | null>(null);
+  const [gitSyncHistoryDialog, setGitSyncHistoryDialog] = useState<GitSyncHistoryDialog | null>(null);
+  const [gitSyncMirrorBytes, setGitSyncMirrorBytes] = useState<number | null>(null);
   const [showSyncedConfirm, setShowSyncedConfirm] = useState(false);
   const [homeSidebarWidth, setHomeSidebarWidth] = useState(HOME_SIDEBAR_DEFAULT);
   const isDraggingSidebar = useRef(false);
-  const homeShellRef = useRef(null);
+  const homeShellRef = useRef<HTMLDivElement | null>(null);
   const [recordingKey, setRecordingKey] = useState(null);
   const recordingKeyRef = useRef(null);
   const renameInputRef = useRef(null);
   const previousViewRef = useRef('home');
-  const menuRef = useRef(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const defaultThemeKey = (themeConfig?.activeTheme || '').toLowerCase();
   const bundledThemes = useMemo(() => loadThemeConfig().themes, []);
   const bundledKeys = useMemo(
@@ -398,7 +435,7 @@ export default function HomePage({
     });
   }, []);
 
-  const handleViewModeChange = (nextMode) => {
+  const handleViewModeChange = (nextMode: 'grid' | 'list') => {
     setViewMode(nextMode);
     saveAppSettings({ homeViewMode: nextMode });
   };
@@ -418,7 +455,7 @@ export default function HomePage({
   // Manual sidebar resize, mirroring the timeline-view left panel drag
   useEffect(() => {
     if (settingsOnly) return undefined;
-    const onMove = (e) => {
+    const onMove = (e: MouseEvent) => {
       if (!isDraggingSidebar.current) return;
       const shell = homeShellRef.current;
       const shellRect = shell?.getBoundingClientRect?.();
@@ -467,7 +504,7 @@ export default function HomePage({
 
   const availableFonts = useMemo(() => {
     const seen = new Set();
-    const list = [];
+    const list: string[] = [];
     (fonts || []).forEach((font) => {
       const name = font?.name?.trim();
       if (!name || seen.has(name)) return;
@@ -495,7 +532,7 @@ export default function HomePage({
     return options;
   }, [availableFonts, appFontFamily]);
 
-  const getPathIssue = (value) => {
+  const getPathIssue = (value: string) => {
     if (!value) return null;
     const trimmed = value.trim();
     if (!trimmed) return null;
@@ -519,7 +556,7 @@ export default function HomePage({
   const timelinePathIssue = getPathIssue(timelineStorageDir);
   const notesPathIssue = getPathIssue(notesStorageDir);
 
-  const applyGitSyncStatus = (status) => {
+  const applyGitSyncStatus = (status: { machineLabel?: string; autoSync?: boolean; debounceMs?: number; repo?: { url?: string; branch?: string } } | null | undefined) => {
     setGitSyncStatus(status);
     if (status?.machineLabel) setGitSyncMachineLabel(status.machineLabel);
     if (typeof status?.autoSync === 'boolean') setGitSyncAuto(status.autoSync);
@@ -668,7 +705,7 @@ export default function HomePage({
   }, [renameTarget]);
 
   useEffect(() => {
-    const handler = (e) => {
+    const handler = (e: KeyboardEvent) => {
       const id = recordingKeyRef.current;
       if (!id) return;
       if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) return;
@@ -701,7 +738,7 @@ export default function HomePage({
       if (window.electron?.listTimelines) {
         try {
           const files = await window.electron.listTimelines();
-          setTimelineFiles(files.map((f) => ({ ...f, storageType: 'local' })));
+          setTimelineFiles(files.map((f: LibraryFile) => ({ ...f, storageType: 'local' })));
         } catch (error) {
           console.error('Failed to list timelines:', error);
           setTimelineFiles([]);
@@ -728,8 +765,8 @@ export default function HomePage({
   // Close context menus when clicking outside
   useEffect(() => {
     if (!contextMenu && !folderContextMenu) return;
-    const handleClickOutside = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target)) {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && (!(e.target instanceof Node) || !menuRef.current.contains(e.target))) {
         setContextMenu(null);
         setFolderContextMenu(null);
       }
@@ -742,13 +779,13 @@ export default function HomePage({
     setIsNewTimelineModalOpen(true);
   };
 
-  const handleCreateTimeline = async (timelineConfig) => {
+  const handleCreateTimeline = async (timelineConfig: Record<string, unknown>) => {
     const result = await onCreateTimeline({ ...timelineConfig, folder: currentFolder || '' });
     if (result?.success) setIsNewTimelineModalOpen(false);
     return result;
   };
 
-  const openTimelineFile = (file) => {
+  const openTimelineFile = (file: LibraryFile & { packagePath?: string }) => {
     if (file.isPackage) onImportTimeline?.(file.packagePath);
     else onSelectTimeline(file.id);
   };
@@ -765,17 +802,17 @@ export default function HomePage({
   // preventDefault on window keeps Electron from navigating to dropped files
   useEffect(() => {
     if (settingsOnly) return undefined;
-    const isFileDrag = (e) => Array.from(e.dataTransfer?.types || []).includes('Files');
-    const onDragOver = (e) => {
+    const isFileDrag = (e: DragEvent) => Array.from(e.dataTransfer?.types || []).includes('Files');
+    const onDragOver = (e: DragEvent) => {
       if (!isFileDrag(e)) return;
       e.preventDefault();
       if (anyModalOpen) return;
       setIsDragOver(true);
     };
-    const onDragLeave = (e) => {
+    const onDragLeave = (e: DragEvent) => {
       if (!e.relatedTarget) setIsDragOver(false);
     };
-    const onDrop = (e) => {
+    const onDrop = (e: DragEvent) => {
       e.preventDefault();
       setIsDragOver(false);
       if (anyModalOpen) return;
@@ -794,7 +831,7 @@ export default function HomePage({
     };
   }, [settingsOnly, onImportTimeline, anyModalOpen]);
 
-  const handleContextMenu = (e, file) => {
+  const handleContextMenu = (e: React.MouseEvent, file: LibraryFile) => {
     e.preventDefault();
     const nearRight = e.clientX > window.innerWidth / 2;
     setContextMenu({
@@ -805,7 +842,7 @@ export default function HomePage({
     });
   };
 
-  const handleMenuAction = (action) => {
+  const handleMenuAction = (action?: () => void) => {
     setContextMenu(null);
     if (action) action();
   };
@@ -814,12 +851,12 @@ export default function HomePage({
     setIsMarketplaceOpen(true);
   };
 
-  const handleSelectLibrarySection = (section) => {
+  const handleSelectLibrarySection = (section: string) => {
     setLibrarySection(section);
     setCurrentFolder('');
   };
 
-  const handleSelectFolder = (folderPath) => {
+  const handleSelectFolder = (folderPath: string) => {
     setLibrarySection('folder');
     setCurrentFolder(folderPath);
   };
@@ -842,7 +879,7 @@ export default function HomePage({
     setTimeout(() => setThemeMigrationStatus(null), 3000);
   };
 
-  const handleDuplicate = async (file) => {
+  const handleDuplicate = async (file: LibraryFile) => {
     try {
       if (!window.electron?.loadTimeline || !window.electron?.saveTimeline) {
         throw new Error('Duplicate is only available in the desktop app.');
@@ -895,7 +932,7 @@ export default function HomePage({
   const refreshLocal = async () => {
     if (window.electron?.listTimelines) {
       const files = await window.electron.listTimelines();
-      setTimelineFiles(files.map((f) => ({ ...f, storageType: 'local' })));
+      setTimelineFiles(files.map((f: LibraryFile) => ({ ...f, storageType: 'local' })));
     }
     if (window.electron?.listFolders) {
       const folders = await window.electron.listFolders();
@@ -1000,7 +1037,7 @@ export default function HomePage({
     }
   };
 
-  const loadGitSyncShareInfo = async (file) => {
+  const loadGitSyncShareInfo = async (file: LibraryFile): Promise<GitSyncShareInfo> => {
     if (!window.electron?.gitSyncShareInfo || !file?.uid) {
       throw new Error('Share links are only available for synced local timelines.');
     }
@@ -1011,7 +1048,7 @@ export default function HomePage({
     return result.info;
   };
 
-  const loadGitSyncHistory = async (file) => {
+  const loadGitSyncHistory = async (file: LibraryFile): Promise<{ entries: GitSyncHistoryEntry[] }> => {
     if (!window.electron?.gitSyncFileHistory || !file?.uid) {
       throw new Error('Timeline history is only available for synced local timelines.');
     }
@@ -1022,7 +1059,7 @@ export default function HomePage({
     return result.history;
   };
 
-  const copyText = async (text) => {
+  const copyText = async (text: string | undefined) => {
     if (!text) throw new Error('Nothing to copy.');
     if (!navigator.clipboard?.writeText) {
       throw new Error('Clipboard access is unavailable in this build.');
@@ -1030,7 +1067,7 @@ export default function HomePage({
     await navigator.clipboard.writeText(text);
   };
 
-  const handleOpenGitSyncShare = async (file) => {
+  const handleOpenGitSyncShare = async (file: LibraryFile) => {
     setGitSyncShareDialog({ file, info: null, loading: true, error: '', copied: '' });
     try {
       const info = await loadGitSyncShareInfo(file);
@@ -1040,7 +1077,7 @@ export default function HomePage({
     }
   };
 
-  const handleCopyGitSyncLink = async (kind) => {
+  const handleCopyGitSyncLink = async (kind: GitSyncLinkKind) => {
     const url = gitSyncShareDialog?.info?.[kind];
     try {
       await copyText(url);
@@ -1050,7 +1087,7 @@ export default function HomePage({
     }
   };
 
-  const handleSyncAndCopyGitSyncLink = async (kind) => {
+  const handleSyncAndCopyGitSyncLink = async (kind: GitSyncLinkKind) => {
     const file = gitSyncShareDialog?.file;
     if (!file) return;
     setGitSyncShareDialog((current) => (current ? { ...current, loading: true, error: '', copied: '' } : current));
@@ -1086,7 +1123,7 @@ export default function HomePage({
     }
   };
 
-  const handleOpenGitSyncHistory = async (file) => {
+  const handleOpenGitSyncHistory = async (file: LibraryFile) => {
     setGitSyncHistoryDialog({ file, history: null, loading: true, error: '', restoringOid: '' });
     try {
       const history = await loadGitSyncHistory(file);
@@ -1096,7 +1133,7 @@ export default function HomePage({
     }
   };
 
-  const handleRestoreGitSyncVersion = async (oid) => {
+  const handleRestoreGitSyncVersion = async (oid: string) => {
     const file = gitSyncHistoryDialog?.file;
     if (!file || !oid) return;
     if (!window.confirm('Restore this version as a copy in your library?')) return;
@@ -1127,11 +1164,11 @@ export default function HomePage({
     await refreshLocal();
   };
 
-  const handleOpenMoveDialog = async (file) => {
+  const handleOpenMoveDialog = async (file: LibraryFile) => {
     setMoveDialogFile(file);
     const folders = await listFolders();
     setAvailableFolders(
-      folders.filter((f) => !f.split('/').some((part) => part.startsWith('.') || part.endsWith('.assets'))),
+      folders.filter((f: string) => !f.split('/').some((part: string) => part.startsWith('.') || part.endsWith('.assets'))),
     );
   };
 
@@ -1178,21 +1215,21 @@ export default function HomePage({
     await refreshLocal();
   };
 
-  const handleMoveFolder = async (targetFolder) => {
+  const handleMoveFolder = async (targetFolder: string) => {
     if (!moveFolderTarget) return;
     await moveFolder(moveFolderTarget.folderPath, targetFolder || '');
     setMoveFolderTarget(null);
     await refreshLocal();
   };
 
-  const handleMoveTimeline = async (targetFolder) => {
+  const handleMoveTimeline = async (targetFolder: string) => {
     if (!moveDialogFile) return;
     const result = await moveTimeline(moveDialogFile.id, targetFolder);
     setMoveDialogFile(null);
     if (result.success) await refreshLocal();
   };
 
-  const handleDelete = async (file) => {
+  const handleDelete = async (file: LibraryFile) => {
     setDeleteDialogFile(file);
     setDeleteDialogWithNotes(false);
     setDeleteDialogWithAssets(false);
@@ -1215,7 +1252,7 @@ export default function HomePage({
 
         // Reload timeline list
         const files = await window.electron.listTimelines();
-        setTimelineFiles(files.map((f) => ({ ...f, storageType: 'local' })));
+        setTimelineFiles(files.map((f: LibraryFile) => ({ ...f, storageType: 'local' })));
       } else {
         alert('Delete is only available in the desktop app');
       }
@@ -1310,11 +1347,11 @@ export default function HomePage({
 
   const gitSyncExcluded = gitSyncStatus?.excludedPaths || [];
   const gitSyncExcludedSet = new Set(gitSyncExcluded);
-  const isGitSyncExcluded = (id) => {
+  const isGitSyncExcluded = (id: string) => {
     const rel = String(id || '');
     return gitSyncExcluded.some((e) => (e.endsWith('/') ? rel.startsWith(e) : rel === e));
   };
-  const isExcludedByAncestorFolder = (id) => {
+  const isExcludedByAncestorFolder = (id: string) => {
     const rel = String(id || '');
     return gitSyncExcluded.some((e) => e.endsWith('/') && rel.startsWith(e));
   };
@@ -1377,7 +1414,7 @@ export default function HomePage({
     return formatSyncTime(gitSyncStatus?.lastSyncedAt);
   }, [gitSyncBusy, gitSyncConnected, gitSyncStatus?.error, gitSyncStatus?.lastSyncedAt, gitSyncStatus?.state]);
 
-  const handleGitSyncExcludeChange = async (targetKey, nextChecked) => {
+  const handleGitSyncExcludeChange = async (targetKey: string, nextChecked: boolean) => {
     const targetId = targetKey.endsWith('/') ? targetKey.slice(0, -1) : targetKey;
     const next = new Set(Array.from(gitSyncExcludedSet).filter((value): value is string => typeof value === 'string'));
     if (nextChecked) {
@@ -1411,7 +1448,7 @@ export default function HomePage({
     setView('home');
   };
 
-  const renderGitSyncTreeNode = (node, depth = 0) => {
+  const renderGitSyncTreeNode = (node: SyncNode, depth = 0) => {
     if (!node) return null;
     if (node.type === 'timeline') {
       const coveredByFolder = isExcludedByAncestorFolder(node.id);
@@ -1438,11 +1475,11 @@ export default function HomePage({
       );
     }
 
-    const flattenLeaves = (current) =>
-      current.children.flatMap((child) => (child.type === 'folder' ? flattenLeaves(child) : [child]));
+    const flattenLeaves = (current: SyncFolderNode): SyncTimelineNode[] =>
+      current.children.flatMap((child: SyncNode): SyncTimelineNode[] => child.type === 'folder' ? flattenLeaves(child) : [child]);
     const leaves = flattenLeaves(node);
-    const selectableLeaves = leaves.filter((leaf) => !leaf.neverSync);
-    const checkedCount = selectableLeaves.filter((leaf) => !isGitSyncExcluded(leaf.id)).length;
+    const selectableLeaves = leaves.filter((leaf: SyncTimelineNode) => !leaf.neverSync);
+    const checkedCount = selectableLeaves.filter((leaf: SyncTimelineNode) => !isGitSyncExcluded(leaf.id)).length;
     const allChecked = selectableLeaves.length > 0 && checkedCount === selectableLeaves.length;
     const partiallyChecked = checkedCount > 0 && checkedCount < selectableLeaves.length;
 
@@ -1470,7 +1507,7 @@ export default function HomePage({
             <span className="git-sync-tree-label">{node.label}</span>
           </label>
         ) : null}
-        {node.children.map((child) => renderGitSyncTreeNode(child, node.id ? depth + 1 : depth))}
+        {node.children.map((child: SyncNode) => renderGitSyncTreeNode(child, node.id ? depth + 1 : depth))}
       </div>
     );
   };
@@ -3102,10 +3139,10 @@ export default function HomePage({
               const folders = await listFolders();
               setAvailableFolders(
                 folders.filter(
-                  (f) =>
+                  (f: string) =>
                     f !== fc.folderPath &&
                     !f.startsWith(fc.folderPath + '/') &&
-                    !f.split('/').some((part) => part.startsWith('.') || part.endsWith('.assets')),
+                    !f.split('/').some((part: string) => part.startsWith('.') || part.endsWith('.assets')),
                 ),
               );
               setMoveFolderTarget(fc);

@@ -2,6 +2,19 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Play, Pause } from 'lucide-react';
 import { parseTimelineInput, snapToMonthGrid, snapToDayGrid } from '../utils/dateUtils';
 import { formatYear } from '../utils/timelineUtils';
+import type { TimelineData, TimelineElement, TimelineFile } from '../types/timeline';
+
+type ScaleSection = { start: number; end: number; scale: number };
+type TimelineScrollbarProps = {
+  timelineData?: TimelineData;
+  onYearChange?: (year: number) => void;
+  viewportPercent?: number;
+  leftPanelWidth?: number;
+  isLeftPanelOpen?: boolean;
+  rightPanelWidth?: number;
+  isRightPanelOpen?: boolean;
+};
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
 
 /**
  * Standalone scrollbar component.
@@ -17,25 +30,25 @@ export default function TimelineScrollbar({
   isLeftPanelOpen = false,
   rightPanelWidth = 0,
   isRightPanelOpen = false,
-}) {
+}: TimelineScrollbarProps) {
   const [sliderValue, setSliderValue] = useState(0);
   const [sliderYearLabel, setSliderYearLabel] = useState('');
   const [isPlaying, setIsPlaying] = useState(false);
 
-  const animationFrameRef = useRef(null);
-  const lastPlayTimeRef = useRef(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const lastPlayTimeRef = useRef<number | null>(null);
   const sliderValueRef = useRef(0);
-  const sliderElementRef = useRef(null);
-  const yearLabelRef = useRef(null);
+  const sliderElementRef = useRef<HTMLInputElement | null>(null);
+  const yearLabelRef = useRef<HTMLDivElement | null>(null);
   const lastSliderLabelRef = useRef('');
 
   // Compute year range from timeline data
   const { compressedMin, compressedMax, decompressYear, file } = useMemo(() => {
-    const file = timelineData?.file || {};
+    const file: TimelineFile = timelineData?.file || {};
     const elements = timelineData?.elements || [];
     const useCalendar = file.useCalendar === true;
 
-    const hasDayPrecision = (label) => {
+    const hasDayPrecision = (label: unknown): boolean => {
       if (!label || typeof label !== 'string') return false;
       const parts = label
         .split('/')
@@ -44,9 +57,8 @@ export default function TimelineScrollbar({
       return parts.length === 3;
     };
 
-    const adjustDate = (value, label) => {
-      if (!useCalendar) return value;
-      if (!Number.isFinite(value)) return value;
+    const adjustDate = (value: number | undefined, label: unknown): number | undefined => {
+      if (!useCalendar || typeof value !== 'number' || !Number.isFinite(value)) return value;
       if (hasDayPrecision(label)) return value;
       const scaled = value * 12;
       const isOnMonthGrid = Math.abs(scaled - Math.round(scaled)) < 1e-6;
@@ -54,22 +66,22 @@ export default function TimelineScrollbar({
       return snapToMonthGrid(value);
     };
 
-    const resolveDate = (value, label) => {
+    const resolveDate = (value: number | undefined, label: unknown): number | undefined => {
       if (!label || typeof label !== 'string') return adjustDate(value, label);
       const parsed = parseTimelineInput(label);
       if (Number.isFinite(parsed.value)) return adjustDate(parsed.value, label);
       return adjustDate(value, label);
     };
 
-    const events = elements.filter((e) => e.type === 'event');
-    const spans = elements.filter((e) => e.type === 'span');
-    const eras = elements.filter((e) => e.type === 'era');
+    const events = elements.filter((e: TimelineElement) => e.type === 'event');
+    const spans = elements.filter((e: TimelineElement) => e.type === 'span');
+    const eras = elements.filter((e: TimelineElement) => e.type === 'era');
 
     const allYears = [
-      ...events.map((e) => resolveDate(e.date, e.dateLabel)),
-      ...spans.flatMap((s) => [resolveDate(s.start, s.startLabel), resolveDate(s.end, s.endLabel)]),
-      ...eras.flatMap((e) => [resolveDate(e.start, e.startLabel), resolveDate(e.end, e.endLabel)]),
-    ];
+      ...events.map((e: TimelineElement) => resolveDate(e.date, e.dateLabel)),
+      ...spans.flatMap((s: TimelineElement) => [resolveDate(s.start, s.startLabel), resolveDate(s.end, s.endLabel)]),
+      ...eras.flatMap((e: TimelineElement) => [resolveDate(e.start, e.startLabel), resolveDate(e.end, e.endLabel)]),
+    ].filter((year): year is number => typeof year === 'number' && Number.isFinite(year));
 
     const rawMin = allYears.length > 0 ? Math.min(...allYears) : 0;
     const rawMax = allYears.length > 0 ? Math.max(...allYears) : 2024;
@@ -77,7 +89,7 @@ export default function TimelineScrollbar({
     const maxYear = file.end ?? rawMax;
 
     // Parse and normalize scale sections (with legacy breaks fallback)
-    const parseScaleValue = (value) => {
+    const parseScaleValue = (value: unknown): number | null => {
       if (typeof value === 'number') return value;
       if (typeof value === 'string') {
         const parsed = parseTimelineInput(value);
@@ -86,17 +98,18 @@ export default function TimelineScrollbar({
       return null;
     };
 
-    const normalizeScaleSections = (sections, legacyBreaks, min, max) => {
+    const normalizeScaleSections = (sections: unknown, legacyBreaks: unknown, min: number, max: number): ScaleSection[] => {
       let raw =
         Array.isArray(sections) && sections.length > 0
           ? sections
           : Array.isArray(legacyBreaks) && legacyBreaks.length > 0
-            ? legacyBreaks.map((b) => ({ ...b, scale: 0 }))
+            ? legacyBreaks.map((b) => (isRecord(b) ? { ...b, scale: 0 } : { scale: 0 }))
             : [];
       if (raw.length === 0) return [];
 
       const cleaned = raw
-        .map((item) => {
+        .map((item): ScaleSection | null => {
+          if (!isRecord(item)) return null;
           const startRaw = parseScaleValue(item?.start);
           const endRaw = parseScaleValue(item?.end);
           if (!Number.isFinite(startRaw) || !Number.isFinite(endRaw)) return null;
@@ -109,10 +122,10 @@ export default function TimelineScrollbar({
           const scale = Math.max(0, Math.min(2, Number(item?.scale) || 0));
           return { start: clippedStart, end: clippedEnd, scale };
         })
-        .filter(Boolean)
+        .filter((item): item is ScaleSection => item !== null)
         .sort((a, b) => a.start - b.start);
 
-      const merged = [];
+      const merged: ScaleSection[] = [];
       cleaned.forEach((current) => {
         const last = merged[merged.length - 1];
         if (!last || current.start > last.end || current.scale !== last.scale) {
@@ -126,7 +139,7 @@ export default function TimelineScrollbar({
 
     const normalizedScaleSections = normalizeScaleSections(file.scaleSections, file.breaks, minYear, maxYear);
 
-    const compressYear = (year) => {
+    const compressYear = (year: number): number => {
       let adjustment = 0;
       for (const section of normalizedScaleSections) {
         const duration = section.end - section.start;
@@ -143,7 +156,7 @@ export default function TimelineScrollbar({
       return year - adjustment;
     };
 
-    const decompressYear = (compressedYear) => {
+    const decompressYear = (compressedYear: number): number => {
       let adjustment = 0;
       for (const section of normalizedScaleSections) {
         const duration = section.end - section.start;
@@ -216,7 +229,7 @@ export default function TimelineScrollbar({
     // Scrub speed: traverse the full range in ~10 seconds
     const percentPerSec = 100 / 10;
 
-    const animate = (time) => {
+    const animate = (time: number) => {
       if (lastPlayTimeRef.current === null) {
         lastPlayTimeRef.current = time;
       }
@@ -231,7 +244,7 @@ export default function TimelineScrollbar({
 
       // Update slider DOM directly
       if (sliderElementRef.current) {
-        sliderElementRef.current.value = nextValue;
+        sliderElementRef.current.value = String(nextValue);
       }
 
       // Compute year label
@@ -274,7 +287,7 @@ export default function TimelineScrollbar({
     };
   }, [isPlaying]);
 
-  const handleSliderChange = (e) => {
+  const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e?.nativeEvent && e.nativeEvent.isTrusted === false) return;
     const value = parseFloat(e.target.value);
     if (!Number.isFinite(value)) return;

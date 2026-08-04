@@ -1,10 +1,18 @@
+import type { TimelineData, TimelineElement, TimelineElementType, TimelineFile } from '../types/timeline';
+
+type ElementInput = {
+  id?: string | number;
+  type?: string;
+  [key: string]: unknown;
+};
+
 /**
  * Generate a URL-safe ID from a title
  * @param {string} title - The title to convert to an ID
  * @param {string} type - The type prefix (event, span, era)
  * @returns {string} - The generated ID
  */
-export function generateIdFromTitle(title, type) {
+export function generateIdFromTitle(title: unknown, type: string): string {
   const sanitized = String(title || '')
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, '') // Remove special characters
@@ -19,18 +27,18 @@ export function generateIdFromTitle(title, type) {
  * Storage key for a timeline's notes/assets folders: the immutable file.uid,
  * with fallback to the title-derived file.id for older timelines.
  */
-export function getStorageId(file) {
+export function getStorageId(file: TimelineFile | null | undefined): string | null {
   return file?.uid ?? file?.id?.replace(/-timeline$/, '') ?? null;
 }
 
 // Storage uid: title slug plus random digits so same-titled timelines never share notes/assets folders
-export function generateStorageUid(base) {
+export function generateStorageUid(base: unknown): string {
   return `${String(base || 'timeline')}-${getRandomDigits(6)}`;
 }
 
 const RANDOM_ID_RETRY_LIMIT = 1024;
 
-const getRandomDigits = (length = 12) => {
+const getRandomDigits = (length = 12): string => {
   const max = 10 ** length;
   if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
     const bytes = new Uint32Array(1);
@@ -40,9 +48,10 @@ const getRandomDigits = (length = 12) => {
   return String(Math.floor(Math.random() * max)).padStart(length, '0');
 };
 
-export function ensureUniqueElementIds(elements) {
-  if (!Array.isArray(elements)) return elements;
-  const used = new Set();
+export function ensureUniqueElementIds<T extends ElementInput & { id: string }>(elements: T[]): T[];
+export function ensureUniqueElementIds<T extends ElementInput>(elements: T[]): Array<T & { id: string }>;
+export function ensureUniqueElementIds(elements: ElementInput[]): ElementInput[] {
+  const used = new Set<string>();
   let changed = false;
   const next = elements.map((el) => {
     if (!el || typeof el !== 'object') return el;
@@ -63,7 +72,11 @@ export function ensureUniqueElementIds(elements) {
   return changed ? next : elements;
 }
 
-export function generateUniqueRandomElementId(elements, type = 'item', excludeId = undefined) {
+export function generateUniqueRandomElementId(
+  elements: readonly ElementInput[],
+  type: TimelineElementType | 'item' | string = 'item',
+  excludeId?: TimelineElement['id'],
+): string {
   const ids = new Set((elements || []).map((el) => String(el.id)));
   if (excludeId) ids.delete(String(excludeId));
   const prefix = String(type || 'item')
@@ -89,7 +102,11 @@ export function generateUniqueRandomElementId(elements, type = 'item', excludeId
  * @param {string} originalId
  * @returns {Object}
  */
-export function updateElementWithNewId(timelineData, updatedElement, originalId) {
+export function updateElementWithNewId(
+  timelineData: TimelineData,
+  updatedElement: TimelineElement,
+  originalId: TimelineElement['id'],
+): TimelineData {
   const dataWithUpdatedElement = {
     ...timelineData,
     elements: timelineData.elements.map((el) => (el.id === originalId ? updatedElement : el)),

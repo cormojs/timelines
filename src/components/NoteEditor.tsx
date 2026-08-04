@@ -87,7 +87,7 @@ const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function NoteEd
     [flushSave],
   );
 
-  const wrapSelection = (prefix, suffix = prefix) => {
+  const wrapSelection = (prefix: string, suffix = prefix) => {
     const textarea = textareaRef.current;
     if (!textarea) return;
     const start = textarea.selectionStart ?? 0;

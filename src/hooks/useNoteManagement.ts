@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback, type Dispatch, type SetStateAction } from 'react';
 import { renderNoteMarkdown } from '../utils/noteUtils';
 import {
   createNote,
@@ -14,8 +14,18 @@ import {
 import { isSafeNoteRef } from '../utils/validation';
 import { getStorageId } from '../utils/idUtils';
 import { resolvePackageAssetSrc } from '../utils/viewerPackageStore';
+import type { NoteEditorHandle } from '../components/NoteEditor';
+import type { TimelineData, TimelineElement } from '../types/timeline';
 
-export function useNoteManagement({ selectedElement, timelineData, formData, setFormData, onUpdate }) {
+type NoteManagementArgs = {
+  selectedElement?: TimelineElement | null;
+  timelineData?: TimelineData;
+  formData: TimelineElement | null;
+  setFormData: Dispatch<SetStateAction<TimelineElement | null>>;
+  onUpdate?: (element: TimelineElement) => void | Promise<void>;
+};
+
+export function useNoteManagement({ selectedElement, timelineData, formData, setFormData, onUpdate }: NoteManagementArgs) {
   const timelineId = getStorageId(timelineData?.file);
   const [noteInitialContent, setNoteInitialContent] = useState('');
   const [isNoteLoading, setIsNoteLoading] = useState(false);
@@ -24,8 +34,8 @@ export function useNoteManagement({ selectedElement, timelineData, formData, set
   const [notesBaseUrl, setNotesBaseUrl] = useState('');
   const [notesBasePath, setNotesBasePath] = useState('');
   const [assetsBasePath, setAssetsBasePath] = useState('');
-  const noteEditorRef = useRef(null);
-  const noteRenderRef = useRef(null);
+  const noteEditorRef = useRef<NoteEditorHandle | null>(null);
+  const noteRenderRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (window.electron === undefined) return;
@@ -84,7 +94,7 @@ export function useNoteManagement({ selectedElement, timelineData, formData, set
   useEffect(() => {
     if (!noteRenderRef.current) return;
     const imgs = noteRenderRef.current.querySelectorAll('img');
-    imgs.forEach((img) => {
+    imgs.forEach((img: HTMLImageElement) => {
       if (img.complete && img.naturalWidth === 0) {
         img.style.display = 'none';
       } else {
@@ -99,7 +109,7 @@ export function useNoteManagement({ selectedElement, timelineData, formData, set
       }
     });
     const videos = noteRenderRef.current.querySelectorAll('video');
-    videos.forEach((video) => {
+    videos.forEach((video: HTMLVideoElement) => {
       video.addEventListener(
         'error',
         function () {
@@ -137,7 +147,7 @@ export function useNoteManagement({ selectedElement, timelineData, formData, set
   );
 
   const noteViewCallbackRef = useCallback(
-    (node) => {
+    (node: HTMLDivElement | null) => {
       noteRenderRef.current = node;
       if (node) node.innerHTML = renderedNoteHtml;
     },
@@ -145,7 +155,7 @@ export function useNoteManagement({ selectedElement, timelineData, formData, set
   );
 
   const handleNoteSave = useCallback(
-    async (content) => {
+    async (content: string) => {
       if (!formData?.noteFile || !isSafeNoteRef(formData.noteFile)) return;
       const timelineId = getStorageId(timelineData?.file);
       if (!timelineId) return;
@@ -156,7 +166,7 @@ export function useNoteManagement({ selectedElement, timelineData, formData, set
   ); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleTaskToggle = useCallback(
-    (idx) => {
+    (idx: number) => {
       let count = 0;
       const newContent = noteInitialContent.replace(/^(\s*[-*+] \[)([ x])(\])/gm, (match, pre, state, post) => {
         if (count++ === idx) return `${pre}${state === ' ' ? 'x' : ' '}${post}`;
@@ -248,7 +258,7 @@ export function useNoteManagement({ selectedElement, timelineData, formData, set
   }, [timelineId]);
 
   const handleDropThumbnail = useCallback(
-    async (filePath) => {
+    async (filePath: string) => {
       if (!timelineId || !filePath) return null;
       const result = await importImageFromPath({ timelineId, filePath });
       if (!result?.success) return null;

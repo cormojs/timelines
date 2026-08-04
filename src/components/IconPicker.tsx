@@ -2,11 +2,13 @@ import { useState, useRef, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { ICON_CATEGORIES, ALL_ICONS } from '../config/elementIcons';
 
-export default function IconPicker({ value, onChange }) {
+type IconPickerProps = { value: string | null | undefined; onChange: (value: string | null) => void };
+
+export default function IconPicker({ value, onChange }: IconPickerProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const searchRef = useRef(null);
-  const popoverRef = useRef(null);
+  const searchRef = useRef<HTMLInputElement | null>(null);
+  const popoverRef = useRef<HTMLDivElement | null>(null);
 
   const CurrentIcon = value ? ALL_ICONS.find((i) => i.name === value)?.component : null;
 
@@ -16,8 +18,8 @@ export default function IconPicker({ value, onChange }) {
 
   useEffect(() => {
     if (!open) return;
-    const handler = (e) => {
-      if (!popoverRef.current?.contains(e.target)) setOpen(false);
+    const handler = (e: globalThis.MouseEvent) => {
+      if (!(e.target instanceof Node) || !popoverRef.current?.contains(e.target)) setOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -25,7 +27,7 @@ export default function IconPicker({ value, onChange }) {
 
   const filtered = query.trim() ? ALL_ICONS.filter((i) => i.name.toLowerCase().includes(query.toLowerCase())) : null;
 
-  const handleSelect = (name) => {
+  const handleSelect = (name: string): void => {
     onChange(name === value ? null : name);
     setOpen(false);
     setQuery('');

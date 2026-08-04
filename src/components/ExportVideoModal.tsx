@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, type CSSProperties } from 'react';
 import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
 import { formatYear } from '../utils/timelineUtils';
 import type { TimelineData } from '../types/timeline';
+import type { TimelinePreview, TimelinePreviewOptions, TimelineViewHandle } from './TimelineView';
 import '../styles/07-modals-menus.css';
 
 const RESOLUTION_OPTIONS = [
@@ -27,13 +28,11 @@ const FPS_OPTIONS = [
 const VIDEO_ZOOM_MIN = 0.2;
 const VIDEO_ZOOM_MAX = 1;
 
-type PreviewOptions = { transparentBg?: boolean; customBg?: string };
-
 type ExportVideoModalProps = {
   isOpen: boolean;
   onClose: () => void;
   timelineData?: TimelineData;
-  timelineViewRef?: { current?: { generatePreview: (options: PreviewOptions) => Promise<string> } | null };
+  timelineViewRef?: { current?: Pick<TimelineViewHandle, 'generatePreview'> | null };
 };
 
 export default function ExportVideoModal({
@@ -43,7 +42,7 @@ export default function ExportVideoModal({
   timelineViewRef,
 }: ExportVideoModalProps) {
   const [filename, setFilename] = useState('');
-  const [previewData, setPreviewData] = useState(null);
+  const [previewData, setPreviewData] = useState<TimelinePreview | null>(null);
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
@@ -61,13 +60,13 @@ export default function ExportVideoModal({
   const [titleStyle, setTitleStyle] = useState('title-logo');
   const [titleText, setTitleText] = useState('');
 
-  const previewTimeoutRef = useRef(null);
+  const previewTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const backdropPointerDownRef = useRef(false);
   const exportCancelRef = useRef(false);
 
   useEffect(() => {
     if (!isOpen) return;
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !isExporting) onClose();
     };
     document.addEventListener('keydown', handleKeyDown);
@@ -112,7 +111,7 @@ export default function ExportVideoModal({
     previewTimeoutRef.current = setTimeout(async () => {
       setIsGeneratingPreview(true);
       try {
-        const previewOpts: PreviewOptions = {};
+        const previewOpts: TimelinePreviewOptions = {};
         if (bgOption === 'transparent') {
           previewOpts.transparentBg = true;
         } else if (bgOption === 'secondary' || bgOption === 'tertiary') {
@@ -155,11 +154,11 @@ export default function ExportVideoModal({
     return selectedRes ? { width: selectedRes.width, height: selectedRes.height } : null;
   };
 
-  const handleBackdropMouseDown = (e) => {
+  const handleBackdropMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     backdropPointerDownRef.current = e.target === e.currentTarget;
   };
 
-  const handleBackdropMouseUp = (e) => {
+  const handleBackdropMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
     if (backdropPointerDownRef.current && e.target === e.currentTarget) {
       if (!isExporting) onClose();
     }
@@ -176,7 +175,7 @@ export default function ExportVideoModal({
     setExportProgress(0);
     exportCancelRef.current = false;
 
-    let encoder = null;
+    let encoder: VideoEncoder | null = null;
     try {
       const actualDuration = getDurationValue();
       const actualFps = fps;
@@ -214,6 +213,7 @@ export default function ExportVideoModal({
       canvas.width = outputW;
       canvas.height = outputH;
       const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Unable to create video canvas context');
 
       const muxerTarget = new ArrayBufferTarget();
       const muxer = new Muxer({
@@ -257,6 +257,7 @@ export default function ExportVideoModal({
         wmCanvas.width = outputW;
         wmCanvas.height = outputH;
         const wmCtx = wmCanvas.getContext('2d');
+        if (!wmCtx) throw new Error('Unable to create watermark canvas context');
         const fontSize = Math.max(14, Math.round(outputW * 0.018));
         const padding = Math.round(fontSize * 1.5);
         const computedStyle = getComputedStyle(document.documentElement);
@@ -349,14 +350,14 @@ export default function ExportVideoModal({
         frame.close();
 
         if (encoder.encodeQueueSize > 5) {
-          await new Promise((r) => encoder.addEventListener('dequeue', r, { once: true }));
+          await new Promise<void>((resolve) => encoder.addEventListener('dequeue', () => resolve(), { once: true }));
         }
 
         const pct = Math.round(((i + 1) / totalFrames) * 100);
         if (pct >= lastPct + 5) {
           lastPct = pct;
           setExportProgress(pct);
-          await new Promise((r) => setTimeout(r, 0));
+          await new Promise<void>((resolve) => setTimeout(resolve, 0));
         }
       }
 
@@ -403,8 +404,8 @@ export default function ExportVideoModal({
   const minRangePercent = 5;
 
   const file = timelineData?.file;
-  const displayYear = (value) => {
-    if (!Number.isFinite(value)) return '--';
+  const displayYear = (value: number | undefined) => {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return '--';
     return formatYear(value, file?.negID, file?.posID, file?.useCalendar === true, file?.hideDecimals);
   };
 
@@ -418,7 +419,7 @@ export default function ExportVideoModal({
   const rangeMaxYear = previewData?.maxYear;
   const rangeStep = 0.1;
 
-  const handleStartRangeChange = (e) => {
+  const handleStartRangeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = Number(e.target.value);
     if (!Number.isFinite(raw)) return;
     setExportRange((current) => ({
@@ -427,7 +428,7 @@ export default function ExportVideoModal({
     }));
   };
 
-  const handleEndRangeChange = (e) => {
+  const handleEndRangeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = Number(e.target.value);
     if (!Number.isFinite(raw)) return;
     setExportRange((current) => ({

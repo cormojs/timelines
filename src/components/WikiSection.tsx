@@ -32,10 +32,13 @@ type WikiSectionProps = {
   wikiUrl?: string;
   useWiki?: boolean;
   isEditMode?: boolean;
-  onUrlChange?: (url: string) => void;
+  onUrlChange?: (url: string | null) => void;
 };
 
-function getCachedWiki(key) {
+type WikiFetchOptions = { forceRefresh?: boolean; background?: boolean };
+type WikiApiData = { parse: { text: string } };
+
+function getCachedWiki(key: string): string | undefined {
   if (!wikiCache.has(key)) return undefined;
   const value = wikiCache.get(key);
   wikiCache.delete(key);
@@ -43,13 +46,13 @@ function getCachedWiki(key) {
   return value;
 }
 
-function setCachedWiki(key, value) {
+function setCachedWiki(key: string, value: string): void {
   wikiCache.delete(key);
   wikiCache.set(key, value);
   while (wikiCache.size > WIKI_CACHE_MAX_ENTRIES) wikiCache.delete(wikiCache.keys().next().value);
 }
 
-function sanitizeWikiHtml(html, host = 'https://en.wikipedia.org') {
+function sanitizeWikiHtml(html: string, host = 'https://en.wikipedia.org'): string {
   const preDoc = new DOMParser().parseFromString(html, 'text/html');
   preDoc.querySelectorAll('img').forEach((img) => {
     const lazySrc =
@@ -240,11 +243,11 @@ export default function WikiSection({ wikiUrl, useWiki, isEditMode, onUrlChange 
   const [wikiUrlInput, setWikiUrlInput] = useState('');
   const [isWikiUrlInputOpen, setIsWikiUrlInputOpen] = useState(false);
   const [wikiUrlInputError, setWikiUrlInputError] = useState('');
-  const wikiRenderRef = useRef(null);
-  const wikiUrlInputRef = useRef(null);
-  const activeUrlRef = useRef(null);
+  const wikiRenderRef = useRef<HTMLDivElement | null>(null);
+  const wikiUrlInputRef = useRef<HTMLInputElement | null>(null);
+  const activeUrlRef = useRef<string | null>(null);
 
-  const fetchWikiContent = async (url, { forceRefresh = false, background = false } = {}) => {
+  const fetchWikiContent = async (url: string | undefined, { forceRefresh = false, background = false }: WikiFetchOptions = {}) => {
     if (!url) return;
     if (!background) activeUrlRef.current = url;
     const cacheKey = `${WIKI_SANITIZE_VERSION}:${url}`;
@@ -288,7 +291,7 @@ export default function WikiSection({ wikiUrl, useWiki, isEditMode, onUrlChange 
         if (lastSegment) titleCandidates.push(lastSegment);
       }
 
-      const resolveSectionIndex = async (base, title, anchor) => {
+      const resolveSectionIndex = async (base: string, title: string, anchor: string): Promise<string | number | null> => {
         const q = `?action=parse&page=${encodeURIComponent(title)}&prop=sections&format=json&formatversion=2`;
         const result = await fetchWikiApi(base + q);
         if (!result?.success) return null;
@@ -302,7 +305,7 @@ export default function WikiSection({ wikiUrl, useWiki, isEditMode, onUrlChange 
             s.anchor.replace(/_/g, ' ') === normalizedAnchor ||
             (() => {
               let t = s.line ?? '';
-              let prev;
+              let prev = '';
               do {
                 prev = t;
                 t = t.replace(/<[^>]*>/g, '');
@@ -313,7 +316,7 @@ export default function WikiSection({ wikiUrl, useWiki, isEditMode, onUrlChange 
         return match ? match.index : null;
       };
 
-      const tryApi = async (base, title, sectionIndex) => {
+      const tryApi = async (base: string, title: string, sectionIndex: string | number | null): Promise<WikiApiData | null> => {
         let q = `?action=parse&page=${encodeURIComponent(title)}&prop=text&disabletoc=1&format=json&formatversion=2`;
         if (sectionIndex != null) q += `&section=${sectionIndex}`;
         const result = await fetchWikiApi(base + q);
@@ -321,10 +324,10 @@ export default function WikiSection({ wikiUrl, useWiki, isEditMode, onUrlChange 
         const j = parseMediaWikiResponseJson(result.html);
         let text = j?.parse?.text;
         if (text && typeof text === 'object') text = text['*'] ?? null;
-        return text ? { parse: { ...j.parse, text } } : null;
+        return typeof text === 'string' ? { parse: { ...j.parse, text } } : null;
       };
 
-      let data = null;
+      let data: WikiApiData | null = null;
       outer: for (const title of titleCandidates) {
         for (const base of apiPaths) {
           let sectionIndex = null;
@@ -390,7 +393,7 @@ export default function WikiSection({ wikiUrl, useWiki, isEditMode, onUrlChange 
     }
   };
 
-  const handleWikiRefresh = (e) => {
+  const handleWikiRefresh = (e: React.SyntheticEvent) => {
     e.stopPropagation();
     if (isWikiLoading) return;
     fetchWikiContent(wikiUrl, { forceRefresh: true });
@@ -409,7 +412,7 @@ export default function WikiSection({ wikiUrl, useWiki, isEditMode, onUrlChange 
   useEffect(() => {
     if (!wikiRenderRef.current || !wikiContent) return;
     const container = wikiRenderRef.current;
-    container.querySelectorAll('.infobox td').forEach((td) => {
+    container.querySelectorAll<HTMLTableCellElement>('.infobox td').forEach((td) => {
       if (td.dataset.wikiInit) return;
       td.dataset.wikiInit = '1';
       if (td.querySelectorAll('li').length < 4) return;
@@ -457,7 +460,7 @@ export default function WikiSection({ wikiUrl, useWiki, isEditMode, onUrlChange 
     setWikiUrlInputError('');
   };
 
-  const handleWikiUrlKeyDown = (e) => {
+  const handleWikiUrlKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       handleWikiUrlSubmit();

@@ -20,8 +20,23 @@ import { parseThemeJson } from '../utils/json';
 
 const MARKETPLACE_BASE = 'https://raw.githubusercontent.com/sreegjl/timelines-marketplace/refs/heads/main/';
 
-type MarketplaceTheme = Theme & { id: string; thumbnail?: string; description?: string; paths?: { thumbnail?: string } }
-type BundledTheme = Theme & { thumbnail?: string }
+type ThemeMetadata = Theme & { type?: string; author?: string; description?: string; thumbnail?: string };
+type MarketplaceTheme = ThemeMetadata & { id: string; paths?: { theme?: string; thumbnail?: string } };
+type BundledTheme = ThemeMetadata;
+type ThemeCard = {
+  id: string; name: string; origin: 'built-in' | 'marketplace' | 'local'; collection: string | null;
+  type: string | null; author: string | null; thumbnailUrl: string | null; description: string | null;
+};
+type ImportResult = { results?: Array<{ success: boolean }> };
+type BulkProgress = { done: number; total: number };
+
+const isMarketplaceTheme = (value: unknown): value is MarketplaceTheme => {
+  if (typeof value !== 'object' || value === null || typeof (value as { id?: unknown }).id !== 'string') return false;
+  const { paths } = value as { paths?: unknown };
+  return paths === undefined || (typeof paths === 'object' && paths !== null);
+};
+const optionalString = (value: unknown): string | undefined => (typeof value === 'string' ? value : undefined);
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
 
 type MarketplaceModalProps = {
   isOpen: boolean
@@ -52,21 +67,21 @@ export default function MarketplaceModal({
   const [marketplaceError, setMarketplaceError] = useState('');
   const [marketplaceLoading, setMarketplaceLoading] = useState(false);
   const [marketplaceBusyId, setMarketplaceBusyId] = useState('');
-  const [installedThemeIds, setInstalledThemeIds] = useState(new Set());
+  const [installedThemeIds, setInstalledThemeIds] = useState<Set<string>>(new Set());
   const [marketplaceSearch, setMarketplaceSearch] = useState('');
-  const [marketplaceCollection, setMarketplaceCollection] = useState(null);
+  const [marketplaceCollection, setMarketplaceCollection] = useState<string | null>(null);
   const [marketplaceDarkLight, setMarketplaceDarkLight] = useState('all');
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
-  const moreMenuRef = useRef(null);
+  const moreMenuRef = useRef<HTMLDivElement | null>(null);
   const [bulkMenuOpen, setBulkMenuOpen] = useState(false);
-  const bulkMenuRef = useRef(null);
+  const bulkMenuRef = useRef<HTMLDivElement | null>(null);
   const [marketplaceTab, setMarketplaceTab] = useState('marketplace');
   const [localDragOver, setLocalDragOver] = useState(false);
-  const localGridRef = useRef(null);
-  const localDropHandlerRef = useRef(null);
+  const localGridRef = useRef<HTMLDivElement | null>(null);
+  const localDropHandlerRef = useRef<(files: File[]) => void | Promise<void>>(() => undefined);
   const [installedOriginFilter, setInstalledOriginFilter] = useState('all');
   const [marketplaceBulkBusy, setMarketplaceBulkBusy] = useState('');
-  const [bulkProgress, setBulkProgress] = useState(null); // { done, total } | null
+  const [bulkProgress, setBulkProgress] = useState<BulkProgress | null>(null);
 
   const loadInstalledThemes = async () => {
     if (!window.electron?.listThemes) return;
@@ -85,8 +100,9 @@ export default function MarketplaceModal({
     try {
       const response = await fetch(`${MARKETPLACE_BASE}index.json`, { cache: 'no-store' });
       if (!response.ok) throw new Error(`Failed to load marketplace (${response.status})`);
-      const data = await response.json();
-      setMarketplaceThemes(Array.isArray(data?.themes) ? data.themes : []);
+      const data: unknown = await response.json();
+      const themes = isRecord(data) && Array.isArray(data.themes) ? data.themes.filter(isMarketplaceTheme) : [];
+      setMarketplaceThemes(themes);
     } catch (error) {
       console.error('Failed to load marketplace:', error);
       setMarketplaceError('Failed to load marketplace themes.');
@@ -115,9 +131,9 @@ export default function MarketplaceModal({
 
   useEffect(() => {
     if (!moreMenuOpen && !bulkMenuOpen) return;
-    const handler = (e) => {
-      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target)) setMoreMenuOpen(false);
-      if (bulkMenuRef.current && !bulkMenuRef.current.contains(e.target)) setBulkMenuOpen(false);
+    const handler = (e: MouseEvent) => {
+      if (!(e.target instanceof Node) || (moreMenuRef.current && !moreMenuRef.current.contains(e.target))) setMoreMenuOpen(false);
+      if (!(e.target instanceof Node) || (bulkMenuRef.current && !bulkMenuRef.current.contains(e.target))) setBulkMenuOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -125,15 +141,15 @@ export default function MarketplaceModal({
 
   useEffect(() => {
     if (marketplaceTab !== 'local') return;
-    const onDragOver = (e) => {
+    const onDragOver = (e: DragEvent) => {
       e.preventDefault();
       setLocalDragOver(true);
     };
-    const onDragLeave = (e) => {
+    const onDragLeave = (e: DragEvent) => {
       if (!e.relatedTarget) setLocalDragOver(false);
     };
-    const onDrop = (e) => {
-      const files = (Array.from(e.dataTransfer?.files ?? []) as File[]).filter((file) => file.name.endsWith('.json'));
+    const onDrop = (e: DragEvent) => {
+      const files = Array.from(e.dataTransfer?.files ?? []).filter((file) => file.name.endsWith('.json'));
       if (!files.length) return;
       e.preventDefault();
       setLocalDragOver(false);
@@ -150,7 +166,7 @@ export default function MarketplaceModal({
     };
   }, [marketplaceTab]);
 
-  const downloadThemeFile = async (theme) => {
+  const downloadThemeFile = async (theme: MarketplaceTheme): Promise<boolean> => {
     if (!theme?.id || !theme?.paths?.theme) return false;
     const response = await fetch(`${MARKETPLACE_BASE}${theme.paths.theme}`, { cache: 'no-store' });
     if (!response.ok) throw new Error(`Failed to download theme (${response.status})`);
@@ -160,7 +176,7 @@ export default function MarketplaceModal({
     return true;
   };
 
-  const deleteThemeFile = async (theme) => {
+  const deleteThemeFile = async (theme: Pick<ThemeCard, 'id'>): Promise<boolean> => {
     if (!theme?.id) return false;
     const result = await deleteUserTheme({ id: theme.id });
     if (!result?.success && result?.error !== 'NOT_FOUND') {
@@ -169,7 +185,7 @@ export default function MarketplaceModal({
     return true;
   };
 
-  const handleDownloadTheme = async (theme) => {
+  const handleDownloadTheme = async (theme: MarketplaceTheme) => {
     if (!theme?.id || !theme?.paths?.theme) return;
     setMarketplaceBusyId(theme.id);
     try {
@@ -184,7 +200,7 @@ export default function MarketplaceModal({
     }
   };
 
-  const handleImportResult = async (result) => {
+  const handleImportResult = async (result: ImportResult | null | undefined) => {
     if (!result) return;
     const failed = (result?.results || []).filter((r) => !r.success);
     if (failed.length > 0) {
@@ -196,7 +212,7 @@ export default function MarketplaceModal({
     }
   };
 
-  const processThemeFiles = async (files) => {
+  const processThemeFiles = async (files: File[]) => {
     if (!files.length) return;
     for (const file of files) {
       try {
@@ -214,7 +230,7 @@ export default function MarketplaceModal({
   };
   localDropHandlerRef.current = processThemeFiles;
 
-  const handleDeleteTheme = async (theme) => {
+  const handleDeleteTheme = async (theme: Pick<ThemeCard, 'id'>) => {
     if (!theme?.id) return;
     setMarketplaceBusyId(theme.id);
     try {
@@ -246,18 +262,18 @@ export default function MarketplaceModal({
 
   const mktIds = new Set(marketplaceThemes.map((t) => String(t.id || '').toLowerCase()));
 
-  const allInstalledThemes = [
-    ...appThemes.map(([key, theme]) => ({
+  const allInstalledThemes: ThemeCard[] = [
+    ...appThemes.map(([key, theme]): ThemeCard => ({
       id: key,
       name: theme.name || key,
       origin: 'built-in',
-      collection: theme.collection || bundledThemes[key]?.collection || null,
-      type: theme.type || null,
+      collection: optionalString(theme.collection) || optionalString(bundledThemes[key]?.collection) || null,
+      type: optionalString(theme.type),
       author: 'shipped',
-      thumbnailUrl: bundledThemes[key]?.thumbnail || null,
+      thumbnailUrl: optionalString(bundledThemes[key]?.thumbnail) || null,
       description: null,
     })),
-    ...userThemes.map(([key, theme]) => {
+    ...userThemes.map(([key, theme]): ThemeCard => {
       const tid = key.toLowerCase();
       const isMkt = marketplaceThemes.length > 0 && mktIds.has(tid);
       const mktData = isMkt ? marketplaceThemes.find((t) => String(t.id || '').toLowerCase() === tid) : null;
@@ -265,29 +281,29 @@ export default function MarketplaceModal({
         id: key,
         name: theme.name || mktData?.name || key,
         origin: isMkt ? 'marketplace' : 'local',
-        collection: theme.collection || mktData?.collection || null,
-        type: theme.type || mktData?.type || null,
-        author: mktData?.author || (isMkt ? null : 'you'),
-        thumbnailUrl: mktData?.paths?.thumbnail ? `${MARKETPLACE_BASE}${mktData.paths.thumbnail}` : null,
-        description: mktData?.description || null,
+        collection: optionalString(theme.collection) || optionalString(mktData?.collection) || null,
+        type: optionalString(theme.type) || optionalString(mktData?.type) || null,
+        author: optionalString(mktData?.author) || (isMkt ? null : 'you'),
+        thumbnailUrl: optionalString(mktData?.paths?.thumbnail) ? `${MARKETPLACE_BASE}${mktData.paths.thumbnail}` : null,
+        description: optionalString(mktData?.description) || null,
       };
     }),
   ];
 
-  const allLocalThemes = userThemes
+  const allLocalThemes: ThemeCard[] = userThemes
     .filter(([key]) => marketplaceThemes.length === 0 || !mktIds.has(key.toLowerCase()))
-    .map(([key, theme]) => ({
+    .map(([key, theme]): ThemeCard => ({
       id: key,
       name: theme.name || key,
       origin: 'local',
-      collection: theme.collection || null,
-      type: theme.type || null,
+      collection: optionalString(theme.collection) || null,
+      type: optionalString(theme.type) || null,
       author: 'you',
       thumbnailUrl: null,
       description: null,
     }));
 
-  const searchFilter = (theme) => {
+  const searchFilter = (theme: ThemeCard) => {
     const q = marketplaceSearch.trim().toLowerCase();
     if (!q) return true;
     return [theme.name, theme.author, theme.description, theme.collection]
@@ -296,7 +312,7 @@ export default function MarketplaceModal({
       .toLowerCase()
       .includes(q);
   };
-  const typeFilter = (theme) => marketplaceDarkLight === 'all' || theme.type === marketplaceDarkLight;
+  const typeFilter = (theme: ThemeCard) => marketplaceDarkLight === 'all' || theme.type === marketplaceDarkLight;
 
   const filteredMarketplace = marketplaceThemes
     .filter((t) => {
@@ -455,7 +471,7 @@ export default function MarketplaceModal({
     }
   };
 
-  const renderCard = (theme, showEdit = false) => {
+  const renderCard = (theme: ThemeCard, showEdit = false) => {
     const themeId = String(theme.id || '').toLowerCase();
     const isActive = String(appThemeKey || '').toLowerCase() === themeId;
     const isBuiltIn = theme.origin === 'built-in';
@@ -535,7 +551,7 @@ export default function MarketplaceModal({
 
   return (
     <div className="settings-backdrop" onClick={onClose}>
-      <div className="marketplace-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="marketplace-modal" onClick={(e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation()}>
         <div className="marketplace-header">
           <button className="settings-back-button" onClick={onClose} aria-label="Close marketplace">
             <ArrowLeft size={18} strokeWidth={2} />

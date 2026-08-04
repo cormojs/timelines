@@ -6,6 +6,15 @@ export type TimelineSource = {
   [key: string]: unknown
 }
 
+export type TimelineBreak = {
+  year?: number
+  yearInput?: string
+  label?: string
+  color?: string
+  size?: string
+  [key: string]: unknown
+}
+
 export type TimelineElement = {
   id: string | number
   type: TimelineElementType
@@ -21,6 +30,7 @@ export type TimelineElement = {
   mergeParent?: string | number
   tags?: string[]
   sources?: TimelineSource[]
+  sourceLink?: string
   thumbnail?: string
   thumbnailStyle?: string
   thumbnailFit?: string
@@ -40,6 +50,13 @@ export type TimelineElement = {
   spanSize?: string
   eraSize?: string
   noteFile?: string
+  dateInput?: string
+  startInput?: string
+  endInput?: string
+  dateLabel?: string
+  startLabel?: string
+  endLabel?: string
+  breaks?: TimelineBreak[]
   parents?: (string | number)[]
   extendFrom?: string | number
   [key: string]: unknown
@@ -72,6 +89,8 @@ export type TimelineFile = {
   hideDecimals?: boolean
   panelGroupMode?: string
   useEraGroupsInPanel?: boolean
+  useSpanGroupsInPanel?: boolean
+  keepSelection?: boolean
   nestEraSubGroups?: boolean
   startLabel?: string
   endLabel?: string
@@ -83,6 +102,7 @@ export type TimelineFile = {
   useDays?: boolean
   useMonths?: boolean
   dateFormat?: string
+  datePrecision?: string
   scaleSections?: unknown[]
   breaks?: unknown[]
   scaleType?: string
@@ -91,6 +111,7 @@ export type TimelineFile = {
   fixedEventHeight?: boolean
   eventWidth?: number
   eventFontSize?: number
+  eventHeight?: number
   compactEvents?: boolean
   thinConnectors?: boolean
   hideSpanConnectors?: boolean
@@ -107,6 +128,7 @@ export type TimelineFile = {
   mapEraMarker?: string
   mapLimitToViewportYear?: boolean
   useWiki?: boolean
+  useMaps?: boolean
   [key: string]: unknown
 }
 

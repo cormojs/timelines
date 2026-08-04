@@ -3,7 +3,7 @@ const assert = require('node:assert');
 const path = require('node:path');
 
 const load = () => import(pathToFileUrl(path.join(__dirname, '..', 'src', 'utils', 'dateUtils.ts')));
-const pathToFileUrl = (p) => require('node:url').pathToFileURL(p).href;
+const pathToFileUrl = (p: string): string => require('node:url').pathToFileURL(p).href;
 
 test("parseTimelineInput resolves 'today' to the current date and keeps the label", async () => {
   const { parseTimelineInput, todayFractionalYear, fractionalYearToDate } = await load();

@@ -13,6 +13,11 @@ import {
   parseThemeJson,
   parseTimelineJson,
 } from '../src/utils/json';
+type PackageTimeline = {
+  file?: { id?: string; uid?: string; [key: string]: unknown };
+  elements: Array<{ thumbnail?: unknown; noteFile?: unknown; [key: string]: unknown }>;
+  [key: string]: unknown;
+};
 const DEFAULT_THEME_KEY = 'parchment';
 const devServerUrl = process.env.ELECTRON_RENDERER_URL;
 
@@ -31,8 +36,12 @@ try {
   // Leave hardware acceleration at default (enabled)
 }
 
-let mainWindow;
-let gitSync = null;
+type AppSettings = ReturnType<typeof parseAppSettingsJson>;
+type TimelineFileEntry = { fullPath: string; relativeId: string };
+type GitSyncEngine = ReturnType<typeof createEngine>;
+
+let mainWindow: BrowserWindow | null = null;
+let gitSync: GitSyncEngine | null = null;
 let gitSyncQuitStarted = false;
 const appSettingsPath = () => path.join(app.getPath('userData'), 'app-settings.json');
 const defaultTimelinesDir = () => path.join(app.getPath('userData'), 'timelines');
@@ -42,7 +51,7 @@ const gitSyncRepoDir = () => path.join(app.getPath('userData'), 'git-sync-repo')
 const gitSyncStatePath = () => path.join(app.getPath('userData'), 'git-sync-state.json');
 const gitSyncCredsPath = () => path.join(app.getPath('userData'), 'git-sync-credentials.json');
 
-const safeName = (value) =>
+const safeName = (value: unknown): string =>
   String(value || '')
     .trim()
     .replace(/[^\w.-]+/g, '-')
@@ -50,39 +59,40 @@ const safeName = (value) =>
     .replace(/^-+|-+$/g, '')
     .toLowerCase();
 
-const sanitizeId = (value, fallback = '') => safeName(value) || fallback;
+const sanitizeId = (value: unknown, fallback = ''): string => safeName(value) || fallback;
 
-const sanitizeTimelinePath = (value) => {
+const sanitizeTimelinePath = (value: unknown): string => {
   const parts = String(value || '').split(/[/\\]/);
   const sanitized = parts.map((p) => safeName(p)).filter(Boolean);
   return sanitized.length > 0 ? sanitized.join('/') : 'timeline';
 };
 
 // Existing files/folders keep their on-disk name verbatim; only traversal parts are stripped
-const existingTimelinePath = (value) => {
+const existingTimelinePath = (value: unknown): string => {
   const parts = String(value || '')
     .split(/[/\\]/)
     .filter((p) => p && p !== '.' && p !== '..');
   return parts.length > 0 ? parts.join('/') : 'timeline';
 };
 
-const samePath = (a, b) =>
+const samePath = (a: string, b: string): boolean =>
   process.platform === 'win32'
     ? path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase()
     : path.resolve(a) === path.resolve(b);
 
 // Notes/assets folders are keyed by immutable file.uid; older timelines fall back to file.id
-const deriveStorageId = (file) => file?.uid || file?.id?.replace(/-timeline$/, '') || null;
+const deriveStorageId = (file: { uid?: string; id?: string } | null | undefined): string | null =>
+  file?.uid || file?.id?.replace(/-timeline$/, '') || null;
 
 // Write via temp file + rename so a crash mid-write can't truncate the target
-async function writeFileAtomic(filePath, content) {
+async function writeFileAtomic(filePath: string, content: string): Promise<void> {
   const tmpPath = `${filePath}.tmp`;
   await fs.writeFile(tmpPath, content, 'utf8');
   await fs.rename(tmpPath, filePath);
 }
 
-async function listTimelineFilesRecursive(dir, baseDir) {
-  const results = [];
+async function listTimelineFilesRecursive(dir: string, baseDir: string): Promise<TimelineFileEntry[]> {
+  const results: TimelineFileEntry[] = [];
   try {
     const entries = await fs.readdir(dir, { withFileTypes: true });
     for (const entry of entries) {
@@ -98,13 +108,13 @@ async function listTimelineFilesRecursive(dir, baseDir) {
   return results;
 }
 
-const sanitizeNoteFilename = (value) => {
+const sanitizeNoteFilename = (value: unknown): string => {
   const base = String(value || '').replace(/\.md$/i, '');
   const cleaned = sanitizeId(base, 'note');
   return `${cleaned}.md`;
 };
 
-const resolveNotePath = async (timelineId, notePath) => {
+const resolveNotePath = async (timelineId: string, notePath: string): Promise<string> => {
   const notesRootDir = await getNotesRootDir();
   const notesDir = await getNotesDir(timelineId);
   const rawPath = String(notePath || '').trim();
@@ -131,11 +141,11 @@ const resolveNotePath = async (timelineId, notePath) => {
   return resolvedPath;
 };
 // Cached because the asset protocol reads settings on every image request; writers invalidate
-let appSettingsCache = null;
-const invalidateAppSettingsCache = () => {
+let appSettingsCache: AppSettings | null = null;
+const invalidateAppSettingsCache = (): void => {
   appSettingsCache = null;
 };
-const readAppSettings = async () => {
+const readAppSettings = async (): Promise<AppSettings> => {
   if (appSettingsCache) return appSettingsCache;
   try {
     const content = await fs.readFile(appSettingsPath(), 'utf8');
@@ -146,9 +156,9 @@ const readAppSettings = async () => {
   return appSettingsCache;
 };
 
-async function writeAppSettingsPartial(partial) {
+async function writeAppSettingsPartial(partial: Partial<AppSettings>): Promise<void> {
   const filePath = appSettingsPath();
-  let existing = {};
+  let existing: AppSettings = {};
   try {
     existing = parseAppSettingsJson(await fs.readFile(filePath, 'utf8'));
   } catch {}
@@ -173,7 +183,7 @@ async function loadGitSyncCredentials() {
   }
 }
 
-async function saveGitSyncCredentials(credentials) {
+async function saveGitSyncCredentials(credentials: { token: string; username?: string }): Promise<void> {
   const json = JSON.stringify(credentials);
   const payload = safeStorage.isEncryptionAvailable()
     ? {
@@ -211,7 +221,7 @@ const getNotesRootDir = async () => {
   return path.join(await getTimelinesDir(), '.notes');
 };
 
-const getNotesDir = async (timelineId) => {
+const getNotesDir = async (timelineId: string): Promise<string> => {
   const baseDir = await getNotesRootDir();
   const safePath = sanitizeTimelinePath(String(timelineId || 'timeline'));
   return path.join(baseDir, ...safePath.split('/'));
@@ -228,7 +238,7 @@ const getAssetsRootDir = async () => {
   return path.join(path.dirname(notesRoot), '.assets');
 };
 
-const getAssetsDir = async (timelineId) => {
+const getAssetsDir = async (timelineId: string): Promise<string> => {
   const baseDir = await getAssetsRootDir();
   const safePath = sanitizeTimelinePath(String(timelineId || 'timeline'));
   return path.join(baseDir, ...safePath.split('/'));
@@ -236,7 +246,7 @@ const getAssetsDir = async (timelineId) => {
 
 const getFontsDir = async () => defaultFontsDir();
 
-async function getStartupBackgroundColor() {
+async function getStartupBackgroundColor(): Promise<string> {
   const fallback = '#FFFAF4';
   try {
     const settings = await readAppSettings();
@@ -252,8 +262,13 @@ async function getStartupBackgroundColor() {
       return fallback;
     }
 
-    const data = parseTimelineJson(fsSync.readFileSync(filePath, 'utf8'));
-    return data?.colors?.['secondary-bg'] || fallback;
+    const data = parseThemeJson(fsSync.readFileSync(filePath, 'utf8'));
+    const colors = data.colors;
+    if (typeof colors === 'object' && colors !== null && 'secondary-bg' in colors) {
+      const background = colors['secondary-bg'];
+      if (typeof background === 'string') return background;
+    }
+    return fallback;
   } catch (error) {
     console.error('Failed to resolve startup theme background:', error);
     return fallback;
@@ -626,7 +641,7 @@ ipcMain.handle('list-timelines', async () => {
             const folder = parts.length > 1 ? parts.slice(0, -1).join('/') : '';
             const storageId = deriveStorageId(data.file);
             const thumbnailPath = path.join(await getAssetsDir(storageId), '.timeline-thumbnail.jpg');
-            const thumbnailStat = await fs.stat(thumbnailPath).catch(() => null);
+            const thumbnailStat = await fs.stat(thumbnailPath).catch((): null => null);
             return {
               id: relativeId,
               uid: storageId,
@@ -715,7 +730,7 @@ ipcMain.handle('export-timeline', async (event, { data, suggestedName }) => {
 });
 
 // Image/video refs inside note markdown: ![alt](src) tokens and src="..." attributes
-function extractNoteImageSrcs(markdown): string[] {
+function extractNoteImageSrcs(markdown: string): string[] {
   const srcs = new Set<string>();
   const md = String(markdown || '');
   for (const m of md.matchAll(/!\[[^\]]*\]\(\s*<?([^)\s>]+)/g)) if (m[1]) srcs.add(m[1]);
@@ -723,27 +738,30 @@ function extractNoteImageSrcs(markdown): string[] {
   return [...srcs];
 }
 
-const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-const rewriteNoteSrc = (content, oldSrc, newSrc) =>
+const rewriteNoteSrc = (content: string, oldSrc: string, newSrc: string): string =>
   content
     .split(`](${oldSrc})`)
     .join(`](${newSrc})`)
     .replace(new RegExp(`(src\\s*=\\s*["'])${escapeRegExp(oldSrc)}(["'])`, 'gi'), `$1${newSrc}$2`);
 
 // Collects a timeline's thumbnails, notes, and note images as zip entries; elements must be in stored-ref form
-async function collectPackageFiles(data, storageId) {
+async function collectPackageFiles(
+  data: PackageTimeline,
+  storageId: string | null,
+): Promise<{ files: Record<string, Uint8Array>; skipped: string[] }> {
   const elementsArr = Array.isArray(data.elements) ? data.elements : [];
 
   const assetsRoot = await getAssetsRootDir();
   const timelineAssetsDir = storageId ? await getAssetsDir(storageId) : null;
 
-  const files = {}; // zip entry -> Uint8Array
-  const skipped = [];
+  const files: Record<string, Uint8Array> = {}; // zip entry -> Uint8Array
+  const skipped: string[] = [];
 
-  const buffersEqual = (a, b) => a.length === b.length && Buffer.compare(a, b) === 0;
+  const buffersEqual = (a: Uint8Array, b: Uint8Array): boolean => a.length === b.length && Buffer.compare(a, b) === 0;
 
-  const addAssetBytes = (desiredEntry, bytes) => {
+  const addAssetBytes = (desiredEntry: string, bytes: Uint8Array): string => {
     const ext = path.posix.extname(desiredEntry);
     const stem = desiredEntry.slice(0, desiredEntry.length - ext.length);
     let entry = desiredEntry;
@@ -856,7 +874,7 @@ ipcMain.handle('export-timeline-package', async (event, { data, suggestedName })
   }
 });
 
-async function findTimelineByUid(uid) {
+async function findTimelineByUid(uid: string): Promise<TimelineFileEntry | null> {
   if (!uid) return null;
   const timelinesDir = await getTimelinesDir();
   const files = await listTimelineFilesRecursive(timelinesDir, timelinesDir);
@@ -871,7 +889,7 @@ async function findTimelineByUid(uid) {
 
 // Writes bytes (or text) under baseDir/rel, deduping filename collisions with
 // different content; returns the relative path actually used
-async function writeExtractedFile(baseDir, rel, contents) {
+async function writeExtractedFile(baseDir: string, rel: string, contents: string | Uint8Array): Promise<string> {
   const bytes = typeof contents === 'string' ? Buffer.from(contents, 'utf8') : Buffer.from(contents);
   const parts = rel.split('/');
   const filename = parts.pop();
@@ -899,7 +917,12 @@ async function writeExtractedFile(baseDir, rel, contents) {
 }
 
 // Sync-pull update for an existing uid: rewrite the .timeline in place and write assets/notes where the exporter reads them; never deletes stray files
-async function overwriteExistingTimeline(data, pkg: ReturnType<typeof readPackage> | null, existing, opts) {
+async function overwriteExistingTimeline(
+  data: PackageTimeline,
+  pkg: ReturnType<typeof readPackage> | null,
+  existing: TimelineFileEntry,
+  opts: { preserveNotes?: boolean; preferredRelId?: string },
+): Promise<{ success: boolean; id: string; uid: string; overwritten: boolean }> {
   const storageId = deriveStorageId(data.file);
   if (pkg) {
     const assetsRoot = await getAssetsRootDir();
@@ -1108,7 +1131,7 @@ async function listGitSyncTimelines() {
   return timelines;
 }
 
-async function buildGitSyncPackageForTimeline(timeline) {
+async function buildGitSyncPackageForTimeline(timeline: { uid: string; relativeId: string }): Promise<Uint8Array> {
   if (!timeline?.relativeId) throw new Error('Missing timeline relativeId');
   const timelinesDir = await getTimelinesDir();
   const filePath = path.join(timelinesDir, ...`${timeline.relativeId}.timeline`.split('/'));
@@ -1125,7 +1148,7 @@ async function buildGitSyncPackageForTimeline(timeline) {
   return buildPackage(JSON.stringify(data, null, 2), files, { deterministic: true });
 }
 
-async function removeGitSyncTimeline(uid) {
+async function removeGitSyncTimeline(uid: string): Promise<{ success: boolean }> {
   const existing = await findTimelineByUid(uid);
   if (!existing) return { success: true };
   await fs.unlink(existing.fullPath).catch((err) => {
@@ -1149,24 +1172,24 @@ async function initGitSync() {
     machineLabel: settings?.gitSyncMachineLabel,
     autoSync: settings?.gitSyncAutoSync !== false,
     debounceMs: Math.max(30_000, (Number(settings?.gitSyncIntervalMinutes) || 5) * 60_000),
-    onStatus: (status) => {
+    onStatus: (status: ReturnType<GitSyncEngine['getStatus']>) => {
       mainWindow?.webContents?.send('git-sync-state-changed', status);
     },
-    onApplied: (ids) => {
+    onApplied: (ids: string[]) => {
       mainWindow?.webContents?.send('git-sync-applied', ids);
     },
   });
   await gitSync.init();
 }
 
-function requireGitSync() {
+function requireGitSync(): GitSyncEngine {
   if (!gitSync) {
     throw new Error('Git sync is not initialized');
   }
   return gitSync;
 }
 
-function markGitSyncDirty(uid) {
+function markGitSyncDirty(uid: string): void {
   gitSync?.markDirty(uid);
 }
 
@@ -1384,9 +1407,9 @@ ipcMain.handle('create-folder', async (event, { folderName, parentFolder }) => {
 ipcMain.handle('list-folders', async () => {
   try {
     const baseDir = await getTimelinesDir();
-    const folders = [];
-    const scan = async (dir, prefix) => {
-      const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => []);
+    const folders: string[] = [];
+    const scan = async (dir: string, prefix: string): Promise<void> => {
+      const entries = await fs.readdir(dir, { withFileTypes: true }).catch((): fsSync.Dirent[] => []);
       for (const entry of entries) {
         if (entry.isDirectory()) {
           const name = prefix ? `${prefix}/${entry.name}` : entry.name;
@@ -1682,17 +1705,18 @@ ipcMain.handle('set-app-settings', async (event, settings) => {
       return { success: false, error: 'Invalid settings' };
     }
     const filePath = appSettingsPath();
-    let existing = {};
+    let existing: AppSettings = {};
     try {
       const raw = await fs.readFile(filePath, 'utf8');
       existing = parseAppSettingsJson(raw);
     } catch {
       /* first run or corrupt file — start fresh */
     }
-    const merged = { ...existing };
-    for (const key of Object.keys(settings)) {
+    const merged: Record<string, unknown> = { ...existing };
+    const incomingSettings: Record<string, unknown> = settings;
+    for (const key of Object.keys(incomingSettings)) {
       if (ALLOWED_SETTINGS_KEYS.has(key)) {
-        merged[key] = settings[key];
+        merged[key] = incomingSettings[key];
       }
     }
     await writeFileAtomic(filePath, JSON.stringify(merged, null, 2));
@@ -1992,16 +2016,16 @@ ipcMain.handle('get-assets-base-dir', async () => {
   }
 });
 
-const toAssetUrl = (absPath) => `timelines-asset://asset?p=${encodeURIComponent(path.normalize(absPath))}`;
+const toAssetUrl = (absPath: string): string => `timelines-asset://asset?p=${encodeURIComponent(path.normalize(absPath))}`;
 
-const toPosixRelative = (from, to) => {
+const toPosixRelative = (from: string, to: string): string | null => {
   const rel = path.relative(from, path.normalize(to));
   if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) return null;
   return rel.split(path.sep).join('/');
 };
 
 // Absolute path encoded in a timelines-asset:// URL, or null
-const decodeAssetUrl = (value) => {
+const decodeAssetUrl = (value: string): string | null => {
   try {
     const url = new URL(value);
     const p = url.searchParams.get('p');
@@ -2017,7 +2041,7 @@ const decodeAssetUrl = (value) => {
 
 // Storage ref for a thumbnail: bare filename (in the timeline's assets folder)
 // or slash path (relative to the assets root)
-function extractThumbnailRef(thumbnail, assetsRoot, timelineAssetsDir) {
+function extractThumbnailRef(thumbnail: unknown, assetsRoot: string, timelineAssetsDir: string | null): string | null {
   if (!thumbnail || typeof thumbnail !== 'string') return null;
   if (thumbnail.startsWith('timelines-asset://')) {
     const decoded = decodeAssetUrl(thumbnail);
@@ -2038,17 +2062,17 @@ function extractThumbnailRef(thumbnail, assetsRoot, timelineAssetsDir) {
 
 // Bare refs prefer the timeline folder, slash refs the assets root;
 // whichever exists on disk wins, so legacy refs keep resolving either way
-function thumbnailCandidatePaths(ref, assetsRoot, timelineAssetsDir) {
+function thumbnailCandidatePaths(ref: string, assetsRoot: string, timelineAssetsDir: string | null): string[] {
   const hasSlash = ref.includes('/') || ref.includes('\\');
   const dirs = hasSlash ? [assetsRoot, timelineAssetsDir] : [timelineAssetsDir, assetsRoot];
   const normalizedRoot = path.normalize(assetsRoot);
   return dirs
-    .filter(Boolean)
+    .filter((dir): dir is string => typeof dir === 'string')
     .map((dir) => path.normalize(path.join(dir, ref)))
     .filter((candidate) => candidate.startsWith(normalizedRoot + path.sep));
 }
 
-async function findThumbnailFile(ref, assetsRoot, timelineAssetsDir) {
+async function findThumbnailFile(ref: string, assetsRoot: string, timelineAssetsDir: string | null): Promise<string | null> {
   if (!ref) return null;
   for (const candidate of thumbnailCandidatePaths(ref, assetsRoot, timelineAssetsDir)) {
     try {
@@ -2059,7 +2083,7 @@ async function findThumbnailFile(ref, assetsRoot, timelineAssetsDir) {
   return null;
 }
 
-async function resolveThumbnailRef(ref, assetsRoot, timelineAssetsDir) {
+async function resolveThumbnailRef(ref: string, assetsRoot: string, timelineAssetsDir: string | null): Promise<string | null> {
   if (!ref) return null;
   const existing = await findThumbnailFile(ref, assetsRoot, timelineAssetsDir);
   if (existing) return toAssetUrl(existing);
@@ -2067,8 +2091,10 @@ async function resolveThumbnailRef(ref, assetsRoot, timelineAssetsDir) {
   return contained.length > 0 ? toAssetUrl(contained[0]) : null;
 }
 
-async function stripThumbnails(elements, storageId) {
-  if (!Array.isArray(elements)) return elements;
+async function stripThumbnails(
+  elements: PackageTimeline['elements'],
+  storageId: string | null,
+): Promise<PackageTimeline['elements']> {
   const assetsRoot = await getAssetsRootDir();
   const timelineAssetsDir = storageId ? await getAssetsDir(storageId) : null;
   return elements.map((el) => {
@@ -2078,8 +2104,11 @@ async function stripThumbnails(elements, storageId) {
   });
 }
 
-async function resolveThumbnails(elements, storageId) {
-  if (!Array.isArray(elements) || !storageId) return elements;
+async function resolveThumbnails(
+  elements: PackageTimeline['elements'],
+  storageId: string | null,
+): Promise<PackageTimeline['elements']> {
+  if (!storageId) return elements;
   const assetsRoot = await getAssetsRootDir();
   const timelineAssetsDir = await getAssetsDir(storageId);
   return Promise.all(
@@ -2097,13 +2126,17 @@ async function resolveThumbnails(elements, storageId) {
 // contains every referenced image, recover it: orphaned folders (pre-uid
 // rename) are renamed, folders owned by another timeline (pre-fix duplicate)
 // are copied
-async function healMissingAssets(elements, storageId, currentFilePath) {
-  if (!Array.isArray(elements) || !storageId) return;
-  const refs = [
+async function healMissingAssets(
+  elements: PackageTimeline['elements'],
+  storageId: string | null,
+  currentFilePath: string,
+): Promise<void> {
+  if (!storageId) return;
+  const refs: string[] = [
     ...new Set(
       elements
         .map((el) => el.thumbnail)
-        .filter((t) => t && typeof t === 'string' && !t.includes('://') && !/[\\/]/.test(t)),
+        .filter((t): t is string => typeof t === 'string' && !t.includes('://') && !/[\\/]/.test(t)),
     ),
   ];
   if (refs.length === 0) return;
@@ -2130,7 +2163,7 @@ async function healMissingAssets(elements, storageId, currentFilePath) {
 
   const timelinesDir = await getTimelinesDir();
   const files = await listTimelineFilesRecursive(timelinesDir, timelinesDir);
-  const otherIds = new Set();
+  const otherIds = new Set<string>();
   for (const f of files) {
     if (path.normalize(f.fullPath) === path.normalize(currentFilePath)) continue;
     otherIds.add(f.relativeId.split('/').pop());
@@ -2143,7 +2176,7 @@ async function healMissingAssets(elements, storageId, currentFilePath) {
 
   let match = null;
   let matchOwned = false;
-  const entries = await fs.readdir(root, { withFileTypes: true }).catch(() => []);
+  const entries = await fs.readdir(root, { withFileTypes: true }).catch((): fsSync.Dirent[] => []);
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     const candidate = path.join(root, entry.name);
@@ -2174,7 +2207,10 @@ async function healMissingAssets(elements, storageId, currentFilePath) {
   }
 }
 
-async function importImageByPath(imagePath, timelineId) {
+async function importImageByPath(
+  imagePath: string,
+  timelineId: string,
+): Promise<{ success: boolean; relativePath: string; assetUrl: string }> {
   const assetsBase = await getAssetsRootDir();
   const timelineAssetsDir = await getAssetsDir(timelineId);
   const normalizedImage = path.normalize(imagePath);
@@ -2286,7 +2322,7 @@ ipcMain.handle('list-themes', async () => {
     await fs.mkdir(dir, { recursive: true });
     const files = await fs.readdir(dir);
     const themeFiles = files.filter((file) => file.endsWith('.json'));
-    const themes = {};
+    const themes: Record<string, ReturnType<typeof parseThemeJson>> = {};
 
     for (const file of themeFiles) {
       try {

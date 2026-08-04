@@ -1,23 +1,25 @@
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 
+type LocalSourceResolver = ((src: string) => string | null | undefined) | null;
+
 // resolveLocalSrc: optional (src) => url hook so environments without
 // filesystem access (the web viewer reading a packaged .timeline) can serve
 // stored asset refs, e.g. as blob URLs
 export function sanitizeNoteHtml(
-  html,
+  html: string,
   baseUrl = '',
   basePath = '',
   assetsBasePath = '',
   assetsTimelineDir = '',
-  resolveLocalSrc = null,
-) {
-  const normalizeFsPath = (inputPath) => {
+  resolveLocalSrc: LocalSourceResolver = null,
+): string {
+  const normalizeFsPath = (inputPath: string): string => {
     if (!inputPath) return '';
     let value = decodeURIComponent(String(inputPath)).replace(/\\/g, '/');
     if (/^\/[a-zA-Z]:\//.test(value)) value = value.slice(1);
-    const parts = [];
-    value.split('/').forEach((part) => {
+    const parts: string[] = [];
+    value.split('/').forEach((part: string) => {
       if (!part || part === '.') return;
       if (part === '..') {
         if (parts.length) parts.pop();
@@ -28,7 +30,7 @@ export function sanitizeNoteHtml(
     return parts.join('/');
   };
 
-  const isPathInsideBase = (candidatePath) => {
+  const isPathInsideBase = (candidatePath: string): boolean => {
     const normalizedCandidate = normalizeFsPath(candidatePath).toLowerCase();
     if (basePath) {
       const normalizedBase = normalizeFsPath(basePath).toLowerCase();
@@ -49,7 +51,7 @@ export function sanitizeNoteHtml(
     return false;
   };
 
-  const fileUrlToPath = (fileUrl) => {
+  const fileUrlToPath = (fileUrl: string): string | null => {
     try {
       const url = new URL(fileUrl);
       if (url.protocol !== 'file:') return null;
@@ -59,7 +61,7 @@ export function sanitizeNoteHtml(
     }
   };
 
-  const toAssetProtocol = (filePath) => {
+  const toAssetProtocol = (filePath: string): string | null => {
     if (!assetsBasePath) return null;
     const normalizedCandidate = normalizeFsPath(filePath).toLowerCase();
     const normalizedAssets = normalizeFsPath(assetsBasePath).toLowerCase();
@@ -70,7 +72,7 @@ export function sanitizeNoteHtml(
     return null;
   };
 
-  const normalizeSrc = (rawValue) => {
+  const normalizeSrc = (rawValue: string | null): string | null => {
     const value = String(rawValue || '').trim();
     if (!value) return null;
     if (resolveLocalSrc) {
@@ -104,7 +106,7 @@ export function sanitizeNoteHtml(
     }
   };
 
-  const normalizeHref = (rawValue) => {
+  const normalizeHref = (rawValue: string | null): string | null => {
     const value = String(rawValue || '').trim();
     if (!value) return null;
     if (/^https:\/\//i.test(value) || /^mailto:/i.test(value)) return value;
@@ -238,14 +240,14 @@ export function sanitizeNoteHtml(
 }
 
 export function renderNoteMarkdown(
-  content,
-  isLoading,
+  content: string,
+  isLoading: boolean,
   baseUrl = '',
   basePath = '',
   assetsBasePath = '',
   assetsTimelineDir = '',
-  resolveLocalSrc = null,
-) {
+  resolveLocalSrc: LocalSourceResolver = null,
+): string {
   const raw = isLoading ? '_Loading note..._' : content || '';
 
   let frontmatterHtml = '';
@@ -255,7 +257,7 @@ export function renderNoteMarkdown(
     body = raw.slice(fmMatch[0].length);
     const rows = fmMatch[1]
       .split(/\r?\n/)
-      .map((line) => {
+      .map((line: string) => {
         const sep = line.indexOf(':');
         if (sep === -1) return '';
         const key = line.slice(0, sep).trim();
@@ -271,7 +273,7 @@ export function renderNoteMarkdown(
   const withUnderline = body.replace(/__(.+?)__/g, '<u>$1</u>');
   const withHighlight = withUnderline.replace(/==(.+?)==/g, '<mark>$1</mark>');
 
-  const extractYouTubeId = (url) => {
+  const extractYouTubeId = (url: string): string | null => {
     try {
       const u = new URL(url);
       if (u.hostname === 'youtu.be') return u.pathname.slice(1).split('?')[0];
@@ -282,7 +284,7 @@ export function renderNoteMarkdown(
     return null;
   };
 
-  const extractVimeoId = (url) => {
+  const extractVimeoId = (url: string): string | null => {
     try {
       const u = new URL(url);
       if (u.hostname === 'vimeo.com' || u.hostname.endsWith('.vimeo.com')) {

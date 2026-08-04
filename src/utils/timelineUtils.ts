@@ -1,8 +1,40 @@
 import { daysInMonth, displayDateLabel, getActiveDateFormat, formatCalendarDate } from './dateUtils';
+import type { TimelineElement } from '../types/timeline';
+
+type SpanPlacement = { parentId: string | number; offset?: number; priority?: number; mode?: 'extend' };
+type SpanPlacements = Record<string, SpanPlacement>;
+type SpanInput = TimelineElement & { start: number; end: number };
+type PositionedSpan = SpanInput & { left: number; width: number; top: number; lane: number; spanHeight: number };
+type LaneInterval = { startPx: number; endPx: number };
+type FamilyBand = { minLane: number; maxLane: number; start: number; end: number };
+type SpanLayoutOptions = {
+  spans: SpanInput[]; yearToPx: (year: number) => number; BASE_LINE_Y: number; SPAN_HEIGHT: number;
+  SPAN_OFFSET: number; SPAN_GAP: number; SPAN_VERTICAL_GAP: number; spanChildPlacement: SpanPlacements;
+  timelineStart?: number; timelineEnd?: number; belowLine?: boolean;
+};
+type EventInput = TimelineElement & { date: number };
+type MeasuredEventBox = { boxHeight: number; isMultiLine: boolean; boxWidth: number; squareSize?: number };
+type MeasureEvent = (
+  title: unknown, tags: unknown, yearLabel: string, icon: unknown, thumbnail: unknown, thumbnailStyle: unknown,
+  hideYears: unknown, sourceLink: unknown, eventBorderStyle: unknown,
+) => MeasuredEventBox;
+type PositionedEvent = EventInput & { _x: number; top: number; _boxHeight: number; _boxWidth: number; _isMultiLine: boolean; _squareSize?: number };
+type EventLayoutOptions = {
+  events: EventInput[]; yearToPx: (year: number) => number; BASE_LINE_Y: number; spanBandHeight: number;
+  EVENT_WIDTH: number; EVENT_GAP: number; LANE_SPACING: number; BOX_OFFSET: number; fixedEventHeight: boolean;
+  eventWidth?: number; eventFontSize?: number; fontFamily?: string; pinnedTags?: string[]; negID?: string;
+  posID?: string; belowLine?: boolean; useCalendar?: boolean; hideDecimals?: boolean;
+};
 
 export const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-export function formatYear(year, negID, posID, useCalendar = false, hideDecimals = false) {
+export function formatYear(
+  year: number,
+  negID: string | null | undefined,
+  posID: string | null | undefined,
+  useCalendar = false,
+  hideDecimals = false,
+): string {
   if (year < 0) {
     const abs = hideDecimals ? Math.round(Math.abs(year)) : Math.abs(year);
     return negID ? `${abs} ${negID}` : `${-abs}`;
@@ -39,13 +71,13 @@ export function formatYear(year, negID, posID, useCalendar = false, hideDecimals
   return '0';
 }
 
-const clampChannel = (value) => Math.max(0, Math.min(255, Math.round(value)));
+const clampChannel = (value: number): number => Math.max(0, Math.min(255, Math.round(value)));
 
-const mixColor = (base, target, amount) => clampChannel(base + (target - base) * amount);
+const mixColor = (base: number, target: number, amount: number): number => clampChannel(base + (target - base) * amount);
 
-const toHex = (value) => value.toString(16).padStart(2, '0');
+const toHex = (value: number): string => value.toString(16).padStart(2, '0');
 
-export function getReadableTextColor(background) {
+export function getReadableTextColor(background: unknown): string {
   if (!background || typeof background !== 'string') return '#1A1A1A';
   const hex = background.replace('#', '').trim();
   if (hex.length !== 6) return '#1A1A1A';
@@ -68,7 +100,7 @@ export function getReadableTextColor(background) {
 // Scrollbar Width = (viewport width / (range * detail * scale)) * 100
 // (1200 / (range × detail × 0.5)) × 100 = 20 (Solving for detail: detail = 12000 / range)
 
-export function calculateDetailLevel(range) {
+export function calculateDetailLevel(range: number): number {
   const absRange = Math.abs(range);
   if (absRange === 0) return 1;
 
@@ -78,7 +110,7 @@ export function calculateDetailLevel(range) {
   return detailLevel;
 }
 
-export function pickStep(range) {
+export function pickStep(range: number): number {
   const absRange = Math.abs(range);
   if (absRange === 0) return 1;
   const targetTicks = 10;
@@ -98,11 +130,14 @@ export function pickStep(range) {
 // Each child span declares its parent via span.parent (string ID).
 // Children of the same parent alternate above/below with increasing offset.
 // Pattern: -1, +1, -2, +2, -3, +3, ...
-export function buildSpanChildPlacement(spans, branchOrdering = 'later-first') {
-  const placement = {};
-  const spanById = Object.fromEntries(spans.map((span) => [span.id, span]));
-  const isContiguous = (left, right) =>
-    Number.isFinite(left) && Number.isFinite(right) && Math.abs(left - right) < 1e-6;
+export function buildSpanChildPlacement(spans: TimelineElement[], branchOrdering = 'later-first'): SpanPlacements {
+  const placement: SpanPlacements = {};
+  const spanById: Record<string, TimelineElement> = Object.fromEntries(spans.map((span) => [span.id, span]));
+  const isContiguous = (left: unknown, right: unknown): boolean => {
+    const leftNumber = typeof left === 'number' ? left : Number.NaN;
+    const rightNumber = typeof right === 'number' ? right : Number.NaN;
+    return Number.isFinite(leftNumber) && Number.isFinite(rightNumber) && Math.abs(leftNumber - rightNumber) < 1e-6;
+  };
 
   // Extension links: child starts exactly when parent ends.
   for (const span of spans) {
@@ -119,7 +154,7 @@ export function buildSpanChildPlacement(spans, branchOrdering = 'later-first') {
   }
 
   // Group children by their parent
-  const childrenByParent = {};
+  const childrenByParent: Record<string, Array<string | number>> = {};
   for (const span of spans) {
     if (placement[span.id]?.mode === 'extend') continue;
     if (span.parent) {
@@ -128,7 +163,7 @@ export function buildSpanChildPlacement(spans, branchOrdering = 'later-first') {
     }
   }
 
-  for (const [parentId, childIds] of Object.entries(childrenByParent) as [string, string[]][]) {
+  for (const [parentId, childIds] of Object.entries(childrenByParent)) {
     // offset -1 = lower lane number = larger Y = BELOW parent (lower on screen)
     // offset +1 = higher lane number = smaller Y = ABOVE parent (higher on screen)
     const orderedChildren =
@@ -162,8 +197,8 @@ export function buildSpanChildPlacement(spans, branchOrdering = 'later-first') {
 
 // build child -> { parentId } for merge connections (visual only, no lane changes)
 // Each child span declares its merge target via span.mergeParent (string ID).
-export function buildSpanMergePlacement(spans) {
-  const placement = {};
+export function buildSpanMergePlacement(spans: TimelineElement[]): Record<string, { parentId: string | number }> {
+  const placement: Record<string, { parentId: string | number }> = {};
   for (const span of spans) {
     if (span.mergeParent) {
       placement[span.id] = { parentId: span.mergeParent };
@@ -172,7 +207,7 @@ export function buildSpanMergePlacement(spans) {
   return placement;
 }
 
-export function calcSpanBandHeight(rows, offset, height, gap) {
+export function calcSpanBandHeight(rows: number, offset: number, height: number, gap: number): number {
   if (rows === 0) return 0;
   return offset + height + (rows - 1) * (height + gap);
 }
@@ -189,23 +224,23 @@ export function layoutSpans({
   timelineStart,
   timelineEnd,
   belowLine = false,
-}) {
-  const spanLaneEnds = [];
-  const spanLaneIntervals = [];
-  const spanLaneById = {};
-  const spanById = Object.fromEntries(spans.map((s) => [s.id, s]));
-  const finalSpans = [];
-  const familyBands = new Map();
+}: SpanLayoutOptions): { finalSpans: PositionedSpan[]; spanLaneEnds: number[]; spanLaneById: Record<string, number>; spanChildPlacement: SpanPlacements } {
+  const spanLaneEnds: number[] = [];
+  const spanLaneIntervals: LaneInterval[][] = [];
+  const spanLaneById: Record<string, number> = {};
+  const spanById: Record<string, SpanInput> = Object.fromEntries(spans.map((s: SpanInput) => [s.id, s]));
+  const finalSpans: PositionedSpan[] = [];
+  const familyBands = new Map<string | number, FamilyBand>();
 
-  const childToParent = {};
-  const parentToChildren = {};
-  Object.entries(spanChildPlacement).forEach(([childId, { parentId }]: [string, { parentId: string }]) => {
+  const childToParent: Record<string, string | number> = {};
+  const parentToChildren: Record<string, Array<string | number>> = {};
+  Object.entries(spanChildPlacement).forEach(([childId, { parentId }]) => {
     childToParent[childId] = parentId;
     if (!parentToChildren[parentId]) parentToChildren[parentId] = [];
     parentToChildren[parentId].push(childId);
   });
 
-  const getRootId = (id) => {
+  const getRootId = (id: string | number): string | number => {
     let current = id;
     while (childToParent[current]) {
       current = childToParent[current];
@@ -215,16 +250,16 @@ export function layoutSpans({
 
   const CSS_SPAN_HEIGHT = 20;
 
-  const sizeRank = (size) => (size === 'thick' ? 2 : size === 'thin' ? 0 : 1);
-  const getEffectiveSize = (s) => {
+  const sizeRank = (size: unknown): number => (size === 'thick' ? 2 : size === 'thin' ? 0 : 1);
+  const getEffectiveSize = (s: SpanInput | undefined): 'thick' | 'thin' | 'normal' => {
     if (!s) return 'normal';
     const maxRank = sizeRank(s.spanSize);
     return maxRank === 2 ? 'thick' : maxRank === 0 ? 'thin' : 'normal';
   };
-  const isThickSpan = (s) => getEffectiveSize(s) === 'thick';
-  const isThinSpan = (s) => getEffectiveSize(s) === 'thin';
+  const isThickSpan = (s: SpanInput | PositionedSpan) => getEffectiveSize(s) === 'thick';
+  const isThinSpan = (s: SpanInput | PositionedSpan) => getEffectiveSize(s) === 'thin';
 
-  function spanFitsAllNeededLanes(lane, span, rootId) {
+  function spanFitsAllNeededLanes(lane: number, span: SpanInput, rootId: string | number) {
     if (!spanFitsInLane(lane, span.start, span.end, rootId)) return false;
     if (isThickSpan(span) && !spanFitsInLane(lane + 1, span.start, span.end, rootId)) return false;
     return true;
@@ -232,10 +267,10 @@ export function layoutSpans({
 
   // Check a span AND its entire extend chain at the given lane.
   // Extend children inherit the same lane as their parent, so they must also fit there.
-  function spanWithExtendsFitsAtLane(spanId, lane, rootId) {
+  function spanWithExtendsFitsAtLane(spanId: string | number, lane: number, rootId: string | number) {
     const s = spanById[spanId];
     if (!s || !spanFitsAllNeededLanes(lane, s, rootId)) return false;
-    const stk = [spanId];
+    const stk: Array<string | number> = [spanId];
     while (stk.length > 0) {
       const cur = stk.pop();
       for (const childId of parentToChildren[cur] || []) {
@@ -250,12 +285,12 @@ export function layoutSpans({
     return true;
   }
 
-  const familyOffsetsCache = new Map();
-  const getFamilyOffsets = (rootId) => {
+  const familyOffsetsCache = new Map<string | number, { minOffset: number; maxOffset: number }>();
+  const getFamilyOffsets = (rootId: string | number): { minOffset: number; maxOffset: number } => {
     if (familyOffsetsCache.has(rootId)) return familyOffsetsCache.get(rootId);
     const root = spanById[rootId];
     if (!root) return { minOffset: 0, maxOffset: 0 };
-    const stack = [{ id: rootId, offset: 0 }];
+    const stack: Array<{ id: string | number; offset: number }> = [{ id: rootId, offset: 0 }];
     let minOffset = 0;
     let maxOffset = 0;
     while (stack.length > 0) {
@@ -267,7 +302,7 @@ export function layoutSpans({
         maxOffset = Math.max(maxOffset, offset + 1);
       }
       const children = parentToChildren[id] || [];
-      children.forEach((childId) => {
+      children.forEach((childId: string | number) => {
         const placement = spanChildPlacement[childId];
         if (!placement) return;
         stack.push({ id: childId, offset: offset + placement.offset });
@@ -278,16 +313,16 @@ export function layoutSpans({
     return result;
   };
 
-  const familyRangeCache = new Map();
+  const familyRangeCache = new Map<string | number, { start: number; end: number }>();
   // Computes the overall time range covered by a family (root + descendants).
   // Used to prevent other families from taking lanes that overlap in time.
-  const getFamilyRange = (rootId) => {
+  const getFamilyRange = (rootId: string | number): { start: number; end: number } => {
     if (familyRangeCache.has(rootId)) return familyRangeCache.get(rootId);
     const root = spanById[rootId];
     if (!root) return { start: 0, end: 0 };
     let minStart = root.start;
     let maxEnd = root.end;
-    const stack = [rootId];
+    const stack: Array<string | number> = [rootId];
     while (stack.length > 0) {
       const id = stack.pop();
       const span = spanById[id];
@@ -295,29 +330,29 @@ export function layoutSpans({
       minStart = Math.min(minStart, span.start);
       maxEnd = Math.max(maxEnd, span.end);
       const children = parentToChildren[id] || [];
-      children.forEach((childId) => stack.push(childId));
+      children.forEach((childId: string | number) => stack.push(childId));
     }
     const result = { start: minStart, end: maxEnd };
     familyRangeCache.set(rootId, result);
     return result;
   };
 
-  const spansOverlap = (startA, endA, startB, endB) => startA < endB && endA > startB;
+  const spansOverlap = (startA: number, endA: number, startB: number, endB: number) => startA < endB && endA > startB;
 
-  const rootSpans = spans.filter((span) => !childToParent[span.id]);
-  const familyRoots = rootSpans.filter((span) => parentToChildren[span.id]?.length > 0);
-  const otherRoots = rootSpans.filter((span) => !parentToChildren[span.id]?.length);
+  const rootSpans = spans.filter((span: SpanInput) => !childToParent[span.id]);
+  const familyRoots = rootSpans.filter((span: SpanInput) => parentToChildren[span.id]?.length > 0);
+  const otherRoots = rootSpans.filter((span: SpanInput) => !parentToChildren[span.id]?.length);
 
-  familyRoots.sort((a, b) => a.start - b.start);
-  otherRoots.sort((a, b) => a.start - b.start);
+  familyRoots.sort((a: SpanInput, b: SpanInput) => a.start - b.start);
+  otherRoots.sort((a: SpanInput, b: SpanInput) => a.start - b.start);
 
-  const processed = new Set();
+  const processed = new Set<string | number>();
 
-  function spanFitsInLane(lane, start, end, rootId) {
+  function spanFitsInLane(lane: number, start: number, end: number, rootId?: string | number) {
     const startPx = yearToPx(start);
     const endPx = yearToPx(end);
     const intervals = spanLaneIntervals[lane] || [];
-    const hasCollision = intervals.some(({ startPx: existingStartPx, endPx: existingEndPx }) => {
+    const hasCollision = intervals.some(({ startPx: existingStartPx, endPx: existingEndPx }: LaneInterval) => {
       return !(existingEndPx + SPAN_GAP <= startPx || endPx + SPAN_GAP <= existingStartPx);
     });
     if (hasCollision) {
@@ -334,7 +369,7 @@ export function layoutSpans({
     return true;
   }
 
-  function familyFitsAtLane(span, baseLane) {
+  function familyFitsAtLane(span: SpanInput, baseLane: number) {
     const rootId = span.id;
     const { minOffset, maxOffset } = getFamilyOffsets(rootId);
 
@@ -374,7 +409,7 @@ export function layoutSpans({
     return true;
   }
 
-  function placeSpan(span) {
+  function placeSpan(span: SpanInput): void {
     if (processed.has(span.id)) return;
     processed.add(span.id);
 
@@ -387,7 +422,7 @@ export function layoutSpans({
     const right = clampedRight;
     const placement = spanChildPlacement[span.id];
 
-    let lane;
+    let lane: number;
 
     const rootId = getRootId(span.id);
 
@@ -483,12 +518,12 @@ export function layoutSpans({
       spanHeight,
     });
 
-    const children = [];
-    (parentToChildren[span.id] || []).forEach((childId) => {
+    const children: SpanInput[] = [];
+    (parentToChildren[span.id] || []).forEach((childId: string | number) => {
       if (spanById[childId]) children.push(spanById[childId]);
     });
     children
-      .sort((a, b) => {
+      .sort((a: SpanInput, b: SpanInput) => {
         const aPriority = spanChildPlacement[a.id]?.priority ?? 0;
         const bPriority = spanChildPlacement[b.id]?.priority ?? 0;
         if (aPriority !== bPriority) return aPriority - bPriority;
@@ -497,30 +532,30 @@ export function layoutSpans({
         if (aStart !== bStart) return bStart - aStart;
         return String(a.id).localeCompare(String(b.id));
       })
-      .forEach((child) => placeSpan(child));
+      .forEach((child: SpanInput) => placeSpan(child));
   }
 
-  familyRoots.forEach((span) => placeSpan(span));
-  otherRoots.forEach((span) => placeSpan(span));
+  familyRoots.forEach((span: SpanInput) => placeSpan(span));
+  otherRoots.forEach((span: SpanInput) => placeSpan(span));
   // Place any remaining spans that weren't reached via a root (safety net).
-  spans.forEach((span) => placeSpan(span));
+  spans.forEach((span: SpanInput) => placeSpan(span));
 
   if (finalSpans.length > 0) {
-    const minLane = Math.min(...finalSpans.map((span) => span.lane));
+    const minLane = Math.min(...finalSpans.map((span: PositionedSpan) => span.lane));
     if (minLane > 0) {
       const laneShift = minLane;
-      finalSpans.forEach((span) => {
+      finalSpans.forEach((span: PositionedSpan) => {
         span.lane -= laneShift;
         span.top += laneShift * (SPAN_HEIGHT + SPAN_VERTICAL_GAP);
         spanLaneById[span.id] = span.lane;
       });
-      const shiftedLaneEnds = [];
-      spanLaneEnds.forEach((end, index) => {
+      const shiftedLaneEnds: number[] = [];
+      spanLaneEnds.forEach((end: number, index: number) => {
         if (end === undefined) return;
         shiftedLaneEnds[index - laneShift] = end;
       });
       spanLaneEnds.length = 0;
-      shiftedLaneEnds.forEach((end, index) => {
+      shiftedLaneEnds.forEach((end: number, index: number) => {
         spanLaneEnds[index] = end;
       });
     }
@@ -528,15 +563,15 @@ export function layoutSpans({
     // Densify lane indexes to remove empty gaps between used lanes.
     // This prevents visual blank rows when some lane numbers end up unused.
     const usedLaneSet = new Set<number>();
-    finalSpans.forEach((span) => {
+    finalSpans.forEach((span: PositionedSpan) => {
       usedLaneSet.add(span.lane);
       if (isThickSpan(span)) usedLaneSet.add(span.lane + 1);
     });
-    const usedLanes = Array.from(usedLaneSet).sort((a, b) => a - b);
+    const usedLanes = Array.from(usedLaneSet).sort((a: number, b: number) => a - b);
     const denseLaneByOldLane = new Map(usedLanes.map((lane, idx) => [lane, idx]));
 
-    if (usedLanes.some((lane, idx) => lane !== idx)) {
-      finalSpans.forEach((span) => {
+    if (usedLanes.some((lane: number, idx: number) => lane !== idx)) {
+      finalSpans.forEach((span: PositionedSpan) => {
         const denseLane = denseLaneByOldLane.get(span.lane);
         if (denseLane === undefined) return;
         span.lane = denseLane;
@@ -551,8 +586,8 @@ export function layoutSpans({
         spanLaneById[span.id] = denseLane;
       });
 
-      const rebuiltLaneEnds = [];
-      finalSpans.forEach((span) => {
+      const rebuiltLaneEnds: number[] = [];
+      finalSpans.forEach((span: PositionedSpan) => {
         const lane = span.lane;
         const right = span.left + span.width;
         if (rebuiltLaneEnds[lane] === undefined || right > rebuiltLaneEnds[lane]) {
@@ -567,7 +602,7 @@ export function layoutSpans({
       });
 
       spanLaneEnds.length = 0;
-      rebuiltLaneEnds.forEach((end, index) => {
+      rebuiltLaneEnds.forEach((end: number, index: number) => {
         spanLaneEnds[index] = end;
       });
     }
@@ -576,7 +611,7 @@ export function layoutSpans({
   return { finalSpans, spanLaneEnds, spanLaneById, spanChildPlacement };
 }
 
-let measureCache = new Map();
+let measureCache = new Map<string, MeasuredEventBox>();
 let measureCacheConfig = '';
 
 export function layoutEvents({
@@ -598,8 +633,10 @@ export function layoutEvents({
   belowLine = false,
   useCalendar = false,
   hideDecimals = false,
-}) {
-  const laidOut = [...events].sort((a, b) => a.date - b.date).map((ev) => ({ ...ev, _x: yearToPx(ev.date) }));
+}: EventLayoutOptions): PositionedEvent[] {
+  const laidOut: Array<EventInput & { _x: number }> = [...events]
+    .sort((a: EventInput, b: EventInput) => a.date - b.date)
+    .map((ev: EventInput) => ({ ...ev, _x: yearToPx(ev.date) }));
 
   const eventHeight = Math.round(eventWidth / 6);
   const paddingV = Math.max(2, Math.round(eventHeight * 0.08));
@@ -640,26 +677,29 @@ export function layoutEvents({
   probeYearSpan.textContent = '0000';
   const probeTags = document.createElement('span');
   probeTags.className = 'pinned-tags probe-tags';
-  let probeTextContent = null;
+  let probeTextContent: HTMLDivElement | null = null;
   probeDate.appendChild(probeYearSpan);
   probe.appendChild(probeTitle);
   probe.appendChild(probeDate);
 
-  const getVisiblePinnedTags = (tags) => (Array.isArray(tags) ? tags : []).filter((tag) => pinnedTags.includes(tag));
+  const getVisiblePinnedTags = (tags: unknown): string[] =>
+    (Array.isArray(tags) ? tags.filter((tag): tag is string => typeof tag === 'string') : []).filter((tag) => pinnedTags.includes(tag));
 
-  const setProbeTags = (tags) => {
+  const setProbeTags = (tags: string[]): void => {
     probeTags.innerHTML = '';
-    tags.forEach((tag) => {
+    tags.forEach((tag: string) => {
       const span = document.createElement('span');
       span.className = 'pinned-tag probe-tag';
       span.textContent = tag;
       probeTags.appendChild(span);
     });
   };
-  const syncProbeDateRow = ({ showDateRow, showYear, visibleTags, hasThumbnailLayout = false }) => {
+  const syncProbeDateRow = ({ showDateRow, showYear, visibleTags, hasThumbnailLayout = false }: {
+    showDateRow: boolean; showYear: boolean; visibleTags: string[]; hasThumbnailLayout?: boolean;
+  }): void => {
     probe.classList.toggle('event-no-year', !showDateRow);
 
-    const dateParent = hasThumbnailLayout ? probeTextContent : probe;
+    const dateParent = hasThumbnailLayout ? probeTextContent ?? probe : probe;
     if (!showDateRow) {
       if (probeDate.parentNode) probeDate.remove();
       return;
@@ -716,7 +756,7 @@ export function layoutEvents({
   probe.style.height = '';
   probe.style.minHeight = '';
 
-  let measureEvent;
+  let measureEvent: MeasureEvent;
   if (fixedEventHeight) {
     measureEvent = (
       title,
@@ -784,7 +824,7 @@ export function layoutEvents({
 
     let lastHasThumbnail = false;
 
-    const setupProbeLayout = (hasThumbnail) => {
+    const setupProbeLayout = (hasThumbnail: boolean): void => {
       if (hasThumbnail === lastHasThumbnail) return;
       lastHasThumbnail = hasThumbnail;
       probe.innerHTML = '';
@@ -840,7 +880,7 @@ export function layoutEvents({
           : noYearBaseContentHeight;
       probeTitle.innerHTML = '';
       if (icon) probeTitle.appendChild(probeIcon);
-      probeTitle.appendChild(document.createTextNode(title || 'X'));
+      probeTitle.appendChild(document.createTextNode(typeof title === 'string' && title ? title : 'X'));
       if (showYear) {
         probeYearSpan.textContent = yearLabel || '0000';
       }
@@ -881,7 +921,7 @@ export function layoutEvents({
     measureCache = new Map();
   }
   const measureEventUncached = measureEvent;
-  measureEvent = (title, tags, yearLabel, icon, thumbnail, thumbnailStyle, hideYears, sourceLink, eventBorderStyle) => {
+  measureEvent = (title, tags, yearLabel, icon, thumbnail, thumbnailStyle, hideYears, sourceLink, eventBorderStyle): MeasuredEventBox => {
     const key = JSON.stringify([
       title,
       tags,
@@ -918,9 +958,9 @@ export function layoutEvents({
   const LANE0_TOP = belowLine
     ? BASE_LINE_Y + spanBandHeight + BOX_OFFSET
     : BASE_LINE_Y - spanBandHeight - Math.max(BOX_OFFSET, singleLineHeight + SPAN_BAND_CLEARANCE);
-  const placed = []; // { left, right, top, boxHeight }
+  const placed: Array<{ left: number; right: number; top: number; boxHeight: number }> = [];
 
-  const finalEvents = laidOut.map((event) => {
+  const finalEvents: PositionedEvent[] = laidOut.map((event: EventInput & { _x: number }): PositionedEvent => {
     const x = event._x;
     const yearLabel =
       displayDateLabel(event.dateLabel) ?? formatYear(event.date, negID, posID, useCalendar, hideDecimals);
@@ -946,8 +986,8 @@ export function layoutEvents({
     const right = x + boxWidth / 2;
 
     const conflicts = placed
-      .filter((p) => p.right + EVENT_GAP > left)
-      .sort((a, b) => (belowLine ? a.top - b.top : b.top - a.top));
+      .filter((p: { right: number }) => p.right + EVENT_GAP > left)
+      .sort((a: { top: number }, b: { top: number }) => (belowLine ? a.top - b.top : b.top - a.top));
 
     let top;
     if (belowLine) {

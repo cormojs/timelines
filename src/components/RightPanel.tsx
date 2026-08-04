@@ -24,7 +24,7 @@ import WikiSection from './WikiSection';
 import SourcesSection from './SourcesSection';
 import { useNoteManagement } from '../hooks/useNoteManagement';
 import IconPicker from './IconPicker';
-import type { TimelineData, TimelineElement } from '../types/timeline';
+import type { TimelineData, TimelineElement, TimelineSource } from '../types/timeline';
 import { ICON_MAP } from '../config/elementIcons';
 import {
   parseTimelineInput,
@@ -43,7 +43,7 @@ import { formatYear } from '../utils/timelineUtils';
 import { isValidIdValue, isValidTagValue, normalizeTagValue, buildValidatedUpdate } from '../utils/validation';
 import { normalizeColor } from '../utils/colorUtils';
 
-function SectionHeader({ title, isOpen, onToggle, summary }) {
+function SectionHeader({ title, isOpen, onToggle, summary }: { title: string; isOpen: boolean; onToggle: () => void; summary?: string }) {
   return (
     <button type="button" className="edit-section-header" onClick={onToggle}>
       <ChevronDown size={15} className={`edit-section-header-chevron${isOpen ? '' : ' is-collapsed'}`} />
@@ -104,8 +104,8 @@ export default function RightPanel({
   readOnly = false,
   onClose,
 }: RightPanelProps) {
-  const [formData, setFormData] = useState(null);
-  const [validationErrors, setValidationErrors] = useState([]);
+  const [formData, setFormData] = useState<TimelineElement | null>(null);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isThumbnailUrlMode, setIsThumbnailUrlMode] = useState(false);
@@ -133,8 +133,8 @@ export default function RightPanel({
     handlePickThumbnail,
     handleDropThumbnail,
   } = useNoteManagement({ selectedElement, timelineData, formData, setFormData, onUpdate });
-  const prevSelectedIdRef = useRef(null);
-  const titleTextareaRef = useRef(null);
+  const prevSelectedIdRef = useRef<TimelineElement['id'] | null>(null);
+  const titleTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   useLayoutEffect(() => {
     const el = titleTextareaRef.current;
@@ -152,28 +152,28 @@ export default function RightPanel({
   }, [formData?.title, isEditMode]);
   const [spanParentQuery, setSpanParentQuery] = useState('');
   const [isSpanParentMenuOpen, setIsSpanParentMenuOpen] = useState(false);
-  const spanParentMenuTimeoutRef = useRef(null);
+  const spanParentMenuTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [spanRelationType, setSpanRelationType] = useState('branch');
   const [isSpanRelationOpen, setIsSpanRelationOpen] = useState(false);
   const [mergeParentQuery, setMergeParentQuery] = useState('');
   const [isMergeParentMenuOpen, setIsMergeParentMenuOpen] = useState(false);
-  const mergeParentMenuTimeoutRef = useRef(null);
+  const mergeParentMenuTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [parentQuery, setParentQuery] = useState('');
   const [isParentMenuOpen, setIsParentMenuOpen] = useState(false);
-  const parentMenuTimeoutRef = useRef(null);
+  const parentMenuTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [tagQuery, setTagQuery] = useState('');
   const [isTagMenuOpen, setIsTagMenuOpen] = useState(false);
-  const tagMenuTimeoutRef = useRef(null);
+  const tagMenuTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isNoteCollapsed, setIsNoteCollapsed] = useState(false);
-  const [thumbnailMeta, setThumbnailMeta] = useState(null);
-  const panelRef = useRef(null);
+  const [thumbnailMeta, setThumbnailMeta] = useState<{ width: number; height: number; ext: string } | null>(null);
+  const panelRef = useRef<HTMLDivElement | null>(null);
   const datePickerRefs = useRef<Record<string, HTMLInputElement>>({});
   const TAG_MAX_LENGTH = 32;
   const ID_MAX_LENGTH = 60;
   const showCalendarInputIcon = timelineData?.file?.useCalendar === true;
-  const [dynamicMenuField, setDynamicMenuField] = useState(null);
+  const [dynamicMenuField, setDynamicMenuField] = useState<keyof TimelineElement | null>(null);
 
-  const applyDynamicDate = (field, keyword) => {
+  const applyDynamicDate = (field: keyof TimelineElement, keyword: string) => {
     const next = { ...formData, [field]: keyword };
     setFormData(next);
     commitDraft(next);
@@ -182,12 +182,12 @@ export default function RightPanel({
 
   useEffect(() => {
     if (!dynamicMenuField) return;
-    const close = (e) => {
+    const close = (e: MouseEvent) => {
       // ignore clicks on any dynamic-date toggle or menu so toggling/selecting works
-      if (e.target.closest?.('.dynamic-date-menu, .edit-input-icon-button-dynamic')) return;
+      if (e.target instanceof Element && e.target.closest('.dynamic-date-menu, .edit-input-icon-button-dynamic')) return;
       setDynamicMenuField(null);
     };
-    const onKeyDown = (e) => {
+    const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setDynamicMenuField(null);
     };
     document.addEventListener('mousedown', close);
@@ -198,14 +198,14 @@ export default function RightPanel({
     };
   }, [dynamicMenuField]);
 
-  const renderDynamicDateButton = (field) => (
+  const renderDynamicDateButton = (field: keyof TimelineElement) => (
     <>
       <button
         type="button"
         className={`edit-input-icon-button edit-input-icon-button-dynamic${dynamicMenuField === field ? ' is-open' : ''}`}
         aria-label="Insert dynamic date"
         title="Dynamic date (stays anchored to the current date)"
-        onMouseDown={(e) => e.preventDefault()}
+        onMouseDown={(e: React.MouseEvent<HTMLButtonElement>) => e.preventDefault()}
         onClick={() => setDynamicMenuField((v) => (v === field ? null : field))}
       >
         <Clock size={14} className="edit-input-icon" aria-hidden="true" />
@@ -227,13 +227,13 @@ export default function RightPanel({
     </>
   );
 
-  const pushValidationError = (message) => {
+  const pushValidationError = (message: string) => {
     if (!message) return;
     setValidationErrors([message]);
   };
 
   const stripEditableEraSuffix = useCallback(
-    (input) => {
+    (input: unknown): string => {
       const raw = String(input ?? '').trim();
       if (!raw) return '';
       const negSuffix = typeof timelineData?.file?.negID === 'string' ? timelineData.file.negID.trim() : '';
@@ -265,9 +265,9 @@ export default function RightPanel({
   );
 
   const formatEditableDateInput = useCallback(
-    (value, label) => {
+    (value: number | undefined, label: unknown): string => {
       if (label != null && label !== '') return stripEditableEraSuffix(formatDateForInput(label));
-      if (!Number.isFinite(value)) return value ?? '';
+      if (!Number.isFinite(value)) return String(value ?? '');
       return stripEditableEraSuffix(
         formatYear(
           value,
@@ -287,7 +287,7 @@ export default function RightPanel({
     ],
   );
 
-  const getPickerIsoValue = useCallback((inputValue, fallbackValue) => {
+  const getPickerIsoValue = useCallback((inputValue: unknown, fallbackValue: number | undefined): string => {
     const parsed = parseTimelineInput(inputValue);
     const resolvedValue = Number.isFinite(parsed.value) ? parsed.value : fallbackValue;
     if (!Number.isFinite(resolvedValue)) return '';
@@ -296,7 +296,7 @@ export default function RightPanel({
     return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
   }, []);
 
-  const getTimelineLimitIsoValue = useCallback((value) => {
+  const getTimelineLimitIsoValue = useCallback((value: number | undefined): string => {
     if (!Number.isFinite(value)) return '';
     const { year, month, day } = fractionalYearToDate(value);
     if (!Number.isFinite(year) || year < 0 || year > 9999) return '';
@@ -306,7 +306,7 @@ export default function RightPanel({
   const calendarMinIso = showCalendarInputIcon ? getTimelineLimitIsoValue(timelineData?.file?.start) : '';
   const calendarMaxIso = showCalendarInputIcon ? getTimelineLimitIsoValue(timelineData?.file?.end) : '';
 
-  const formatIsoAsEditableDate = useCallback((isoValue) => {
+  const formatIsoAsEditableDate = useCallback((isoValue: string): string => {
     const raw = String(isoValue ?? '').trim();
     const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (!match) return '';
@@ -315,7 +315,7 @@ export default function RightPanel({
   }, []);
 
   const handleCalendarPick = useCallback(
-    (field, isoValue) => {
+    (field: keyof TimelineElement, isoValue: string) => {
       const formatted = formatIsoAsEditableDate(isoValue);
       if (!formatted) return;
       const nextDraft = { ...formData, [field]: formatted };
@@ -325,7 +325,7 @@ export default function RightPanel({
     [formData, formatIsoAsEditableDate],
   );
 
-  const openCalendarPicker = useCallback((pickerKey) => {
+  const openCalendarPicker = useCallback((pickerKey: string) => {
     const input = datePickerRefs.current[pickerKey];
     if (!input) return;
     if (typeof input.showPicker === 'function') {
@@ -340,7 +340,7 @@ export default function RightPanel({
     const anyOpen =
       isSpanParentMenuOpen || isMergeParentMenuOpen || isParentMenuOpen || isTagMenuOpen || isSpanRelationOpen;
     if (!anyOpen) return;
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       setIsSpanParentMenuOpen(false);
       setIsMergeParentMenuOpen(false);
@@ -399,9 +399,9 @@ export default function RightPanel({
   useEffect(() => {
     if (!isEditMode) return;
 
-    const handleOutsideClick = (event) => {
+    const handleOutsideClick = (event: MouseEvent) => {
       const panel = panelRef.current;
-      if (!panel || panel.contains(event.target)) {
+      if (!panel || (event.target instanceof Node && panel.contains(event.target))) {
         return;
       }
       if (formData) {
@@ -436,19 +436,19 @@ export default function RightPanel({
     onEditRequestHandled?.();
   }, [selectedElement, editRequestId, onEditRequestHandled, readOnly]);
 
-  const handleChange = (field, value) => {
+  const handleChange = (field: keyof TimelineElement, value: unknown) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (field === 'dateInput' || field === 'parents') {
       setValidationErrors([]);
     }
   };
 
-  const getSpanNumericStart = (span) => {
+  const getSpanNumericStart = (span: TimelineElement): number | undefined => {
     const parsed = parseTimelineInput(span.startLabel ?? span.start);
     return parsed.value ?? span.start;
   };
 
-  const getSpanNumericEnd = (span) => {
+  const getSpanNumericEnd = (span: TimelineElement): number | undefined => {
     const parsed = parseTimelineInput(span.endLabel ?? span.end);
     return parsed.value ?? span.end;
   };
@@ -585,7 +585,7 @@ export default function RightPanel({
     );
   }, [mergeParentCandidates, mergeParentQuery]);
 
-  const renderEventStrokeStyleControl = (field, currentValue, ariaLabel, variant) => (
+  const renderEventStrokeStyleControl = (field: keyof TimelineElement, currentValue: unknown, ariaLabel: string, variant: string) => (
     <div className="event-style-toggle" role="group" aria-label={ariaLabel}>
       {EVENT_STROKE_STYLE_OPTIONS.map((option) => {
         const isActive = (currentValue || 'solid') === option.value;
@@ -615,7 +615,7 @@ export default function RightPanel({
 
   const tagCandidates = useMemo(() => {
     if (!timelineData) return [];
-    const tags = new Set();
+    const tags = new Set<string>();
     timelineData.elements.forEach((element) => {
       if (Array.isArray(element.tags)) {
         element.tags.forEach((tag) => {
@@ -634,7 +634,7 @@ export default function RightPanel({
     return tagCandidates.filter((tag) => tag.toLowerCase().includes(needle));
   }, [tagCandidates, tagQuery]);
 
-  const setSpanParent = (spanId) => {
+  const setSpanParent = (spanId: TimelineElement['id']) => {
     if (!spanId) return;
     const { extendFrom: _e, ...base } = formData;
     const next = { ...base, parent: spanId };
@@ -644,7 +644,7 @@ export default function RightPanel({
     setIsSpanParentMenuOpen(false);
   };
 
-  const setExtendFrom = (spanId) => {
+  const setExtendFrom = (spanId: TimelineElement['id']) => {
     if (!spanId) return;
     const { parent: _p, ...base } = formData;
     const next = { ...base, extendFrom: spanId };
@@ -677,7 +677,7 @@ export default function RightPanel({
     }, 120);
   };
 
-  const setMergeParent = (spanId) => {
+  const setMergeParent = (spanId: TimelineElement['id']) => {
     if (!spanId) return;
     setFormData((prev) => ({ ...prev, mergeParent: spanId }));
     commitDraft({ ...formData, mergeParent: spanId });
@@ -732,7 +732,7 @@ export default function RightPanel({
     }, 120);
   };
 
-  const addTag = (tag) => {
+  const addTag = (tag: string) => {
     const normalized = normalizeTagValue(tag);
     if (!normalized) return;
     if (normalized.length > TAG_MAX_LENGTH) {
@@ -753,14 +753,14 @@ export default function RightPanel({
     setIsTagMenuOpen(false);
   };
 
-  const removeTag = (tag) => {
+  const removeTag = (tag: string) => {
     const existing = Array.isArray(formData.tags) ? formData.tags : [];
     const nextTags = existing.filter((value) => value !== tag);
     setFormData((prev) => ({ ...prev, tags: nextTags }));
     commitDraft({ ...formData, tags: nextTags });
   };
 
-  const handleSourcesChange = (nextSources, nextSourceLink) => {
+  const handleSourcesChange = (nextSources: TimelineSource[], nextSourceLink?: string | null) => {
     const next = { ...formData, sources: nextSources };
     if (nextSourceLink !== undefined) {
       if (nextSourceLink) next.sourceLink = nextSourceLink;
@@ -770,7 +770,7 @@ export default function RightPanel({
     commitDraft(next);
   };
 
-  const commitDraft = (draft) => {
+  const commitDraft = (draft: TimelineElement) => {
     let effectiveDraft = draft;
 
     const { errors, nextData } = buildValidatedUpdate(effectiveDraft, timelineData);
@@ -787,7 +787,7 @@ export default function RightPanel({
   };
 
   const formatDisplayYear = useCallback(
-    (value) =>
+    (value: number) =>
       formatYear(
         value,
         timelineData?.file?.negID,
@@ -812,9 +812,10 @@ export default function RightPanel({
 
   useEffect(() => {
     if (readOnly || !selectedElement) return;
-    const handler = (e) => {
+    const handler = (e: KeyboardEvent) => {
       if (e.key !== 'e' && e.key !== 'E') return;
       const target = e.target;
+      if (!(target instanceof HTMLElement)) return;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
       e.preventDefault();
       toggleEditMode();
@@ -823,7 +824,7 @@ export default function RightPanel({
     return () => window.removeEventListener('keydown', handler);
   }, [selectedElement, toggleEditMode, readOnly]);
 
-  const handleWikiUrlChange = (newUrl) => {
+  const handleWikiUrlChange = (newUrl: string | null) => {
     const next = { ...formData };
     if (newUrl) {
       next.wikiUrl = newUrl;
@@ -1304,7 +1305,7 @@ export default function RightPanel({
                                     type="button"
                                     className="relation-selected-remove"
                                     onClick={() => {
-                                      const next = { ...formData, parents: [] };
+                                      const next = { ...formData, parents: formData.parents.filter(() => false) };
                                       setFormData(next);
                                       commitDraft(next);
                                       setParentQuery('');

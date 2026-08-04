@@ -30,7 +30,7 @@ export const appSettingsSchema = jsonObjectSchema.extend({
   notesSubfolderEnabled: z.boolean().optional(),
   appFontFamily: z.string().optional(),
   appFontSize: z.number().finite().optional(),
-  keybinds: z.record(z.string(), z.string()).optional(),
+  keybinds: z.record(z.string(), z.union([z.string(), z.array(z.string())])).optional(),
   hardwareAcceleration: z.boolean().optional(),
   startMaximized: z.boolean().optional(),
   assetsStorageDir: z.string().optional(),

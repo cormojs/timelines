@@ -1,16 +1,19 @@
-const NOOP = () => {};
+type FontFaceLike = { family: string; status: string };
+type FontFaceSetLike = Iterable<FontFaceLike> | null | undefined;
+
+const NOOP = (): void => {};
 const POLL_INTERVAL_MS = 100;
 
-const normalizeFamily = (value) =>
+const normalizeFamily = (value: unknown): string =>
   String(value || '')
     .trim()
     .replace(/^["']|["']$/g, '')
     .toLowerCase();
 
-const firstFamily = (stack) => normalizeFamily(String(stack || '').split(',')[0]);
+const firstFamily = (stack: unknown): string => normalizeFamily(String(stack || '').split(',')[0]);
 
 // fonts.check() reports unknown families as available. Unicode-range siblings may stay unloaded.
-export function isFontReady(fonts, fontStack) {
+export function isFontReady(fonts: FontFaceSetLike, fontStack: unknown): boolean {
   const family = firstFamily(fontStack);
   if (!fonts || !family) return true;
   try {
@@ -24,7 +27,12 @@ export function isFontReady(fonts, fontStack) {
 }
 
 // WebKit may not fire loadingdone for runtime-injected stylesheets.
-export function watchFontLoad(fonts, fontStack, onReady, timeoutMs) {
+export function watchFontLoad(
+  fonts: FontFaceSetLike,
+  fontStack: unknown,
+  onReady: () => void,
+  timeoutMs: number,
+): () => void {
   if (isFontReady(fonts, fontStack)) return NOOP;
 
   let done = false;

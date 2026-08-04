@@ -1,7 +1,9 @@
 const STORAGE_KEY = 'timelines-app-settings';
 import { parseAppSettingsJson } from './json';
 
-export async function getAppSettings() {
+type AppSettings = ReturnType<typeof parseAppSettingsJson>;
+
+export async function getAppSettings(): Promise<AppSettings> {
   if (window.electron?.getAppSettings) {
     try {
       return await window.electron.getAppSettings();
@@ -21,7 +23,7 @@ export async function getAppSettings() {
   }
 }
 
-export async function saveAppSettings(settings) {
+export async function saveAppSettings(settings: Partial<AppSettings>): Promise<void> {
   if (window.electron?.setAppSettings) {
     try {
       await window.electron.setAppSettings(settings);

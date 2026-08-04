@@ -1,22 +1,33 @@
 import { parseTimelineInput, snapToMonthGrid } from './dateUtils';
+import type { TimelineData, TimelineElement } from '../types/timeline';
+
+export type ScaleSectionInput = { start?: string; end?: string; scale?: string; showBreak?: boolean };
+type EditableTimelineElement = TimelineElement & {
+  dateInput?: string;
+  startInput?: string;
+  endInput?: string;
+  dateLabel?: string;
+  startLabel?: string;
+  endLabel?: string;
+};
 
 // --- ID / tag / filename validators ---
 
-export const isValidIdValue = (value) => /^[a-z0-9_-]+$/i.test(value);
+export const isValidIdValue = (value: string): boolean => /^[a-z0-9_-]+$/i.test(value);
 
-export const isValidTagValue = (value) => /^[a-z0-9 _-]+$/i.test(value);
+export const isValidTagValue = (value: string): boolean => /^[a-z0-9 _-]+$/i.test(value);
 
 // Bare filename or notes-root-relative slash path, matching what resolveNotePath accepts in main
-export const isSafeNoteRef = (name) => {
+export const isSafeNoteRef = (name: unknown): boolean => {
   if (!name || typeof name !== 'string' || name.includes('..')) return false;
   return /^[\w.-]+(\/[\w.-]+)*\.md$/i.test(name);
 };
 
-export const normalizeTagValue = (value) => value.trim().replace(/\s+/g, ' ');
+export const normalizeTagValue = (value: string): string => value.trim().replace(/\s+/g, ' ');
 
 // --- URL helpers ---
 
-export const parseMediaWikiUrl = (url) => {
+export const parseMediaWikiUrl = (url: string): { host: string; title: string; section: string | null } | null => {
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== 'https:') return null;
@@ -54,7 +65,7 @@ export const parseMediaWikiUrl = (url) => {
 
 // --- Title sanitization (SettingsModal) ---
 
-export const sanitizeTitle = (value) =>
+export const sanitizeTitle = (value: unknown): string =>
   String(value || '')
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, '')
@@ -64,7 +75,7 @@ export const sanitizeTitle = (value) =>
 
 // --- Scale section helpers (SettingsModal) ---
 
-export const loadScaleSections = (stored = [], legacyBreaks = []) => {
+export const loadScaleSections = (stored: ScaleSectionInput[] = [], legacyBreaks: ScaleSectionInput[] = []): Required<ScaleSectionInput>[] => {
   const source =
     Array.isArray(stored) && stored.length > 0
       ? stored
@@ -80,7 +91,7 @@ export const loadScaleSections = (stored = [], legacyBreaks = []) => {
   }));
 };
 
-export const validateScaleSection = (item) => {
+export const validateScaleSection = (item: ScaleSectionInput): string | null => {
   const startRaw = item?.start?.trim() || '';
   const endRaw = item?.end?.trim() || '';
   const scaleRaw = item?.scale?.trim() || '';
@@ -100,18 +111,18 @@ export const validateScaleSection = (item) => {
 
 // --- Span/element helpers (RightPanel) ---
 
-export const getSpanNumericEnd = (span) => {
+export const getSpanNumericEnd = (span: TimelineElement): number | undefined => {
   const parsed = parseTimelineInput(span.endLabel ?? span.end);
   return parsed.value ?? span.end;
 };
 
-const stripInputs = (data) => {
+const stripInputs = (data: EditableTimelineElement): TimelineElement => {
   const { dateInput: _dateInput, startInput: _startInput, endInput: _endInput, ...rest } = data;
   return rest;
 };
 
-const validateEventParents = (draft, timelineData) => {
-  const errors = [];
+const validateEventParents = (draft: EditableTimelineElement, timelineData: TimelineData): string[] => {
+  const errors: string[] = [];
 
   if (draft.type === 'event' && draft.parents && draft.parents.length > 0) {
     const spans = timelineData.elements.filter((el) => el.type === 'span');
@@ -138,7 +149,10 @@ const validateEventParents = (draft, timelineData) => {
   return errors;
 };
 
-export const buildValidatedUpdate = (draft, timelineData) => {
+export const buildValidatedUpdate = (
+  draft: EditableTimelineElement,
+  timelineData: TimelineData,
+): { errors: string[]; nextData: TimelineElement | null } => {
   const errors = validateEventParents(draft, timelineData);
   const parsedDate = parseTimelineInput(draft.dateInput);
   const parsedStart = parseTimelineInput(draft.startInput);

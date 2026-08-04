@@ -40,6 +40,15 @@ import '../styles/07-modals-menus.css';
 const DEFAULT_GROUP_COLOR = '#d9d9d9';
 
 type ElementId = TimelineElement['id'];
+type EventElement = TimelineElement & { type: 'event'; date: number };
+type SpanElement = TimelineElement & { type: 'span'; start: number; end: number };
+type EraElement = TimelineElement & { type: 'era'; start: number; end: number };
+type EraTreeNode = { era: EraElement; items: Array<EventElement | SpanElement>; children: EraTreeNode[]; barLeft: number; barWidth: number };
+type TimelineListItem = { id: string; name: string; isPackage?: boolean };
+type MenuPosition = { x: number; y: number };
+type DragPlacement = { id: string; position: 'top' | 'bottom' };
+type EraGroup = { era: EraElement; items: Array<EventElement | SpanElement>; subGroups: Array<{ era: EraElement; items: Array<EventElement | SpanElement> }>; barLeft: number; barWidth: number };
+type SpanGroup = { span: SpanElement; items: EventElement[]; subGroups: Array<{ span: SpanElement; items: EventElement[] }> };
 
 type ElementMenu = {
   x: number;
@@ -79,7 +88,7 @@ type SidebarProps = {
   onSelect: (id: ElementId) => void;
   timelineData: TimelineData;
   allElements: TimelineElement[];
-  chipFilter?: unknown;
+  chipFilter?: ReturnType<typeof parseFilterQuery>;
   activeTags?: string[];
   hiddenTags?: string[];
   onToggleTag?: (tag: string) => void;
@@ -121,14 +130,15 @@ type ScaleSection = Record<string, unknown> & {
 };
 
 const isScaleSection = (value: unknown): value is ScaleSection => typeof value === 'object' && value !== null;
+const numberOrZero = (value: unknown): number => (typeof value === 'number' && Number.isFinite(value) ? value : 0);
 
-const expandShortHex = (value) =>
+const expandShortHex = (value: string): string =>
   value
     .split('')
     .map((char) => char + char)
     .join('');
 
-const normalizeHexColor = (value) => {
+const normalizeHexColor = (value: unknown): string | null => {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
   const short = /^#([0-9a-f]{3})$/i.exec(trimmed);
@@ -138,7 +148,7 @@ const normalizeHexColor = (value) => {
   return null;
 };
 
-const rgbToHex = (value) => {
+const rgbToHex = (value: unknown): string | null => {
   if (typeof value !== 'string') return null;
   const match = /^rgba?\(([^)]+)\)$/i.exec(value.trim());
   if (!match) return null;
@@ -151,7 +161,7 @@ const rgbToHex = (value) => {
   return `#${[r, g, b].map((channel) => channel.toString(16).padStart(2, '0')).join('')}`;
 };
 
-const normalizeColorForInput = (value) => normalizeHexColor(value) || rgbToHex(value);
+const normalizeColorForInput = (value: unknown): string | null => normalizeHexColor(value) || rgbToHex(value);
 
 const resolveThemeGroupColor = () => {
   if (typeof window === 'undefined') return null;
@@ -166,7 +176,7 @@ const resolveSecondaryBg = () => {
 };
 
 // Returns a version of eraColor that reads well on bgHex while keeping the hue recognizable.
-function getEraLabelColor(eraColor, bgHex) {
+function getEraLabelColor(eraColor: unknown, bgHex: string | null): string | null {
   const hex = normalizeHexColor(eraColor);
   if (!hex) return null;
   const eR = parseInt(hex.slice(1, 3), 16);
@@ -195,12 +205,12 @@ function getEraLabelColor(eraColor, bgHex) {
   return `#${outR.toString(16).padStart(2, '0')}${outG.toString(16).padStart(2, '0')}${outB.toString(16).padStart(2, '0')}`;
 }
 
-function compareEraGroupItems(a, b) {
+function compareEraGroupItems(a: EventElement | SpanElement, b: EventElement | SpanElement): number {
   const aDate = a.type === 'event' ? a.date : a.start;
   const bDate = b.type === 'event' ? b.date : b.start;
   if (aDate !== bDate) return aDate - bDate;
   if (a.type !== b.type) return a.type === 'span' ? -1 : 1;
-  return (a.title || a.id).localeCompare(b.title || b.id);
+  return String(a.title || a.id).localeCompare(String(b.title || b.id));
 }
 
 function SidebarRow({ item, rightText, level = 0, selectedId, onSelect, listRef, lastScrollTopRef, setElementMenu }: SidebarRowProps) {
@@ -350,10 +360,10 @@ export default function Sidebar({
   readOnly = false,
 }: SidebarProps) {
   const isMac = navigator.userAgent?.includes('Mac');
-  const formatKeybind = (bind) => {
+  const formatKeybind = (bind: Keybinds[string] | undefined): string => {
     if (!bind?.keys?.length) return '';
     return bind.keys
-      .map((k) => {
+      .map((k: string) => {
         if (k === 'Ctrl') return isMac ? 'Cmd' : 'Ctrl';
         if (k === 'Alt') return isMac ? 'Option' : 'Alt';
         return k;
@@ -361,46 +371,46 @@ export default function Sidebar({
       .join('+');
   };
   const file = timelineData.file;
-  const events = timelineData.elements.filter((e) => e.type === 'event');
-  const spans = timelineData.elements.filter((e) => e.type === 'span');
-  const eras = timelineData.elements.filter((e) => e.type === 'era');
+  const events = timelineData.elements.filter((e): e is EventElement => e.type === 'event' && typeof e.date === 'number');
+  const spans = timelineData.elements.filter((e): e is SpanElement => e.type === 'span' && typeof e.start === 'number' && typeof e.end === 'number');
+  const eras = timelineData.elements.filter((e): e is EraElement => e.type === 'era' && typeof e.start === 'number' && typeof e.end === 'number');
 
   const [openEras, setOpenEras] = useState(true);
   const [openSpans, setOpenSpans] = useState(true);
   const [openEvents, setOpenEvents] = useState(true);
-  const [openEraGroups, setOpenEraGroups] = useState({});
-  const [openSpanGroups, setOpenSpanGroups] = useState({});
+  const [openEraGroups, setOpenEraGroups] = useState<Record<string, boolean>>({});
+  const [openSpanGroups, setOpenSpanGroups] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState('');
   // Sort prefs live on the file (like panelGroupMode) so they survive reloads
   const sortField = file?.panelSortField === 'name' ? 'name' : 'year';
   const sortOrder = file?.panelSortOrder === 'desc' ? 'desc' : 'asc';
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
-  const sortMenuRef = useRef(null);
+  const sortMenuRef = useRef<HTMLDivElement | null>(null);
   const [newMenuOpen, setNewMenuOpen] = useState(false);
-  const newMenuRef = useRef(null);
-  const [timelineMenu, setTimelineMenu] = useState(null);
-  const [openSubmenu, setOpenSubmenu] = useState(null);
+  const newMenuRef = useRef<HTMLDivElement | null>(null);
+  const [timelineMenu, setTimelineMenu] = useState<MenuPosition | null>(null);
+  const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
   const [sidebarTab, setSidebarTab] = useState('timeline');
-  const [elementMenu, setElementMenu] = useState(null);
-  const [timelineFiles, setTimelineFiles] = useState([]);
-  const [submenuPosition, setSubmenuPosition] = useState(null);
-  const [editingGroupId, setEditingGroupId] = useState(null);
-  const [groupMenuOpenId, setGroupMenuOpenId] = useState(null);
+  const [elementMenu, setElementMenu] = useState<ElementMenu | null>(null);
+  const [timelineFiles, setTimelineFiles] = useState<TimelineListItem[]>([]);
+  const [submenuPosition, setSubmenuPosition] = useState<MenuPosition | null>(null);
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+  const [groupMenuOpenId, setGroupMenuOpenId] = useState<string | null>(null);
   const groupMenuRef = useRef(null);
   const [editingGroupTitle, setEditingGroupTitle] = useState('');
-  const [pendingNewGroupEditId, setPendingNewGroupEditId] = useState(null);
-  const [draggedGroupId, setDraggedGroupId] = useState(null);
-  const [dragOverPlacement, setDragOverPlacement] = useState(null);
+  const [pendingNewGroupEditId, setPendingNewGroupEditId] = useState<string | null>(null);
+  const [draggedGroupId, setDraggedGroupId] = useState<string | null>(null);
+  const [dragOverPlacement, setDragOverPlacement] = useState<DragPlacement | null>(null);
   const [dividerDragOver, setDividerDragOver] = useState(false);
-  const [openGroupContents, setOpenGroupContents] = useState({});
-  const menuRef = useRef(null);
-  const submenuRef = useRef(null);
-  const openTimelineRef = useRef(null);
-  const submenuCloseTimer = useRef(null);
-  const listRef = useRef(null);
+  const [openGroupContents, setOpenGroupContents] = useState<Record<string, boolean>>({});
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const submenuRef = useRef<HTMLDivElement | null>(null);
+  const openTimelineRef = useRef<HTMLButtonElement | null>(null);
+  const submenuCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
   const lastScrollTopRef = useRef(0);
-  const groupColorInputRefs = useRef({});
-  const tagColorInputRefs = useRef({});
+  const groupColorInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const tagColorInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const themeGroupColor = resolveThemeGroupColor() || DEFAULT_GROUP_COLOR;
   const sidebarBgHex = resolveSecondaryBg();
 
@@ -412,7 +422,7 @@ export default function Sidebar({
     return file.title || file.id || '';
   }, [file]);
 
-  const fmtYear = (y) => {
+  const fmtYear = (y: number | undefined): string => {
     if (!file) return String(y);
     return formatYear(y, file.negID, file.posID, file.useCalendar === true, file.hideDecimals);
   };
@@ -420,7 +430,7 @@ export default function Sidebar({
   const spanById = useMemo(() => new Map(spans.map((s) => [s.id, s])), [spans]);
 
   const eraGroups = useMemo(() => {
-    const sortedEras = [...eras].sort((a, b) => a.start - b.start);
+    const sortedEras = [...eras].sort((a: EraElement, b: EraElement) => a.start - b.start);
     const allItems = [...events, ...spans].sort(compareEraGroupItems);
     if (sortedEras.length === 0) return { groups: [], ungrouped: allItems, tree: [] };
     const allDates = [
@@ -449,8 +459,8 @@ export default function Sidebar({
         return { start, end, scale: Math.max(0, Math.min(2, Number(item?.scale) || 0)) };
       })
       .filter(Boolean)
-      .sort((a, b) => a.start - b.start);
-    const compressYear = (year) => {
+      .sort((a: ScaleSection & { start: number; end: number; scale: number }, b: ScaleSection & { start: number; end: number; scale: number }) => a.start - b.start);
+    const compressYear = (year: number): number => {
       let adjustment = 0;
       for (const section of normalizedSections) {
         const duration = section.end - section.start;
@@ -470,42 +480,42 @@ export default function Sidebar({
     const range = compressYear(maxDate) - cMin || 1;
 
     // Build era parent map: each era's smallest containing era
-    const eraParentMap = new Map();
-    sortedEras.forEach((era) => {
+    const eraParentMap = new Map<ElementId, ElementId>();
+    sortedEras.forEach((era: EraElement) => {
       const eraR = era.end - era.start;
-      let bestParent = null,
-        bestRange = Infinity;
-      sortedEras.forEach((candidate) => {
-        if (candidate.id === era.id) return;
+      let bestParent: EraElement | null = null;
+      let bestRange = Infinity;
+      for (const candidate of sortedEras) {
+        if (candidate.id === era.id) continue;
         const r = candidate.end - candidate.start;
-        if (r <= eraR) return; // candidate must be larger to be a parent
+        if (r <= eraR) continue; // candidate must be larger to be a parent
         if (candidate.start <= era.start && era.end <= candidate.end) {
           if (r < bestRange) {
             bestRange = r;
             bestParent = candidate;
           }
         }
-      });
+      }
       if (bestParent) eraParentMap.set(era.id, bestParent.id);
     });
 
-    const rootEras = sortedEras.filter((e) => !eraParentMap.has(e.id));
-    const subEras = sortedEras.filter((e) => eraParentMap.has(e.id));
+    const rootEras = sortedEras.filter((e: EraElement) => !eraParentMap.has(e.id));
+    const subEras = sortedEras.filter((e: EraElement) => eraParentMap.has(e.id));
 
     // Find root ancestor for any sub-era
-    const getRootAncestorId = (eraId) => {
+    const getRootAncestorId = (eraId: ElementId): ElementId => {
       let current = eraId;
       while (eraParentMap.has(current)) current = eraParentMap.get(current);
       return current;
     };
 
     // Assign items to their most specific era (any era, including sub-eras)
-    const elementToAnyEraId = new Map();
-    allItems.forEach((el) => {
+    const elementToAnyEraId = new Map<ElementId, ElementId>();
+    allItems.forEach((el: EventElement | SpanElement) => {
       const elDate = el.type === 'event' ? el.date : el.start;
-      let bestEra = null,
-        bestRange = Infinity;
-      sortedEras.forEach((era) => {
+      let bestEra: EraElement | null = null;
+      let bestRange = Infinity;
+      for (const era of sortedEras) {
         if (elDate >= era.start && elDate <= era.end) {
           const r = era.end - era.start;
           if (r < bestRange) {
@@ -513,11 +523,11 @@ export default function Sidebar({
             bestEra = era;
           }
         }
-      });
+      }
       if (bestEra) elementToAnyEraId.set(el.id, bestEra.id);
     });
 
-    const sortItems = (items) => [...items].sort(compareEraGroupItems);
+    const sortItems = (items: Array<EventElement | SpanElement>) => [...items].sort(compareEraGroupItems);
 
     // Build groups: root eras with nested sub-era subGroups
     const groups = rootEras.map((era) => {
@@ -538,12 +548,12 @@ export default function Sidebar({
       };
     });
 
-    const buildEraNode = (era) => ({
+    const buildEraNode = (era: EraElement): EraTreeNode => ({
       era,
       items: sortItems(allItems.filter((el) => elementToAnyEraId.get(el.id) === era.id)),
       children: sortedEras
-        .filter((se) => eraParentMap.get(se.id) === era.id)
-        .sort((a, b) => a.start - b.start)
+        .filter((se: EraElement) => eraParentMap.get(se.id) === era.id)
+        .sort((a: EraElement, b: EraElement) => a.start - b.start)
         .map(buildEraNode),
       barLeft: ((compressYear(era.start) - cMin) / range) * 100,
       barWidth: Math.max(1, ((compressYear(era.end) - compressYear(era.start)) / range) * 100),
@@ -554,56 +564,57 @@ export default function Sidebar({
   }, [eras, events, spans]);
 
   const spanGroups = useMemo(() => {
-    const sortByDate = (items) => [...items].sort((a, b) => (a.date ?? a.start) - (b.date ?? b.start));
-    const rootSpans = spans.filter((s) => !s.parent);
-    const childSpans = spans.filter((s) => !!s.parent);
+    const sortByDate = (items: Array<EventElement | SpanElement | EraElement>) =>
+      [...items].sort((a, b) => (a.date ?? a.start ?? 0) - (b.date ?? b.start ?? 0));
+    const rootSpans = spans.filter((s: SpanElement) => !s.parent);
+    const childSpans = spans.filter((s: SpanElement) => !!s.parent);
 
     // Map each span to its root ancestor
-    const spanParentMap = new Map(childSpans.map((s) => [s.id, s.parent]));
-    const getRootSpanId = (spanId) => {
+    const spanParentMap = new Map<ElementId, ElementId>(childSpans.flatMap((s: SpanElement) => s.parent ? [[s.id, s.parent]] : []));
+    const getRootSpanId = (spanId: ElementId): ElementId => {
       let current = spanId;
       while (spanParentMap.has(current)) current = spanParentMap.get(current);
       return current;
     };
 
     // Assign each event to its most specific (shortest) parent span
-    const eventToSpanId = new Map();
-    events.forEach((ev) => {
+    const eventToSpanId = new Map<ElementId, ElementId>();
+    events.forEach((ev: EventElement) => {
       if (!ev.parents?.length) return;
-      let bestSpan = null,
-        bestDuration = Infinity;
-      ev.parents.forEach((pid) => {
-        const sp = spans.find((s) => s.id === pid);
-        if (!sp) return;
+      let bestSpan: SpanElement | null = null;
+      let bestDuration = Infinity;
+      for (const pid of ev.parents) {
+        const sp = spans.find((s: SpanElement) => s.id === pid);
+        if (!sp) continue;
         const dur = sp.end - sp.start;
         if (dur < bestDuration) {
           bestDuration = dur;
           bestSpan = sp;
         }
-      });
+      }
       if (bestSpan) eventToSpanId.set(ev.id, bestSpan.id);
     });
 
     const groups = rootSpans
-      .sort((a, b) => a.start - b.start)
-      .map((span) => {
-        const directEvents = sortByDate(events.filter((ev) => eventToSpanId.get(ev.id) === span.id));
+      .sort((a: SpanElement, b: SpanElement) => a.start - b.start)
+      .map((span: SpanElement) => {
+        const directEvents = sortByDate(events.filter((ev: EventElement) => eventToSpanId.get(ev.id) === span.id));
         const children = childSpans
-          .filter((cs) => getRootSpanId(cs.id) === span.id)
-          .sort((a, b) => a.start - b.start)
-          .map((cs) => ({
+          .filter((cs: SpanElement) => getRootSpanId(cs.id) === span.id)
+          .sort((a: SpanElement, b: SpanElement) => a.start - b.start)
+          .map((cs: SpanElement) => ({
             span: cs,
-            items: sortByDate(events.filter((ev) => eventToSpanId.get(ev.id) === cs.id)),
+            items: sortByDate(events.filter((ev: EventElement) => eventToSpanId.get(ev.id) === cs.id)),
           }));
         return { span, items: directEvents, subGroups: children };
       });
 
     const assignedEventIds = new Set(eventToSpanId.keys());
-    const assignedChildSpanIds = new Set(childSpans.map((s) => s.id));
+    const assignedChildSpanIds = new Set(childSpans.map((s: SpanElement) => s.id));
     const ungrouped = sortByDate([
       ...eras,
-      ...events.filter((ev) => !assignedEventIds.has(ev.id)),
-      ...childSpans.filter((s) => !assignedChildSpanIds.has(s.id)),
+      ...events.filter((ev: EventElement) => !assignedEventIds.has(ev.id)),
+      ...childSpans.filter((s: SpanElement) => !assignedChildSpanIds.has(s.id)),
     ]);
     return { groups, ungrouped };
   }, [spans, events, eras]);
@@ -629,12 +640,12 @@ export default function Sidebar({
     [groups],
   );
 
-  const commitDisplayGroupOrder = (nextDisplayGroups, dividerIndex) => {
+  const commitDisplayGroupOrder = (nextDisplayGroups: TimelineGroup[], dividerIndex?: number) => {
     if (!Array.isArray(nextDisplayGroups) || nextDisplayGroups.length === 0) return;
     const total = nextDisplayGroups.length;
     const divIdx = dividerIndex ?? total;
     const patchedById = new Map(
-      nextDisplayGroups.map((group, index) => [
+      nextDisplayGroups.map((group: TimelineGroup, index: number) => [
         group.id,
         {
           stack: total - index - 1,
@@ -661,7 +672,7 @@ export default function Sidebar({
     );
   };
 
-  const updateGroupPatch = (groupId, updates) => {
+  const updateGroupPatch = (groupId: string, updates: Partial<TimelineGroup>) => {
     if (!groupId || !updates || typeof updates !== 'object') return;
     if (typeof onUpdateGroups === 'function') {
       const nextGroups = groups.map((group) => (group.id === groupId ? { ...group, ...updates } : group));
@@ -726,13 +737,13 @@ export default function Sidebar({
     return [...pinned, ...rest].slice(0, 4);
   }, [allTags, pinnedTags]);
 
-  const formatRange = (start, end, startLabel, endLabel) => {
+  const formatRange = (start: number, end: number, startLabel: unknown, endLabel: unknown): string => {
     const left = displayDateLabel(startLabel) ?? fmtYear(start);
     const right = displayDateLabel(endLabel) ?? fmtYear(end);
     return `${left} - ${right}`;
   };
 
-  const handleTimelineMenuClick = (e) => {
+  const handleTimelineMenuClick = (e: React.MouseEvent<HTMLElement | SVGSVGElement>) => {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
     setTimelineMenu({
@@ -741,12 +752,12 @@ export default function Sidebar({
     });
   };
 
-  const handleMenuAction = (action) => {
+  const handleMenuAction = (action?: () => void) => {
     setTimelineMenu(null);
     if (action) action();
   };
 
-  const handleElementMenuAction = (action) => {
+  const handleElementMenuAction = (action?: () => void) => {
     setElementMenu(null);
     if (action) action();
   };
@@ -774,8 +785,8 @@ export default function Sidebar({
 
   useEffect(() => {
     if (!sortMenuOpen) return;
-    const handler = (e) => {
-      if (!sortMenuRef.current?.contains(e.target)) setSortMenuOpen(false);
+    const handler = (e: globalThis.MouseEvent) => {
+      if (!(e.target instanceof Node) || !sortMenuRef.current?.contains(e.target)) setSortMenuOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -785,9 +796,9 @@ export default function Sidebar({
   useEffect(() => {
     if (!timelineMenu && !openSubmenu) return;
 
-    const handleClickOutside = (e) => {
-      const clickedInsideMenu = menuRef.current?.contains(e.target);
-      const clickedInsideSubmenu = submenuRef.current?.contains(e.target);
+    const handleClickOutside = (e: globalThis.MouseEvent) => {
+      const clickedInsideMenu = e.target instanceof Node && menuRef.current?.contains(e.target);
+      const clickedInsideSubmenu = e.target instanceof Node && submenuRef.current?.contains(e.target);
 
       if (!clickedInsideMenu && !clickedInsideSubmenu) {
         // Clear any pending close timer
@@ -799,7 +810,7 @@ export default function Sidebar({
         setOpenSubmenu(null);
       }
     };
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setTimelineMenu(null);
         setOpenSubmenu(null);
@@ -821,13 +832,13 @@ export default function Sidebar({
   useEffect(() => {
     if (!elementMenu) return;
 
-    const handleClickOutside = (e) => {
+    const handleClickOutside = (e: globalThis.MouseEvent) => {
       const menu = document.querySelector('.timeline-context-menu');
-      if (menu && !menu.contains(e.target)) {
+      if (menu && (!(e.target instanceof Node) || !menu.contains(e.target))) {
         setElementMenu(null);
       }
     };
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setElementMenu(null);
     };
 
@@ -841,8 +852,8 @@ export default function Sidebar({
 
   useEffect(() => {
     if (!newMenuOpen) return;
-    const handleClick = (e) => {
-      if (newMenuRef.current && !newMenuRef.current.contains(e.target)) setNewMenuOpen(false);
+    const handleClick = (e: globalThis.MouseEvent) => {
+      if (!(e.target instanceof Node) || (newMenuRef.current && !newMenuRef.current.contains(e.target))) setNewMenuOpen(false);
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
@@ -850,8 +861,8 @@ export default function Sidebar({
 
   useEffect(() => {
     if (!groupMenuOpenId) return;
-    const handleClick = (e) => {
-      if (groupMenuRef.current && !groupMenuRef.current.contains(e.target)) setGroupMenuOpenId(null);
+    const handleClick = (e: globalThis.MouseEvent) => {
+      if (!(e.target instanceof Node) || (groupMenuRef.current && !groupMenuRef.current.contains(e.target))) setGroupMenuOpenId(null);
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
@@ -862,7 +873,7 @@ export default function Sidebar({
     listRef.current.scrollTop = lastScrollTopRef.current;
   }, [selectedId]);
 
-  const handleOpenSubmenu = (e, submenuType) => {
+  const handleOpenSubmenu = (e: React.MouseEvent<HTMLButtonElement>, submenuType: string) => {
     e.stopPropagation();
     // Clear any pending close timer
     if (submenuCloseTimer.current) {
@@ -893,7 +904,7 @@ export default function Sidebar({
     }
   };
 
-  const startGroupTitleEdit = (group) => {
+  const startGroupTitleEdit = (group: TimelineGroup) => {
     setEditingGroupId(group.id);
     setEditingGroupTitle(group.title || group.id || '');
   };
@@ -916,7 +927,7 @@ export default function Sidebar({
     setEditingGroupTitle('');
   };
 
-  const commitGroupTitleEdit = (groupId) => {
+  const commitGroupTitleEdit = (groupId: string) => {
     const group = groups.find((item) => item.id === groupId);
     if (!group) {
       cancelGroupTitleEdit();
@@ -929,17 +940,17 @@ export default function Sidebar({
     cancelGroupTitleEdit();
   };
 
-  const openGroupColorPicker = (groupId) => {
+  const openGroupColorPicker = (groupId: string) => {
     const input = groupColorInputRefs.current[groupId];
     if (input) input.click();
   };
 
-  const openTagColorPicker = (tag) => {
+  const openTagColorPicker = (tag: string) => {
     const input = tagColorInputRefs.current[tag];
     if (input) input.click();
   };
 
-  const toggleGroupContents = (groupId) => {
+  const toggleGroupContents = (groupId: string) => {
     setOpenGroupContents((prev) => ({
       ...prev,
       [groupId]: !prev[groupId],
@@ -965,10 +976,10 @@ export default function Sidebar({
   const hasChipFilter = !!chipFilter;
   const searchActive = searchQuery.trim().length > 0 || hasChipFilter;
   const q = searchQuery.trim().toLowerCase();
-  const matchesSearch = (value) => (value || '').toLowerCase().includes(q);
+  const matchesSearch = (value: unknown): boolean => String(value || '').toLowerCase().includes(q);
   const parsedFilter = useMemo(() => parseFilterQuery(searchQuery), [searchQuery]);
   // Combine the sidebar's own search with the timeline's active chip filter (AND semantics).
-  const elMatches = (el) => matchesFilter(el, parsedFilter) && (!hasChipFilter || matchesFilter(el, chipFilter));
+  const elMatches = (el: TimelineElement) => matchesFilter(el, parsedFilter) && (!hasChipFilter || matchesFilter(el, chipFilter));
   const searchPlaceholder =
     sidebarTab === 'timeline'
       ? 'Search spans, events, eras...'
@@ -976,20 +987,20 @@ export default function Sidebar({
         ? 'Search tags...'
         : 'Search groups...';
 
-  const applySidebarSort = (items, dateField) => {
+  const applySidebarSort = <T extends TimelineElement>(items: T[], dateField: keyof TimelineElement | null): T[] => {
     const sorted = [...items].sort((a, b) =>
       sortField === 'name'
-        ? (a.title || a.id || '').localeCompare(b.title || b.id || '')
-        : ((dateField != null ? a[dateField] : undefined) ?? a.date ?? a.start ?? 0) -
-          ((dateField != null ? b[dateField] : undefined) ?? b.date ?? b.start ?? 0),
+        ? String(a.title || a.id || '').localeCompare(String(b.title || b.id || ''))
+        : numberOrZero((dateField != null ? a[dateField] : undefined) ?? a.date ?? a.start) -
+          numberOrZero((dateField != null ? b[dateField] : undefined) ?? b.date ?? b.start),
     );
     return sortOrder === 'desc' ? sorted.reverse() : sorted;
   };
 
-  const sortByHeader = (groups, key) => {
+  const sortByHeader = <T extends Record<K, TimelineElement>, K extends string>(groups: T[], key: K): T[] => {
     const sorted = [...groups].sort((a, b) =>
       sortField === 'name'
-        ? (a[key].title || a[key].id || '').localeCompare(b[key].title || b[key].id || '')
+        ? String(a[key].title || a[key].id || '').localeCompare(String(b[key].title || b[key].id || ''))
         : (a[key].start ?? 0) - (b[key].start ?? 0),
     );
     return sortOrder === 'desc' ? sorted.reverse() : sorted;
@@ -1029,10 +1040,10 @@ export default function Sidebar({
   const visibleUngrouped = searchActive ? eraGroups.ungrouped.filter((el) => elMatches(el)) : eraGroups.ungrouped;
   const visibleEraTree = searchActive
     ? (() => {
-        const filterNode = (node) => {
+        const filterNode = (node: EraTreeNode): EraTreeNode | null => {
           const eraMatches = elMatches(node.era);
-          const filteredItems = eraMatches ? node.items : node.items.filter((el) => elMatches(el));
-          const filteredChildren = node.children.map(filterNode).filter(Boolean);
+          const filteredItems = eraMatches ? node.items : node.items.filter((el: EventElement | SpanElement) => elMatches(el));
+          const filteredChildren = node.children.map(filterNode).filter((child): child is EraTreeNode => child !== null);
           if (!eraMatches && filteredItems.length === 0 && filteredChildren.length === 0) return null;
           return { ...node, items: filteredItems, children: filteredChildren };
         };
@@ -1063,8 +1074,8 @@ export default function Sidebar({
     subGroups: (g.subGroups || []).map((sg) => ({ ...sg, items: applySidebarSort(sg.items, null) })),
   }));
   const sortedVisibleUngrouped = applySidebarSort(visibleUngrouped, null);
-  const applyEraTreeSort = (nodes) =>
-    sortByHeader(nodes, 'era').map((node) => ({
+  const applyEraTreeSort = (nodes: EraTreeNode[]): EraTreeNode[] =>
+    sortByHeader(nodes, 'era').map((node: EraTreeNode) => ({
       ...node,
       items: applySidebarSort(node.items, null),
       children: applyEraTreeSort(node.children || []),
@@ -1085,7 +1096,7 @@ export default function Sidebar({
           const items = groupElements.get(group.id) || [];
           const visibleItems = groupMatches
             ? items
-            : items.filter((element) => matchesSearch(element.title || element.id));
+            : items.filter((element: TimelineElement) => matchesSearch(element.title || element.id));
           if (!groupMatches && visibleItems.length === 0) return null;
           return {
             ...group,
@@ -1100,8 +1111,8 @@ export default function Sidebar({
         visibleCount: groupCounts.get(group.id) || 0,
       }));
 
-  const countEraTreeItems = (node) => node.items.length + node.children.reduce((s, c) => s + countEraTreeItems(c), 0);
-  const renderEraTreeNode = (node, depth) => {
+  const countEraTreeItems = (node: EraTreeNode): number => node.items.length + node.children.reduce((s: number, c: EraTreeNode) => s + countEraTreeItems(c), 0);
+  const renderEraTreeNode = (node: EraTreeNode, depth: number): React.ReactNode => {
     const { era, items, children, barLeft, barWidth } = node;
     const isOpen = searchActive || openEraGroups[era.id] !== false;
     const eraColor = era.color || 'var(--ui-muted)';
@@ -1137,7 +1148,7 @@ export default function Sidebar({
                   selectedId === era.id ? undefined : { color: getEraLabelColor(era.color, sidebarBgHex) || undefined }
                 }
               >
-                {(era.title || era.id).toUpperCase()}
+                {String(era.title || era.id).toUpperCase()}
               </span>
             </button>
             <span className="sb-era-count">{totalCount}</span>
@@ -1210,7 +1221,7 @@ export default function Sidebar({
                 selectedId === era.id ? undefined : { color: getEraLabelColor(era.color, sidebarBgHex) || undefined }
               }
             >
-              {(era.title || era.id).toUpperCase()}
+              {String(era.title || era.id).toUpperCase()}
             </span>
           </button>
           <span className="sb-sub-era-range">{formatRange(era.start, era.end, era.startLabel, era.endLabel)}</span>
@@ -1661,9 +1672,9 @@ export default function Sidebar({
             {sidebarTab === 'timeline' ? (
               file?.panelGroupMode === 'spans' ? (
                 <div className="sb-era-groups">
-                  {sortedVisibleSpanGroups.map(({ span, items, subGroups }) => {
+                  {sortedVisibleSpanGroups.map(({ span, items, subGroups }: SpanGroup) => {
                     const isOpen = searchActive || openSpanGroups[span.id] !== false;
-                    const renderSpanHeader = (s, isRoot, isOpenState, onToggle) => (
+                    const renderSpanHeader = (s: SpanElement, isRoot: boolean, isOpenState: boolean, onToggle: () => void) => (
                       <div className={`sb-sub-era-header${isRoot ? ' is-root-span' : ''}`}>
                         <button className="sb-era-toggle" onClick={onToggle}>
                           <ChevronDown
@@ -1695,7 +1706,7 @@ export default function Sidebar({
                                 : { color: getEraLabelColor(s.color, sidebarBgHex) || undefined }
                             }
                           >
-                            {(s.title || s.id).toUpperCase()}
+                            {String(s.title || s.id).toUpperCase()}
                           </span>
                         </button>
                         <span className="sb-sub-era-range">
@@ -1710,7 +1721,7 @@ export default function Sidebar({
                         )}
                         {isOpen && (
                           <div className="sb-sub-era-items">
-                            {items.map((el) => (
+                            {items.map((el: EventElement) => (
                               <ElementRow
                                 key={el.id}
                                 element={el}
@@ -1724,7 +1735,7 @@ export default function Sidebar({
                                 fmtYear={fmtYear}
                               />
                             ))}
-                            {subGroups?.map(({ span: childSpan, items: childItems }) => {
+                            {subGroups?.map(({ span: childSpan, items: childItems }: { span: SpanElement; items: EventElement[] }) => {
                               const isChildOpen = searchActive || openSpanGroups[childSpan.id] !== false;
                               return (
                                 <div key={childSpan.id} className="sb-sub-era-group">
@@ -1733,7 +1744,7 @@ export default function Sidebar({
                                   )}
                                   {isChildOpen && childItems.length > 0 && (
                                     <div className="sb-sub-era-items">
-                                      {childItems.map((el) => (
+                                      {childItems.map((el: EventElement) => (
                                         <ElementRow
                                           key={el.id}
                                           element={el}
@@ -1940,7 +1951,7 @@ export default function Sidebar({
                                     : { color: getEraLabelColor(era.color, sidebarBgHex) || undefined }
                                 }
                               >
-                                {(era.title || era.id).toUpperCase()}
+                                {String(era.title || era.id).toUpperCase()}
                               </span>
                             </button>
                             <span className="sb-era-count">{totalCount}</span>
@@ -2013,7 +2024,7 @@ export default function Sidebar({
                                               : { color: getEraLabelColor(subEra.color, sidebarBgHex) || undefined }
                                           }
                                         >
-                                          {(subEra.title || subEra.id).toUpperCase()}
+                                          {String(subEra.title || subEra.id).toUpperCase()}
                                         </span>
                                       </button>
                                       <span className="sb-sub-era-range">
@@ -2459,7 +2470,7 @@ export default function Sidebar({
                           </div>
                           {isGroupOpen && itemsInGroup.length > 0 && (
                             <div className="sidebar-group-elements">
-                              {itemsInGroup.map((element) => (
+                              {itemsInGroup.map((element: TimelineElement) => (
                                 <button
                                   key={element.id}
                                   type="button"

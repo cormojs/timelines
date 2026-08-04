@@ -23,11 +23,11 @@ import { parseFilterQuery, matchesFilter } from '../utils/filterUtils';
 import { ICON_MAP } from '../config/elementIcons';
 import { pickAndImportImage } from '../utils/electronApi';
 import { parseSourcesJson } from '../utils/json';
-import type { TimelineData } from '../types/timeline';
+import type { TimelineData, TimelineElement, TimelineElementType, TimelineSource } from '../types/timeline';
 
-const TYPE_LABEL = { event: 'Event', span: 'Span', era: 'Era' };
+const TYPE_LABEL: Record<TimelineElementType, string> = { event: 'Event', span: 'Span', era: 'Era' };
 
-const DEFAULT_WIDTHS = {
+const DEFAULT_WIDTHS: Record<string, number> = {
   type: 72,
   title: 200,
   description: 180,
@@ -53,11 +53,16 @@ const DEFAULT_WIDTHS = {
   thumbnailStyle: 120,
 };
 
+type Column = { key: string; label: string };
+type CellAddress = { id: string | number; field: string };
+type DropdownPosition = { left: number; top: number; width: number };
+type ContextMenu = { x: number; y: number; id: string | number; ids: Array<string | number> };
+
 type SpreadsheetViewProps = {
   timelineData: TimelineData;
   selectedId?: string | number | null;
   onSelect: (id: string | number) => void;
-  onUpdate: (element: Record<string, unknown>) => void;
+  onUpdate: (element: TimelineElement) => void;
   leftPanelWidth?: number;
   rightPanelWidth?: number;
   isRightPanelOpen?: boolean;
@@ -67,7 +72,7 @@ type SpreadsheetViewProps = {
   onAddEvent?: (groupId?: string) => void;
   onAddSpan?: (groupId?: string) => void;
   onAddEra?: (clickYear?: number, clickCoords?: { lat?: number; lng?: number }) => void;
-  onDelete?: (id: string | number) => void;
+  onDelete?: (id: string | number | Array<string | number>) => void;
   onDuplicate?: (id: string | number) => void;
   onSetElementGroup?: (id: string | number, groupId: string) => void;
   activeTags?: string[];
@@ -108,16 +113,16 @@ export default function SpreadsheetView({
   onTogglePinnedTag,
   readOnly = false,
 }: SpreadsheetViewProps) {
-  const [editCell, setEditCell] = useState(null);
+  const [editCell, setEditCell] = useState<CellAddress | null>(null);
   const [editValue, setEditValue] = useState('');
-  const [selectedCell, setSelectedCell] = useState(null); // { id, field } selection anchor
-  const [selEnd, setSelEnd] = useState(null); // { id, field } far corner of selection
+  const [selectedCell, setSelectedCell] = useState<CellAddress | null>(null); // { id, field } selection anchor
+  const [selEnd, setSelEnd] = useState<CellAddress | null>(null); // { id, field } far corner of selection
   const dragSelRef = useRef(false);
   const didDragRef = useRef(false);
   const [sortField, setSortField] = useState('date');
   const [sortDir, setSortDir] = useState('asc');
-  const [colWidths, setColWidths] = useState({});
-  const scrollRef = useRef(null);
+  const [colWidths, setColWidths] = useState<Record<string, number>>({});
+  const scrollRef = useRef<HTMLDivElement | null>(null);
   const [hiddenCols, setHiddenCols] = useState(
     new Set([
       'icon',
@@ -140,42 +145,42 @@ export default function SpreadsheetView({
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const [newMenuOpen, setNewMenuOpen] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
-  const exportMenuRef = useRef(null);
-  const stickyTopRef = useRef(null);
+  const exportMenuRef = useRef<HTMLDivElement | null>(null);
+  const stickyTopRef = useRef<HTMLDivElement | null>(null);
   const [stickyTopHeight, setStickyTopHeight] = useState(77);
-  const colbarRef = useRef(null);
-  const filterBtnRef = useRef(null);
-  const filterMenuRef = useRef(null);
-  const headerMenuRef = useRef(null);
-  const newMenuRef = useRef(null);
-  const rowRefs = useRef({});
-  const prevElementIds = useRef(new Set());
-  const [ctxMenu, setCtxMenu] = useState(null); // { x, y, id }
-  const ctxMenuRef = useRef(null);
-  const [tagDropdown, setTagDropdown] = useState([]);
-  const [tagDropdownPos, setTagDropdownPos] = useState(null);
-  const tagInputRef = useRef(null);
-  const [parentDropdown, setParentDropdown] = useState([]);
-  const [parentDropdownPos, setParentDropdownPos] = useState(null);
-  const parentInputRef = useRef(null);
-  const [mergeDropdown, setMergeDropdown] = useState([]);
-  const [mergeDropdownPos, setMergeDropdownPos] = useState(null);
-  const mergeInputRef = useRef(null);
-  const [noteDropdown, setNoteDropdown] = useState([]);
-  const [noteDropdownPos, setNoteDropdownPos] = useState(null);
-  const noteInputRef = useRef(null);
-  const [sourceDropdown, setSourceDropdown] = useState([]);
-  const [sourceDropdownPos, setSourceDropdownPos] = useState(null);
-  const sourceInputRef = useRef(null);
-  const [newSourceCellId, setNewSourceCellId] = useState(null);
+  const colbarRef = useRef<HTMLDivElement | null>(null);
+  const filterBtnRef = useRef<HTMLButtonElement | null>(null);
+  const filterMenuRef = useRef<HTMLDivElement | null>(null);
+  const headerMenuRef = useRef<HTMLDivElement | null>(null);
+  const newMenuRef = useRef<HTMLDivElement | null>(null);
+  const rowRefs = useRef<Record<string | number, HTMLTableRowElement>>({});
+  const prevElementIds = useRef<Set<string | number>>(new Set());
+  const [ctxMenu, setCtxMenu] = useState<ContextMenu | null>(null); // { x, y, id }
+  const ctxMenuRef = useRef<HTMLDivElement | null>(null);
+  const [tagDropdown, setTagDropdown] = useState<string[]>([]);
+  const [tagDropdownPos, setTagDropdownPos] = useState<DropdownPosition | null>(null);
+  const tagInputRef = useRef<HTMLInputElement | null>(null);
+  const [parentDropdown, setParentDropdown] = useState<TimelineElement[]>([]);
+  const [parentDropdownPos, setParentDropdownPos] = useState<DropdownPosition | null>(null);
+  const parentInputRef = useRef<HTMLInputElement | null>(null);
+  const [mergeDropdown, setMergeDropdown] = useState<TimelineElement[]>([]);
+  const [mergeDropdownPos, setMergeDropdownPos] = useState<DropdownPosition | null>(null);
+  const mergeInputRef = useRef<HTMLInputElement | null>(null);
+  const [noteDropdown, setNoteDropdown] = useState<string[]>([]);
+  const [noteDropdownPos, setNoteDropdownPos] = useState<DropdownPosition | null>(null);
+  const noteInputRef = useRef<HTMLInputElement | null>(null);
+  const [sourceDropdown, setSourceDropdown] = useState<TimelineSource[]>([]);
+  const [sourceDropdownPos, setSourceDropdownPos] = useState<DropdownPosition | null>(null);
+  const sourceInputRef = useRef<HTMLInputElement | null>(null);
+  const [newSourceCellId, setNewSourceCellId] = useState<string | number | null>(null);
   const [newSourceTitle, setNewSourceTitle] = useState('');
   const [newSourceUrl, setNewSourceUrl] = useState('');
   const [newSourceDesc, setNewSourceDesc] = useState('');
-  const newSourceTitleRef = useRef(null);
-  const [newGroupCellId, setNewGroupCellId] = useState(null);
+  const newSourceTitleRef = useRef<HTMLInputElement | null>(null);
+  const [newGroupCellId, setNewGroupCellId] = useState<string | number | null>(null);
   const [newGroupName, setNewGroupName] = useState('');
-  const newGroupInputRef = useRef(null);
-  const [thumbPanelCellId, setThumbPanelCellId] = useState(null);
+  const newGroupInputRef = useRef<HTMLInputElement | null>(null);
+  const [thumbPanelCellId, setThumbPanelCellId] = useState<string | number | null>(null);
   const [thumbPanelUrl, setThumbPanelUrl] = useState('');
 
   const file = timelineData?.file ?? {};
@@ -189,7 +194,7 @@ export default function SpreadsheetView({
   }, [file.id, file.title]);
 
   const elementById = useMemo(() => {
-    const map = {};
+    const map: Record<string | number, TimelineElement> = {};
     elements.forEach((el) => {
       map[el.id] = el;
     });
@@ -199,7 +204,7 @@ export default function SpreadsheetView({
   const groups = file.groups ?? [];
 
   const groupById = useMemo(() => {
-    const map = {};
+    const map: Record<string, string> = {};
     groups.forEach((g) => {
       map[g.id] = g.title;
     });
@@ -207,7 +212,7 @@ export default function SpreadsheetView({
   }, [groups]);
 
   const COLS = useMemo(() => {
-    const cols = [
+    const cols: Column[] = [
       { key: 'type', label: 'Type' },
       { key: 'title', label: 'Title' },
       { key: 'description', label: 'Description' },
@@ -236,7 +241,7 @@ export default function SpreadsheetView({
 
   const OPTIONAL_COLS = useMemo(() => COLS.filter((c) => c.key !== 'type' && c.key !== 'title'), [COLS]);
 
-  const toggleCol = (key) =>
+  const toggleCol = (key: string) =>
     setHiddenCols((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
@@ -247,12 +252,12 @@ export default function SpreadsheetView({
   const visibleCols = useMemo(() => COLS.filter((c) => !hiddenCols.has(c.key)), [COLS, hiddenCols]);
 
   const fmtDate = useCallback(
-    (yr) => formatYear(yr, negID ?? null, posID ?? null, useCalendar, hideDecimals),
+    (yr: number) => formatYear(yr, negID ?? null, posID ?? null, useCalendar, hideDecimals),
     [negID, posID, useCalendar, hideDecimals],
   );
 
   const getDateDisplay = useCallback(
-    (el) =>
+    (el: TimelineElement) =>
       el.type === 'event'
         ? formatDateForInput(el.dateLabel) || fmtDate(el.date)
         : formatDateForInput(el.startLabel) || fmtDate(el.start),
@@ -260,14 +265,14 @@ export default function SpreadsheetView({
   );
 
   const getEndDisplay = useCallback(
-    (el) => (el.type === 'event' ? null : formatDateForInput(el.endLabel) || fmtDate(el.end)),
+    (el: TimelineElement) => (el.type === 'event' ? null : formatDateForInput(el.endLabel) || fmtDate(el.end)),
     [fmtDate],
   );
 
-  const numDate = (el) => (el.type === 'event' ? (el.date ?? 0) : (el.start ?? 0));
+  const numDate = (el: TimelineElement) => (el.type === 'event' ? (el.date ?? 0) : (el.start ?? 0));
 
   const getParentTitle = useCallback(
-    (el) => {
+    (el: TimelineElement) => {
       const parentId = el.type === 'event' ? el.parents?.[0] : (el.parent ?? el.extendFrom);
       return parentId ? (elementById[parentId]?.title ?? '') : '';
     },
@@ -275,7 +280,7 @@ export default function SpreadsheetView({
   );
 
   const getMergeIntoTitle = useCallback(
-    (el) => {
+    (el: TimelineElement) => {
       return el.mergeParent ? (elementById[el.mergeParent]?.title ?? '') : '';
     },
     [elementById],
@@ -288,7 +293,7 @@ export default function SpreadsheetView({
   }, [elements, search]);
 
   const getCellDisplayValue = useCallback(
-    (el, field) => {
+    (el: TimelineElement, field: string) => {
       if (!el) return '';
       if (field === 'type') return TYPE_LABEL[el.type] ?? el.type;
       if (field === 'title') return el.title ?? '';
@@ -337,7 +342,7 @@ export default function SpreadsheetView({
   }, [searchedElements, sortField, sortDir, getCellDisplayValue]);
 
   const rowIndexById = useMemo(() => {
-    const m = {};
+    const m: Record<string | number, number> = {};
     sortedElements.forEach((el, i) => {
       m[el.id] = i;
     });
@@ -345,7 +350,7 @@ export default function SpreadsheetView({
   }, [sortedElements]);
 
   const colIndexByKey = useMemo(() => {
-    const m = {};
+    const m: Record<string, number> = {};
     visibleCols.forEach((c, i) => {
       m[c.key] = i;
     });
@@ -363,7 +368,7 @@ export default function SpreadsheetView({
   }, [selectedCell, selEnd, rowIndexById, colIndexByKey]);
 
   const selectedCellSet = useMemo(() => {
-    const set = new Set();
+    const set = new Set<string>();
     if (selRect) {
       for (let r = selRect.top; r <= selRect.bottom; r++)
         for (let c = selRect.left; c <= selRect.right; c++) set.add(`${sortedElements[r].id}|${visibleCols[c].key}`);
@@ -372,7 +377,7 @@ export default function SpreadsheetView({
   }, [selRect, sortedElements, visibleCols]);
 
   // Column resize
-  const startResize = (e, key) => {
+  const startResize = (e: React.MouseEvent<HTMLDivElement>, key: string) => {
     e.preventDefault();
     e.stopPropagation();
     const startX = e.clientX;
@@ -380,7 +385,7 @@ export default function SpreadsheetView({
     const startW = th ? th.getBoundingClientRect().width : (colWidths[key] ?? DEFAULT_WIDTHS[key] ?? 100);
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
-    const onMove = (me) => {
+    const onMove = (me: MouseEvent) => {
       setColWidths((prev) => ({ ...prev, [key]: Math.max(40, startW + me.clientX - startX) }));
     };
     const onUp = () => {
@@ -396,8 +401,8 @@ export default function SpreadsheetView({
   // Close menus on outside click
   useEffect(() => {
     if (!filterOpen) return;
-    const h = (e) => {
-      if (!filterBtnRef.current?.contains(e.target) && !filterMenuRef.current?.contains(e.target)) setFilterOpen(false);
+    const h = (e: MouseEvent) => {
+      if (!(e.target instanceof Node) || (!filterBtnRef.current?.contains(e.target) && !filterMenuRef.current?.contains(e.target))) setFilterOpen(false);
     };
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
@@ -405,8 +410,8 @@ export default function SpreadsheetView({
 
   useEffect(() => {
     if (!headerMenuOpen) return;
-    const h = (e) => {
-      if (!headerMenuRef.current?.contains(e.target)) setHeaderMenuOpen(false);
+    const h = (e: MouseEvent) => {
+      if (!(e.target instanceof Node) || !headerMenuRef.current?.contains(e.target)) setHeaderMenuOpen(false);
     };
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
@@ -414,8 +419,8 @@ export default function SpreadsheetView({
 
   useEffect(() => {
     if (!newMenuOpen) return;
-    const h = (e) => {
-      if (!newMenuRef.current?.contains(e.target)) setNewMenuOpen(false);
+    const h = (e: MouseEvent) => {
+      if (!(e.target instanceof Node) || !newMenuRef.current?.contains(e.target)) setNewMenuOpen(false);
     };
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
@@ -423,8 +428,8 @@ export default function SpreadsheetView({
 
   useEffect(() => {
     if (!exportMenuOpen) return;
-    const h = (e) => {
-      if (!exportMenuRef.current?.contains(e.target)) setExportMenuOpen(false);
+    const h = (e: MouseEvent) => {
+      if (!(e.target instanceof Node) || !exportMenuRef.current?.contains(e.target)) setExportMenuOpen(false);
     };
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
@@ -432,8 +437,8 @@ export default function SpreadsheetView({
 
   useEffect(() => {
     if (!ctxMenu) return;
-    const h = (e) => {
-      if (!ctxMenuRef.current?.contains(e.target)) setCtxMenu(null);
+    const h = (e: MouseEvent) => {
+      if (!(e.target instanceof Node) || !ctxMenuRef.current?.contains(e.target)) setCtxMenu(null);
     };
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
@@ -442,7 +447,7 @@ export default function SpreadsheetView({
   // Pure update logic — returns updated element or null if no applicable change.
   // Defined before the keyboard effect so it's initialized when the dep array is evaluated.
   const computeFieldUpdate = useCallback(
-    (el, field, val) => {
+    (el: TimelineElement, field: string, val: string): TimelineElement | null => {
       const updated = { ...el };
       if (field === 'title') {
         const t = val.trim();
@@ -476,7 +481,7 @@ export default function SpreadsheetView({
       } else if (field === 'tags') {
         const tags = val
           .split(',')
-          .map((t) => t.trim())
+          .map((t: string) => t.trim())
           .filter(Boolean);
         if (tags.length) updated.tags = tags;
         else delete updated.tags;
@@ -486,7 +491,7 @@ export default function SpreadsheetView({
         else if (!v) delete updated.icon;
         else return null;
       } else if (field === 'coords') {
-        const parts = val.split(',').map((s) => parseFloat(s.trim()));
+        const parts = val.split(',').map((s: string) => parseFloat(s.trim()));
         if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
           updated.lat = parts[0];
           updated.lng = parts[1];
@@ -591,11 +596,11 @@ export default function SpreadsheetView({
       return el ? { rows: [el], fields: [selectedCell.field] } : { rows: [], fields: [] };
     };
 
-    const clearCells = (rows, fields) => {
-      rows.forEach((orig) => {
+    const clearCells = (rows: TimelineElement[], fields: string[]) => {
+      rows.forEach((orig: TimelineElement) => {
         let el = orig;
         let changed = false;
-        fields.forEach((field) => {
+        fields.forEach((field: string) => {
           if (field === 'sources' || field === 'thumbnail') {
             if (el[field] !== undefined) {
               el = { ...el };
@@ -614,10 +619,10 @@ export default function SpreadsheetView({
       });
     };
 
-    const cellText = (el, field) =>
+    const cellText = (el: TimelineElement, field: string) =>
       field === 'sources' ? JSON.stringify(el.sources ?? []) : (getCellDisplayValue(el, field) ?? '');
 
-    const handler = (e) => {
+    const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setSelectedCell(null);
         setSelEnd(null);
@@ -736,7 +741,7 @@ export default function SpreadsheetView({
     const cols = COLS.filter((c) => !hiddenCols.has(c.key));
     const totalDefault = cols.reduce((s, c) => s + (DEFAULT_WIDTHS[c.key] ?? 100), 0);
     const scale = Math.max(1, containerW / totalDefault);
-    const scaled = {};
+    const scaled: Record<string, number> = {};
     cols.forEach((c) => {
       scaled[c.key] = Math.round((DEFAULT_WIDTHS[c.key] ?? 100) * scale);
     });
@@ -748,9 +753,9 @@ export default function SpreadsheetView({
   // Must attach to document in capture phase because Chrome ignores preventDefault()
   // on wheel events fired on non-vertically-scrollable elements.
   useEffect(() => {
-    const handler = (e) => {
+    const handler = (e: WheelEvent) => {
       const colbar = colbarRef.current;
-      if (!colbar || !colbar.contains(e.target)) return;
+      if (!colbar || !(e.target instanceof Node) || !colbar.contains(e.target)) return;
       if (e.deltaY === 0) return;
       e.preventDefault();
       colbar.scrollLeft += e.deltaY;
@@ -789,7 +794,7 @@ export default function SpreadsheetView({
     rowEl?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [elements]);
 
-  const handleSortClick = (field) => {
+  const handleSortClick = (field: string) => {
     if (sortField === field) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
     else {
       setSortField(field);
@@ -797,7 +802,7 @@ export default function SpreadsheetView({
     }
   };
 
-  const startEdit = (e, id, field) => {
+  const startEdit = (e: React.MouseEvent<HTMLTableCellElement>, id: string | number, field: string) => {
     if (readOnly) return;
     e.stopPropagation();
     if (editCell?.id === id && editCell?.field === field) return;
@@ -848,7 +853,7 @@ export default function SpreadsheetView({
     setEditValue(val);
   };
 
-  const toggleHideYear = (e, el) => {
+  const toggleHideYear = (e: React.MouseEvent<HTMLTableCellElement>, el: TimelineElement) => {
     e.stopPropagation();
     if (e.shiftKey) return;
     const updated = { ...el };
@@ -857,14 +862,14 @@ export default function SpreadsheetView({
     onUpdate(updated);
   };
 
-  const handleTagsChange = (e) => {
+  const handleTagsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setEditValue(val);
     const parts = val.split(',');
     const partial = parts[parts.length - 1].trim().toLowerCase();
     const already = parts
       .slice(0, -1)
-      .map((t) => t.trim())
+      .map((t: string) => t.trim())
       .filter(Boolean);
     const matches = allTags.filter((t) => t.toLowerCase().includes(partial) && !already.includes(t));
     setTagDropdown(matches);
@@ -874,16 +879,16 @@ export default function SpreadsheetView({
     }
   };
 
-  const spanStart = (span) => {
+  const spanStart = (span: TimelineElement) => {
     const p = parseTimelineInput(span.startLabel ?? span.start);
     return p.value ?? span.start;
   };
-  const spanEnd = (span) => {
+  const spanEnd = (span: TimelineElement) => {
     const p = parseTimelineInput(span.endLabel ?? span.end);
     return p.value ?? span.end;
   };
 
-  const handleParentChange = (e) => {
+  const handleParentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setEditValue(val);
     const q = val.trim().toLowerCase();
@@ -914,7 +919,7 @@ export default function SpreadsheetView({
     }
   };
 
-  const selectDropdownParent = (parentEl) => {
+  const selectDropdownParent = (parentEl: TimelineElement) => {
     const el = elements.find((x) => x.id === editCell?.id);
     if (!el) return;
     const updated = { ...el };
@@ -930,7 +935,7 @@ export default function SpreadsheetView({
     setParentDropdown([]);
   };
 
-  const commitNewGroup = (elId) => {
+  const commitNewGroup = (elId: string | number) => {
     const name = newGroupName.trim();
     if (!name) {
       setNewGroupCellId(null);
@@ -944,7 +949,7 @@ export default function SpreadsheetView({
     setNewGroupName('');
   };
 
-  const handleMergeIntoChange = (e) => {
+  const handleMergeIntoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setEditValue(val);
     const q = val.trim().toLowerCase();
@@ -965,7 +970,7 @@ export default function SpreadsheetView({
     }
   };
 
-  const handleNoteChange = (e) => {
+  const handleNoteChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setEditValue(val);
     const q = val.trim().toLowerCase();
@@ -978,7 +983,7 @@ export default function SpreadsheetView({
     }
   };
 
-  const selectDropdownNote = (filename) => {
+  const selectDropdownNote = (filename: string) => {
     const el = elements.find((x) => x.id === editCell?.id);
     if (!el) return;
     const updated = { ...el, noteFile: filename };
@@ -987,24 +992,24 @@ export default function SpreadsheetView({
     setNoteDropdown([]);
   };
 
-  const handleSourceChange = (e) => {
+  const handleSourceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setEditValue(val);
     const q = val.trim().toLowerCase();
     const currentSources = elements.find((x) => x.id === editCell?.id)?.sources ?? [];
-    const currentTitles = new Set(currentSources.map((s) => s.title));
-    const seen = new Set();
-    const allSources = [];
+    const currentTitles = new Set(currentSources.map((s) => s.title).filter((title): title is string => Boolean(title)));
+    const seen = new Set<string>();
+    const allSources: TimelineSource[] = [];
     elements.forEach((x) => {
       (x.sources ?? []).forEach((s) => {
-        if (!seen.has(s.title) && !currentTitles.has(s.title)) {
+        if (s.title && !seen.has(s.title) && !currentTitles.has(s.title)) {
           seen.add(s.title);
           allSources.push(s);
         }
       });
     });
     const matches = allSources.filter(
-      (s) => s.title.toLowerCase().includes(q) || (s.url ?? '').toLowerCase().includes(q),
+      (s) => (s.title ?? '').toLowerCase().includes(q) || (s.url ?? '').toLowerCase().includes(q),
     );
     setSourceDropdown(matches);
     requestAnimationFrame(() => {
@@ -1015,7 +1020,7 @@ export default function SpreadsheetView({
     });
   };
 
-  const srcSubtitle = (src) => {
+  const srcSubtitle = (src: TimelineSource): string => {
     if (src.url) {
       try {
         return new URL(src.url).hostname.replace(/^www\./, '');
@@ -1023,10 +1028,10 @@ export default function SpreadsheetView({
         return src.url;
       }
     }
-    return src.description || src.citation || '';
+    return typeof src.description === 'string' ? src.description : typeof src.citation === 'string' ? src.citation : '';
   };
 
-  const commitNewSource = (elId) => {
+  const commitNewSource = (elId: string | number) => {
     const t = newSourceTitle.trim();
     if (!t) {
       setNewSourceCellId(null);
@@ -1048,7 +1053,7 @@ export default function SpreadsheetView({
     setNewSourceUrl('');
   };
 
-  const selectDropdownSource = (src) => {
+  const selectDropdownSource = (src: TimelineSource) => {
     const el = elements.find((x) => x.id === editCell?.id);
     if (!el) return;
     const updated = { ...el, sources: [...(el.sources ?? []), src] };
@@ -1057,7 +1062,7 @@ export default function SpreadsheetView({
     setSourceDropdown([]);
   };
 
-  const selectDropdownMergeInto = (targetEl) => {
+  const selectDropdownMergeInto = (targetEl: TimelineElement) => {
     const el = elements.find((x) => x.id === editCell?.id);
     if (!el) return;
     const updated = { ...el, mergeParent: targetEl.id };
@@ -1066,7 +1071,7 @@ export default function SpreadsheetView({
     setMergeDropdown([]);
   };
 
-  const selectDropdownTag = (tag) => {
+  const selectDropdownTag = (tag: string) => {
     const parts = editValue.split(',');
     parts[parts.length - 1] = ' ' + tag;
     setEditValue(parts.join(',') + ', ');
@@ -1114,7 +1119,7 @@ export default function SpreadsheetView({
     setThumbPanelUrl('');
   };
 
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       commitEdit();
@@ -1136,7 +1141,7 @@ export default function SpreadsheetView({
     }
   };
 
-  const SortIcon = ({ field }) => {
+  const SortIcon = ({ field }: { field: string }) => {
     if (sortField !== field) return <ChevronsUpDown size={11} className="sheet-sort-icon" />;
     return sortDir === 'asc' ? (
       <ChevronUp size={11} className="sheet-sort-icon" />
@@ -1145,11 +1150,11 @@ export default function SpreadsheetView({
     );
   };
 
-  const w = (key) => colWidths[key] ?? DEFAULT_WIDTHS[key] ?? 100;
+  const w = (key: string) => colWidths[key] ?? DEFAULT_WIDTHS[key] ?? 100;
 
   const hasHeaderMenu = Boolean(onBackToHome) || (!readOnly && Boolean(onOpenSettings));
 
-  const triggerDownload = (content, filename, type) => {
+  const triggerDownload = (content: BlobPart, filename: string, type: string) => {
     const blob = new Blob([content], { type });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -1160,7 +1165,7 @@ export default function SpreadsheetView({
   };
 
   const exportCsv = () => {
-    const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const header = visibleCols.map((c) => esc(c.label)).join(',');
     const rows = sortedElements.map((el) => visibleCols.map((c) => esc(getCellDisplayValue(el, c.key))).join(','));
     triggerDownload([header, ...rows].join('\r\n'), `${displayName || 'timeline'}.csv`, 'text/csv;charset=utf-8;');
@@ -1194,7 +1199,7 @@ export default function SpreadsheetView({
     setThumbPanelUrl('');
   }, []);
 
-  const selectCell = (e, id, field) => {
+  const selectCell = (e: React.MouseEvent<HTMLElement>, id: string | number, field: string) => {
     e.stopPropagation();
     if (e.shiftKey && selectedCell) {
       setSelEnd({ id, field });
@@ -1212,17 +1217,18 @@ export default function SpreadsheetView({
     }
   };
 
-  const cellFromEvent = (e) => {
-    const td = e.target.closest?.('td.sheet-cell');
+  const cellFromEvent = (e: React.MouseEvent<HTMLTableSectionElement>) => {
+    const target = e.target as Element;
+    const td = target.closest('td.sheet-cell');
     if (!td) return null;
     const id = td.closest('tr')?.dataset.rowId;
-    const field = visibleCols[td.cellIndex]?.key;
+    const field = visibleCols[(td as HTMLTableCellElement).cellIndex]?.key;
     return id && field ? { id, field } : null;
   };
 
-  const handleTableMouseDown = (e) => {
+  const handleTableMouseDown = (e: React.MouseEvent<HTMLTableSectionElement>) => {
     if (e.button !== 0) return;
-    if (e.target.closest?.('input, select, button, textarea')) return;
+    if ((e.target as Element).closest('input, select, button, textarea')) return;
     const cell = cellFromEvent(e);
     if (!cell) return;
     didDragRef.current = false;
@@ -1236,7 +1242,7 @@ export default function SpreadsheetView({
     setSelEnd(null);
   };
 
-  const handleTableMouseOver = (e) => {
+  const handleTableMouseOver = (e: React.MouseEvent<HTMLTableSectionElement>) => {
     if (!dragSelRef.current) return;
     const cell = cellFromEvent(e);
     if (!cell) return;
@@ -1262,7 +1268,7 @@ export default function SpreadsheetView({
     return () => document.removeEventListener('mouseup', onUp);
   }, []);
 
-  const renderCell = (el, col) => {
+  const renderCell = (el: TimelineElement, col: Column) => {
     const { key: field } = col;
     const isEditing = editCell?.id === el.id && editCell?.field === field;
     const isSel = selectedCell?.id === el.id && selectedCell?.field === field;
@@ -1341,7 +1347,7 @@ export default function SpreadsheetView({
         );
       }
       const isExtend = !!el.extendFrom;
-      const toggleParentType = (e) => {
+      const toggleParentType = (e: React.MouseEvent<HTMLTableCellElement>) => {
         e.stopPropagation();
         if (e.shiftKey) return;
         const updated = { ...el };
@@ -1704,7 +1710,7 @@ export default function SpreadsheetView({
           </td>
         );
       }
-      const toggleHideDetails = (e) => {
+      const toggleHideDetails = (e: React.MouseEvent<HTMLTableCellElement>) => {
         e.stopPropagation();
         if (e.shiftKey) return;
         const updated = { ...el };
@@ -1847,7 +1853,7 @@ export default function SpreadsheetView({
         : null;
       const isPanelOpen = thumbPanelCellId === el.id;
       const timelineId = file.id?.replace(/-timeline$/, '');
-      const openPanel = (e) => {
+      const openPanel = (e: React.MouseEvent<HTMLTableCellElement>) => {
         selectCell(e, el.id, field);
         if (readOnly || e.shiftKey) return;
         if (!isPanelOpen) {
@@ -1875,7 +1881,7 @@ export default function SpreadsheetView({
         onUpdate(updated);
         closePanel();
       };
-      const browseThumb = async (e) => {
+      const browseThumb = async (e: React.MouseEvent<HTMLButtonElement>) => {
         e.stopPropagation();
         if (!timelineId) return;
         const result = await pickAndImportImage({ timelineId });
@@ -2056,16 +2062,16 @@ export default function SpreadsheetView({
             <span className="sheet-cell-empty">—</span>
           ) : (
             <div className="sheet-sources-list">
-              {srcList.map((src, i) => {
+              {srcList.map((src: TimelineSource, i: number) => {
                 const sub = srcSubtitle(src);
                 return (
                   <div
                     key={i}
                     className={`sheet-source-item${isEditing || isNewFormOpen ? ' sheet-source-item-edit' : ''}`}
                   >
-                    <div className="sheet-source-avatar">{src.title.charAt(0).toUpperCase()}</div>
+                    <div className="sheet-source-avatar">{(src.title ?? '?').charAt(0).toUpperCase()}</div>
                     <div className="sheet-source-text">
-                      <span className="sheet-source-title">{src.title}</span>
+                      <span className="sheet-source-title">{src.title ?? 'Untitled source'}</span>
                       {sub && <span className="sheet-source-sub">{sub}</span>}
                     </div>
                     {(isEditing || isNewFormOpen) && (
@@ -2074,7 +2080,7 @@ export default function SpreadsheetView({
                         onMouseDown={(e) => {
                           e.stopPropagation();
                           e.preventDefault();
-                          const updated = { ...el, sources: srcList.filter((_, j) => j !== i) };
+                          const updated = { ...el, sources: srcList.filter((_: TimelineSource, j: number) => j !== i) };
                           if (!updated.sources.length) delete updated.sources;
                           onUpdate(updated);
                         }}
