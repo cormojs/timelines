@@ -98,7 +98,12 @@ export default function TimelineScrollbar({
       return null;
     };
 
-    const normalizeScaleSections = (sections: unknown, legacyBreaks: unknown, min: number, max: number): ScaleSection[] => {
+    const normalizeScaleSections = (
+      sections: unknown,
+      legacyBreaks: unknown,
+      min: number,
+      max: number,
+    ): ScaleSection[] => {
       let raw =
         Array.isArray(sections) && sections.length > 0
           ? sections

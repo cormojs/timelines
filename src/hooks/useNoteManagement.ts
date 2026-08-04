@@ -25,7 +25,13 @@ type NoteManagementArgs = {
   onUpdate?: (element: TimelineElement) => void | Promise<void>;
 };
 
-export function useNoteManagement({ selectedElement, timelineData, formData, setFormData, onUpdate }: NoteManagementArgs) {
+export function useNoteManagement({
+  selectedElement,
+  timelineData,
+  formData,
+  setFormData,
+  onUpdate,
+}: NoteManagementArgs) {
   const timelineId = getStorageId(timelineData?.file);
   const [noteInitialContent, setNoteInitialContent] = useState('');
   const [isNoteLoading, setIsNoteLoading] = useState(false);

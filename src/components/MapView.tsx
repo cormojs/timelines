@@ -1,4 +1,14 @@
-import { useMemo, useEffect, useRef, useState, memo, forwardRef, useImperativeHandle, type ForwardedRef, type ReactElement } from 'react';
+import {
+  useMemo,
+  useEffect,
+  useRef,
+  useState,
+  memo,
+  forwardRef,
+  useImperativeHandle,
+  type ForwardedRef,
+  type ReactElement,
+} from 'react';
 import type { TimelineElement, TimelineFile } from '../types/timeline';
 import { MapContainer, TileLayer, Marker, Tooltip, Rectangle, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
@@ -16,7 +26,9 @@ const DEFAULT_MARKER_TYPES = {
 };
 type MapMarker = TimelineElement & { resolvedColor: string };
 type MapClickHandlerProps = { onSelect: (id: string | number | null) => void };
-type MapContextMenuHandlerProps = { onOpenContextMenu: (position: { x: number; y: number; lat: number; lng: number }) => void };
+type MapContextMenuHandlerProps = {
+  onOpenContextMenu: (position: { x: number; y: number; lat: number; lng: number }) => void;
+};
 type HoverCleanupHandlerProps = { onHoverChange: (id: string | number | null) => void };
 type WheelShortcutHandlerProps = {
   onAltWheelPan?: (event: { deltaX: number; deltaY: number; shiftKey: boolean }) => void;
@@ -107,7 +119,11 @@ function resolveMarkerType(elType: TimelineElement['type'], fileConfig?: Timelin
   return fileConfig?.mapEventMarker || DEFAULT_MARKER_TYPES.event;
 }
 
-function isMarkerVisibleAtViewportYear(el: TimelineElement, viewportYear: number | undefined, fileConfig?: TimelineFile): boolean {
+function isMarkerVisibleAtViewportYear(
+  el: TimelineElement,
+  viewportYear: number | undefined,
+  fileConfig?: TimelineFile,
+): boolean {
   if (!fileConfig?.mapLimitToViewportYear || !Number.isFinite(viewportYear)) return true;
 
   if (el.type === 'event') {
@@ -273,7 +289,13 @@ function MapAttribution({ attribution }: { attribution: string }): ReactElement 
   return null;
 }
 
-function FlyToSelected({ markers, selectedId }: { markers: MapMarker[]; selectedId?: string | number | null }): ReactElement | null {
+function FlyToSelected({
+  markers,
+  selectedId,
+}: {
+  markers: MapMarker[];
+  selectedId?: string | number | null;
+}): ReactElement | null {
   const map = useMap();
   const lastSnappedId = useRef<string | number | null>(null);
   useEffect(() => {

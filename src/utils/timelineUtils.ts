@@ -8,22 +8,58 @@ type PositionedSpan = SpanInput & { left: number; width: number; top: number; la
 type LaneInterval = { startPx: number; endPx: number };
 type FamilyBand = { minLane: number; maxLane: number; start: number; end: number };
 type SpanLayoutOptions = {
-  spans: SpanInput[]; yearToPx: (year: number) => number; BASE_LINE_Y: number; SPAN_HEIGHT: number;
-  SPAN_OFFSET: number; SPAN_GAP: number; SPAN_VERTICAL_GAP: number; spanChildPlacement: SpanPlacements;
-  timelineStart?: number; timelineEnd?: number; belowLine?: boolean;
+  spans: SpanInput[];
+  yearToPx: (year: number) => number;
+  BASE_LINE_Y: number;
+  SPAN_HEIGHT: number;
+  SPAN_OFFSET: number;
+  SPAN_GAP: number;
+  SPAN_VERTICAL_GAP: number;
+  spanChildPlacement: SpanPlacements;
+  timelineStart?: number;
+  timelineEnd?: number;
+  belowLine?: boolean;
 };
 type EventInput = TimelineElement & { date: number };
 type MeasuredEventBox = { boxHeight: number; isMultiLine: boolean; boxWidth: number; squareSize?: number };
 type MeasureEvent = (
-  title: unknown, tags: unknown, yearLabel: string, icon: unknown, thumbnail: unknown, thumbnailStyle: unknown,
-  hideYears: unknown, sourceLink: unknown, eventBorderStyle: unknown,
+  title: unknown,
+  tags: unknown,
+  yearLabel: string,
+  icon: unknown,
+  thumbnail: unknown,
+  thumbnailStyle: unknown,
+  hideYears: unknown,
+  sourceLink: unknown,
+  eventBorderStyle: unknown,
 ) => MeasuredEventBox;
-type PositionedEvent = EventInput & { _x: number; top: number; _boxHeight: number; _boxWidth: number; _isMultiLine: boolean; _squareSize?: number };
+type PositionedEvent = EventInput & {
+  _x: number;
+  top: number;
+  _boxHeight: number;
+  _boxWidth: number;
+  _isMultiLine: boolean;
+  _squareSize?: number;
+};
 type EventLayoutOptions = {
-  events: EventInput[]; yearToPx: (year: number) => number; BASE_LINE_Y: number; spanBandHeight: number;
-  EVENT_WIDTH: number; EVENT_GAP: number; LANE_SPACING: number; BOX_OFFSET: number; fixedEventHeight: boolean;
-  eventWidth?: number; eventFontSize?: number; fontFamily?: string; pinnedTags?: string[]; negID?: string;
-  posID?: string; belowLine?: boolean; useCalendar?: boolean; hideDecimals?: boolean;
+  events: EventInput[];
+  yearToPx: (year: number) => number;
+  BASE_LINE_Y: number;
+  spanBandHeight: number;
+  EVENT_WIDTH: number;
+  EVENT_GAP: number;
+  LANE_SPACING: number;
+  BOX_OFFSET: number;
+  fixedEventHeight: boolean;
+  eventWidth?: number;
+  eventFontSize?: number;
+  fontFamily?: string;
+  pinnedTags?: string[];
+  negID?: string;
+  posID?: string;
+  belowLine?: boolean;
+  useCalendar?: boolean;
+  hideDecimals?: boolean;
 };
 
 export const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -73,7 +109,8 @@ export function formatYear(
 
 const clampChannel = (value: number): number => Math.max(0, Math.min(255, Math.round(value)));
 
-const mixColor = (base: number, target: number, amount: number): number => clampChannel(base + (target - base) * amount);
+const mixColor = (base: number, target: number, amount: number): number =>
+  clampChannel(base + (target - base) * amount);
 
 const toHex = (value: number): string => value.toString(16).padStart(2, '0');
 
@@ -224,7 +261,12 @@ export function layoutSpans({
   timelineStart,
   timelineEnd,
   belowLine = false,
-}: SpanLayoutOptions): { finalSpans: PositionedSpan[]; spanLaneEnds: number[]; spanLaneById: Record<string, number>; spanChildPlacement: SpanPlacements } {
+}: SpanLayoutOptions): {
+  finalSpans: PositionedSpan[];
+  spanLaneEnds: number[];
+  spanLaneById: Record<string, number>;
+  spanChildPlacement: SpanPlacements;
+} {
   const spanLaneEnds: number[] = [];
   const spanLaneIntervals: LaneInterval[][] = [];
   const spanLaneById: Record<string, number> = {};
@@ -683,7 +725,9 @@ export function layoutEvents({
   probe.appendChild(probeDate);
 
   const getVisiblePinnedTags = (tags: unknown): string[] =>
-    (Array.isArray(tags) ? tags.filter((tag): tag is string => typeof tag === 'string') : []).filter((tag) => pinnedTags.includes(tag));
+    (Array.isArray(tags) ? tags.filter((tag): tag is string => typeof tag === 'string') : []).filter((tag) =>
+      pinnedTags.includes(tag),
+    );
 
   const setProbeTags = (tags: string[]): void => {
     probeTags.innerHTML = '';
@@ -694,12 +738,20 @@ export function layoutEvents({
       probeTags.appendChild(span);
     });
   };
-  const syncProbeDateRow = ({ showDateRow, showYear, visibleTags, hasThumbnailLayout = false }: {
-    showDateRow: boolean; showYear: boolean; visibleTags: string[]; hasThumbnailLayout?: boolean;
+  const syncProbeDateRow = ({
+    showDateRow,
+    showYear,
+    visibleTags,
+    hasThumbnailLayout = false,
+  }: {
+    showDateRow: boolean;
+    showYear: boolean;
+    visibleTags: string[];
+    hasThumbnailLayout?: boolean;
   }): void => {
     probe.classList.toggle('event-no-year', !showDateRow);
 
-    const dateParent = hasThumbnailLayout ? probeTextContent ?? probe : probe;
+    const dateParent = hasThumbnailLayout ? (probeTextContent ?? probe) : probe;
     if (!showDateRow) {
       if (probeDate.parentNode) probeDate.remove();
       return;
@@ -921,7 +973,17 @@ export function layoutEvents({
     measureCache = new Map();
   }
   const measureEventUncached = measureEvent;
-  measureEvent = (title, tags, yearLabel, icon, thumbnail, thumbnailStyle, hideYears, sourceLink, eventBorderStyle): MeasuredEventBox => {
+  measureEvent = (
+    title,
+    tags,
+    yearLabel,
+    icon,
+    thumbnail,
+    thumbnailStyle,
+    hideYears,
+    sourceLink,
+    eventBorderStyle,
+  ): MeasuredEventBox => {
     const key = JSON.stringify([
       title,
       tags,

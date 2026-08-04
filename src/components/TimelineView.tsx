@@ -425,7 +425,8 @@ function assignEraLanes(eras: EraElement[], bandHeight: number, bandGap: number)
     if (size === 'thick') return bandHeight * 2;
     return bandHeight;
   };
-  const verticalOverlap = (topA: number, heightA: number, topB: number, heightB: number) => topA < topB + heightB && topA + heightA > topB;
+  const verticalOverlap = (topA: number, heightA: number, topB: number, heightB: number) =>
+    topA < topB + heightB && topA + heightA > topB;
 
   // Implicit parent = the shortest strictly-longer era that overlaps this one.
   // Overlapping eras are stacked automatically: shorter above longer, touching.
@@ -465,7 +466,10 @@ function assignEraLanes(eras: EraElement[], bandHeight: number, bandGap: number)
   [...eras].sort((a: EraElement, b: EraElement) => a.start - b.start).forEach(visit);
 
   // All root eras share the same base offset so they sit in the same bottommost lane.
-  const commonRootBottom = Math.max(0, ...eras.filter((e: EraElement) => !implicitParentOf.has(e.id)).map((e: EraElement) => getEraHeight(e)));
+  const commonRootBottom = Math.max(
+    0,
+    ...eras.filter((e: EraElement) => !implicitParentOf.has(e.id)).map((e: EraElement) => getEraHeight(e)),
+  );
 
   const offsetOf = new Map<string | number, number>();
 
@@ -517,7 +521,15 @@ function assignEraLanes(eras: EraElement[], bandHeight: number, bandGap: number)
   return offsetOf;
 }
 
-function OverflowTags({ tags, tagColors, getReadableTextColor: readableColor }: { tags: string[]; tagColors?: Record<string, string>; getReadableTextColor: (color: string) => string }) {
+function OverflowTags({
+  tags,
+  tagColors,
+  getReadableTextColor: readableColor,
+}: {
+  tags: string[];
+  tagColors?: Record<string, string>;
+  getReadableTextColor: (color: string) => string;
+}) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [visibleCount, setVisibleCount] = useState(tags.length);
 
@@ -655,7 +667,9 @@ const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(function 
   }, [timelineData?.elements, parsedChipQuery]);
   const hasAnyFilter = filterChips.length > 0 || activeTags.length > 0 || hiddenTags.length > 0;
   const [showMap, setShowMap] = useState(false);
-  const mapViewRef = useRef<{ centerOnYear: (year: number) => void; zoomIn: () => void; zoomOut: () => void } | null>(null);
+  const mapViewRef = useRef<{ centerOnYear: (year: number) => void; zoomIn: () => void; zoomOut: () => void } | null>(
+    null,
+  );
   const [sliderValue, setSliderValue] = useState(0);
   const [sliderYearLabel, setSliderYearLabel] = useState('');
   const [currentScale, setCurrentScale] = useState(1);
@@ -757,9 +771,17 @@ const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(function 
   } = useMemo<TimelineLayout>(() => {
     const file = timelineData.file;
     const passesQuery = (el: TimelineElement) => !parsedChipQuery || matchesFilter(el, parsedChipQuery);
-    const events = timelineData.elements.filter((e): e is TimelineElement & { type: 'event'; date: number } => e.type === 'event' && passesQuery(e) && Number.isFinite(e.date));
-    const spans = timelineData.elements.filter((e): e is TimelineElement & { type: 'span'; start: number; end: number } => e.type === 'span' && passesQuery(e) && Number.isFinite(e.start) && Number.isFinite(e.end));
-    const eras = timelineData.elements.filter((e): e is EraElement => e.type === 'era' && passesQuery(e) && Number.isFinite(e.start) && Number.isFinite(e.end));
+    const events = timelineData.elements.filter(
+      (e): e is TimelineElement & { type: 'event'; date: number } =>
+        e.type === 'event' && passesQuery(e) && Number.isFinite(e.date),
+    );
+    const spans = timelineData.elements.filter(
+      (e): e is TimelineElement & { type: 'span'; start: number; end: number } =>
+        e.type === 'span' && passesQuery(e) && Number.isFinite(e.start) && Number.isFinite(e.end),
+    );
+    const eras = timelineData.elements.filter(
+      (e): e is EraElement => e.type === 'era' && passesQuery(e) && Number.isFinite(e.start) && Number.isFinite(e.end),
+    );
     const useCalendar = file?.useCalendar === true;
     const hasDayPrecision = (label: unknown) => {
       if (!label || typeof label !== 'string') return false;
@@ -835,17 +857,20 @@ const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(function 
       return groupIdSet.has(groupId) ? groupId : defaultGroupId;
     };
 
-    const adjustedEvents: Array<TimelineElement & { type: 'event'; groupId: string; date: number }> = events.map((event) => ({
-      ...event,
-      groupId: getSafeGroupId(event.groupId),
-      date: resolveDate(event.date, event.dateLabel),
-    }));
-    const adjustedSpans: Array<TimelineElement & { type: 'span'; groupId: string; start: number; end: number }> = spans.map((span) => ({
-      ...span,
-      groupId: getSafeGroupId(span.groupId),
-      start: resolveDate(span.start, span.startLabel),
-      end: resolveDate(span.end, span.endLabel),
-    }));
+    const adjustedEvents: Array<TimelineElement & { type: 'event'; groupId: string; date: number }> = events.map(
+      (event) => ({
+        ...event,
+        groupId: getSafeGroupId(event.groupId),
+        date: resolveDate(event.date, event.dateLabel),
+      }),
+    );
+    const adjustedSpans: Array<TimelineElement & { type: 'span'; groupId: string; start: number; end: number }> =
+      spans.map((span) => ({
+        ...span,
+        groupId: getSafeGroupId(span.groupId),
+        start: resolveDate(span.start, span.startLabel),
+        end: resolveDate(span.end, span.endLabel),
+      }));
     const visibleAdjustedEvents = adjustedEvents.filter((event) => visibleGroupIds.has(event.groupId));
     const visibleAdjustedSpans = adjustedSpans.filter((span) => visibleGroupIds.has(span.groupId));
     const adjustedEras: EraElement[] = eras.map((era) => ({
@@ -875,7 +900,12 @@ const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(function 
       return null;
     };
 
-    const normalizeScaleSections = (sections: unknown, legacyBreaks: unknown, min: number, max: number): ScaleSection[] => {
+    const normalizeScaleSections = (
+      sections: unknown,
+      legacyBreaks: unknown,
+      min: number,
+      max: number,
+    ): ScaleSection[] => {
       // Support old breaks format as scale=0 sections
       let raw =
         Array.isArray(sections) && sections.length > 0
@@ -1836,7 +1866,12 @@ const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(function 
     };
   };
 
-  const zoomToPoint = (zoomFactor: number, mouseX: number, mouseY: number, { commitState = true, skipLabels = false }: { commitState?: boolean; skipLabels?: boolean } = {}) => {
+  const zoomToPoint = (
+    zoomFactor: number,
+    mouseX: number,
+    mouseY: number,
+    { commitState = true, skipLabels = false }: { commitState?: boolean; skipLabels?: boolean } = {},
+  ) => {
     const container = containerRef.current;
     if (!container) return;
 
@@ -1867,8 +1902,14 @@ const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(function 
   const panTimelineFromWheelRef = useRef<((input: WheelPanInput) => void) | null>(null);
   const zoomTimelineFromWheelRef = useRef<((input: WheelZoomInput) => void) | null>(null);
   // Stable wrappers so MapView (and its WheelShortcutHandler effect) never re-run due to new function refs
-  const stablePanTimelineFromWheel = useCallback((input: WheelPanInput) => panTimelineFromWheelRef.current?.(input), []);
-  const stableZoomTimelineFromWheel = useCallback((input: WheelZoomInput) => zoomTimelineFromWheelRef.current?.(input), []);
+  const stablePanTimelineFromWheel = useCallback(
+    (input: WheelPanInput) => panTimelineFromWheelRef.current?.(input),
+    [],
+  );
+  const stableZoomTimelineFromWheel = useCallback(
+    (input: WheelZoomInput) => zoomTimelineFromWheelRef.current?.(input),
+    [],
+  );
 
   const panTimelineFromWheel = ({ deltaX = 0, deltaY = 0, shiftKey = false }: WheelPanInput) => {
     const container = containerRef.current;
@@ -2749,7 +2790,7 @@ const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(function 
 
     const handleClickOutside = (e: MouseEvent) => {
       const menu = document.querySelector('.timeline-context-menu');
-      if (menu && (! (e.target instanceof Node) || !menu.contains(e.target))) {
+      if (menu && (!(e.target instanceof Node) || !menu.contains(e.target))) {
         setContextMenu(null);
       }
     };
@@ -3531,7 +3572,14 @@ const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(function 
     const GAP_WIDTH = 24;
     const GAP_OVERLAP = 2;
     const EPSILON = 0.5;
-    const zeroScaleBreaks: Array<{ key: string; px: number; width: number; overlap: number; startLabel: string; endLabel: string }> = [];
+    const zeroScaleBreaks: Array<{
+      key: string;
+      px: number;
+      width: number;
+      overlap: number;
+      startLabel: string;
+      endLabel: string;
+    }> = [];
     const axisBreakMarkers: Array<{ px: number; key: string }> = [];
 
     const pushAxisBreak = (px: number, key: string) => {
@@ -4329,7 +4377,9 @@ const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(function 
                                       className="event-thumbnail-banner"
                                       src={event.thumbnail}
                                       alt=""
-                                      style={{ objectFit: (event.thumbnailFit || 'cover') as CSSProperties['objectFit'] }}
+                                      style={{
+                                        objectFit: (event.thumbnailFit || 'cover') as CSSProperties['objectFit'],
+                                      }}
                                     />
                                   )}
                                   <div
@@ -4938,7 +4988,10 @@ const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(function 
               className="context-menu-item"
               onClick={() =>
                 handleMenuAction(() =>
-                  onAddSpan?.(contextMenu.groupId, contextMenu.clickYear, { lat: contextMenu.lat, lng: contextMenu.lng }),
+                  onAddSpan?.(contextMenu.groupId, contextMenu.clickYear, {
+                    lat: contextMenu.lat,
+                    lng: contextMenu.lng,
+                  }),
                 )
               }
             >
@@ -4952,7 +5005,9 @@ const TimelineView = forwardRef<TimelineViewHandle, TimelineViewProps>(function 
             <button
               className="context-menu-item"
               onClick={() =>
-                handleMenuAction(() => onAddEra?.(contextMenu.clickYear, { lat: contextMenu.lat, lng: contextMenu.lng }))
+                handleMenuAction(() =>
+                  onAddEra?.(contextMenu.clickYear, { lat: contextMenu.lat, lng: contextMenu.lng }),
+                )
               }
             >
               <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16 }}>

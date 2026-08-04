@@ -43,7 +43,17 @@ import { formatYear } from '../utils/timelineUtils';
 import { isValidIdValue, isValidTagValue, normalizeTagValue, buildValidatedUpdate } from '../utils/validation';
 import { normalizeColor } from '../utils/colorUtils';
 
-function SectionHeader({ title, isOpen, onToggle, summary }: { title: string; isOpen: boolean; onToggle: () => void; summary?: string }) {
+function SectionHeader({
+  title,
+  isOpen,
+  onToggle,
+  summary,
+}: {
+  title: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  summary?: string;
+}) {
   return (
     <button type="button" className="edit-section-header" onClick={onToggle}>
       <ChevronDown size={15} className={`edit-section-header-chevron${isOpen ? '' : ' is-collapsed'}`} />
@@ -184,7 +194,8 @@ export default function RightPanel({
     if (!dynamicMenuField) return;
     const close = (e: MouseEvent) => {
       // ignore clicks on any dynamic-date toggle or menu so toggling/selecting works
-      if (e.target instanceof Element && e.target.closest('.dynamic-date-menu, .edit-input-icon-button-dynamic')) return;
+      if (e.target instanceof Element && e.target.closest('.dynamic-date-menu, .edit-input-icon-button-dynamic'))
+        return;
       setDynamicMenuField(null);
     };
     const onKeyDown = (e: KeyboardEvent) => {
@@ -585,7 +596,12 @@ export default function RightPanel({
     );
   }, [mergeParentCandidates, mergeParentQuery]);
 
-  const renderEventStrokeStyleControl = (field: keyof TimelineElement, currentValue: unknown, ariaLabel: string, variant: string) => (
+  const renderEventStrokeStyleControl = (
+    field: keyof TimelineElement,
+    currentValue: unknown,
+    ariaLabel: string,
+    variant: string,
+  ) => (
     <div className="event-style-toggle" role="group" aria-label={ariaLabel}>
       {EVENT_STROKE_STYLE_OPTIONS.map((option) => {
         const isActive = (currentValue || 'solid') === option.value;

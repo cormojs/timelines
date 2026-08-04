@@ -37,7 +37,10 @@ const formatBytes = (n: number): string => {
   return `${n} B`;
 };
 
-function oversizePackageError(rel: string, buf: Uint8Array | null | undefined): { path: string; size: number; error: string } | null {
+function oversizePackageError(
+  rel: string,
+  buf: Uint8Array | null | undefined,
+): { path: string; size: number; error: string } | null {
   if (!buf || buf.length < MAX_PACKAGE_BYTES) return null;
   return {
     path: rel,
@@ -176,86 +179,86 @@ function getChangeTarget(change: unknown): string | undefined {
   return typeof change.to === 'string' ? change.to : undefined;
 }
 
-type GitSyncCredentials = { token: string; username?: string; authType?: string }
-type GitChange = { path: string; from: string | null; to: string | null }
+type GitSyncCredentials = { token: string; username?: string; authType?: string };
+type GitChange = { path: string; from: string | null; to: string | null };
 type GitSyncState = {
-  url: string
-  branch: string
-  machineLabel?: string
-  uidToPath: Record<string, string>
-  excludedPaths?: string[]
-  writeReadme?: boolean
-  lastSyncedCommit?: string
-  [key: string]: unknown
-}
-type SyncTimeline = { uid: string; relativeId: string; neverSync?: boolean }
-type ImportResult = { success: boolean; uid?: string; id?: string; error?: string }
+  url: string;
+  branch: string;
+  machineLabel?: string;
+  uidToPath: Record<string, string>;
+  excludedPaths?: string[];
+  writeReadme?: boolean;
+  lastSyncedCommit?: string;
+  [key: string]: unknown;
+};
+type SyncTimeline = { uid: string; relativeId: string; neverSync?: boolean };
+type ImportResult = { success: boolean; uid?: string; id?: string; error?: string };
 type GitSyncSettingsUpdate = {
-  machineLabel?: string
-  excludedPaths?: string[]
-  autoSync?: boolean
-  debounceMs?: number
-  writeReadme?: boolean
-}
-type GitSyncCredentialsUpdate = { token?: string; username?: string; authType?: string }
+  machineLabel?: string;
+  excludedPaths?: string[];
+  autoSync?: boolean;
+  debounceMs?: number;
+  writeReadme?: boolean;
+};
+type GitSyncCredentialsUpdate = { token?: string; username?: string; authType?: string };
 type GitSyncEngineOptions = {
-  repoDir: string
-  statePath: string
-  listTimelines: () => Promise<SyncTimeline[]>
-  buildPackageForTimeline: (timeline: SyncTimeline) => Promise<Uint8Array>
+  repoDir: string;
+  statePath: string;
+  listTimelines: () => Promise<SyncTimeline[]>;
+  buildPackageForTimeline: (timeline: SyncTimeline) => Promise<Uint8Array>;
   importPackage: (
     buf: Uint8Array,
     options?: { preferredRelId?: string; resolution?: string; silent?: boolean; titleSuffix?: string },
-  ) => Promise<ImportResult>
-  removeLocalTimeline: (uid: string) => Promise<ImportResult>
-  http?: typeof httpNode
-  fetch?: typeof fetch
-  onAuth?: () => { username?: string; password?: string }
-  author?: { name: string; email: string }
-  machineLabel?: string
-  onStatus?: (status: ReturnType<GitSyncEngine['getStatus']>) => void
-  onApplied?: (ids: string[]) => void
-  now?: () => Date
-  debounceMs?: number
-  autoSync?: boolean
-  loadCredentials?: () => Promise<GitSyncCredentials | null>
-  saveCredentials?: (credentials: GitSyncCredentials) => Promise<void>
-  clearCredentials?: () => Promise<void>
-}
+  ) => Promise<ImportResult>;
+  removeLocalTimeline: (uid: string) => Promise<ImportResult>;
+  http?: typeof httpNode;
+  fetch?: typeof fetch;
+  onAuth?: () => { username?: string; password?: string };
+  author?: { name: string; email: string };
+  machineLabel?: string;
+  onStatus?: (status: ReturnType<GitSyncEngine['getStatus']>) => void;
+  onApplied?: (ids: string[]) => void;
+  now?: () => Date;
+  debounceMs?: number;
+  autoSync?: boolean;
+  loadCredentials?: () => Promise<GitSyncCredentials | null>;
+  saveCredentials?: (credentials: GitSyncCredentials) => Promise<void>;
+  clearCredentials?: () => Promise<void>;
+};
 
 class GitSyncEngine {
-  repoDir: string
-  statePath: string
-  listTimelines: GitSyncEngineOptions['listTimelines']
-  buildPackageForTimeline: GitSyncEngineOptions['buildPackageForTimeline']
-  importPackage: GitSyncEngineOptions['importPackage']
-  removeLocalTimeline: GitSyncEngineOptions['removeLocalTimeline']
-  http: typeof httpNode
-  fetch: typeof fetch
-  onAuth: NonNullable<GitSyncEngineOptions['onAuth']>
-  author: { name: string; email: string }
-  machineLabel: string
-  onStatus: GitSyncEngineOptions['onStatus'] | null
-  onApplied: GitSyncEngineOptions['onApplied'] | null
-  now: () => Date
-  debounceMs: number
-  autoSync: boolean
-  state: GitSyncState | null
-  loadCredentials: NonNullable<GitSyncEngineOptions['loadCredentials']>
-  saveCredentials: NonNullable<GitSyncEngineOptions['saveCredentials']>
-  clearCredentials: NonNullable<GitSyncEngineOptions['clearCredentials']>
-  credentials: GitSyncCredentials | null
-  dirtyUids: Set<string>
-  structureDirty: boolean
-  importing: boolean
-  statusState: string
-  lastError: Error | null
-  lastSyncedAt: string | null
-  conflictCopies: unknown[]
-  importErrors: unknown[]
-  exportErrors: unknown[]
-  _timer: ReturnType<typeof setTimeout> | null
-  _queue: Promise<unknown>
+  repoDir: string;
+  statePath: string;
+  listTimelines: GitSyncEngineOptions['listTimelines'];
+  buildPackageForTimeline: GitSyncEngineOptions['buildPackageForTimeline'];
+  importPackage: GitSyncEngineOptions['importPackage'];
+  removeLocalTimeline: GitSyncEngineOptions['removeLocalTimeline'];
+  http: typeof httpNode;
+  fetch: typeof fetch;
+  onAuth: NonNullable<GitSyncEngineOptions['onAuth']>;
+  author: { name: string; email: string };
+  machineLabel: string;
+  onStatus: GitSyncEngineOptions['onStatus'] | null;
+  onApplied: GitSyncEngineOptions['onApplied'] | null;
+  now: () => Date;
+  debounceMs: number;
+  autoSync: boolean;
+  state: GitSyncState | null;
+  loadCredentials: NonNullable<GitSyncEngineOptions['loadCredentials']>;
+  saveCredentials: NonNullable<GitSyncEngineOptions['saveCredentials']>;
+  clearCredentials: NonNullable<GitSyncEngineOptions['clearCredentials']>;
+  credentials: GitSyncCredentials | null;
+  dirtyUids: Set<string>;
+  structureDirty: boolean;
+  importing: boolean;
+  statusState: string;
+  lastError: Error | null;
+  lastSyncedAt: string | null;
+  conflictCopies: unknown[];
+  importErrors: unknown[];
+  exportErrors: unknown[];
+  _timer: ReturnType<typeof setTimeout> | null;
+  _queue: Promise<unknown>;
 
   constructor(opts: GitSyncEngineOptions) {
     this.repoDir = opts.repoDir;
@@ -648,7 +651,12 @@ class GitSyncEngine {
     }
   }
 
-  async _hasPendingTimelineChange(uid: string, rel: string, localOid: string | null, remoteOid: string | null): Promise<boolean> {
+  async _hasPendingTimelineChange(
+    uid: string,
+    rel: string,
+    localOid: string | null,
+    remoteOid: string | null,
+  ): Promise<boolean> {
     if (this.structureDirty || this.dirtyUids.has(uid)) return true;
     try {
       const matrix = await git.statusMatrix(this._g);

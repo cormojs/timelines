@@ -9,7 +9,11 @@ const isElectron = () => {
   return window.electron !== undefined;
 };
 
-export async function saveTimelineToFile(timelineData: TimelinePayload, filename = 'ancient-greece', options: { create?: boolean } = {}) {
+export async function saveTimelineToFile(
+  timelineData: TimelinePayload,
+  filename = 'ancient-greece',
+  options: { create?: boolean } = {},
+) {
   if (!isElectron()) {
     console.warn('Not running in Electron, skipping file save');
     return { success: false, error: 'Not in Electron environment' };
@@ -109,7 +113,15 @@ export async function importTimeline(payload: TimelinePayload) {
   }
 }
 
-export async function createNote({ timelineId, title, elementId }: { timelineId: TimelineId; title: string; elementId: string | number }) {
+export async function createNote({
+  timelineId,
+  title,
+  elementId,
+}: {
+  timelineId: TimelineId;
+  title: string;
+  elementId: string | number;
+}) {
   if (!isElectron()) {
     console.warn('Not running in Electron');
     return { success: false, error: 'Not in Electron environment' };
@@ -154,7 +166,15 @@ export async function readNote({ timelineId, filename }: { timelineId: TimelineI
   }
 }
 
-export async function writeNote({ timelineId, filename, content }: { timelineId: TimelineId; filename: string; content: string }) {
+export async function writeNote({
+  timelineId,
+  filename,
+  content,
+}: {
+  timelineId: TimelineId;
+  filename: string;
+  content: string;
+}) {
   if (!isElectron()) {
     console.warn('Not running in Electron');
     return { success: false, error: 'Not in Electron environment' };

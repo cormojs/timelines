@@ -11,7 +11,8 @@ const electronApi = {
   saveTimelineThumbnail: (payload: IpcPayload) => ipcRenderer.invoke('save-timeline-thumbnail', payload),
   listTimelines: () => ipcRenderer.invoke('list-timelines'),
   loadTimeline: (filename: string) => ipcRenderer.invoke('load-timeline', filename),
-  exportTimeline: (data: IpcPayload, suggestedName: string) => ipcRenderer.invoke('export-timeline', { data, suggestedName }),
+  exportTimeline: (data: IpcPayload, suggestedName: string) =>
+    ipcRenderer.invoke('export-timeline', { data, suggestedName }),
   exportTimelinePackage: (data: IpcPayload, suggestedName: string) =>
     ipcRenderer.invoke('export-timeline-package', { data, suggestedName }),
   importTimeline: (payload: IpcPayload) => ipcRenderer.invoke('import-timeline', payload),

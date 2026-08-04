@@ -67,12 +67,7 @@ export const formatCalendarDate = (
   return `${pad2(month)}/${pad2(day)}/${year}`;
 };
 
-const buildCalendarDate = (
-  year: number,
-  month: number,
-  day: number,
-  precision: DatePrecision,
-): CalendarDate | null => {
+const buildCalendarDate = (year: number, month: number, day: number, precision: DatePrecision): CalendarDate | null => {
   if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
   if (month < 1 || month > 12) return null;
   const maxDay = daysInMonth(year, month);

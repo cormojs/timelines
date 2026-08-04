@@ -402,7 +402,11 @@ export default function SpreadsheetView({
   useEffect(() => {
     if (!filterOpen) return;
     const h = (e: MouseEvent) => {
-      if (!(e.target instanceof Node) || (!filterBtnRef.current?.contains(e.target) && !filterMenuRef.current?.contains(e.target))) setFilterOpen(false);
+      if (
+        !(e.target instanceof Node) ||
+        (!filterBtnRef.current?.contains(e.target) && !filterMenuRef.current?.contains(e.target))
+      )
+        setFilterOpen(false);
     };
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
@@ -997,7 +1001,9 @@ export default function SpreadsheetView({
     setEditValue(val);
     const q = val.trim().toLowerCase();
     const currentSources = elements.find((x) => x.id === editCell?.id)?.sources ?? [];
-    const currentTitles = new Set(currentSources.map((s) => s.title).filter((title): title is string => Boolean(title)));
+    const currentTitles = new Set(
+      currentSources.map((s) => s.title).filter((title): title is string => Boolean(title)),
+    );
     const seen = new Set<string>();
     const allSources: TimelineSource[] = [];
     elements.forEach((x) => {

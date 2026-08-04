@@ -247,7 +247,10 @@ export default function WikiSection({ wikiUrl, useWiki, isEditMode, onUrlChange 
   const wikiUrlInputRef = useRef<HTMLInputElement | null>(null);
   const activeUrlRef = useRef<string | null>(null);
 
-  const fetchWikiContent = async (url: string | undefined, { forceRefresh = false, background = false }: WikiFetchOptions = {}) => {
+  const fetchWikiContent = async (
+    url: string | undefined,
+    { forceRefresh = false, background = false }: WikiFetchOptions = {},
+  ) => {
     if (!url) return;
     if (!background) activeUrlRef.current = url;
     const cacheKey = `${WIKI_SANITIZE_VERSION}:${url}`;
@@ -291,7 +294,11 @@ export default function WikiSection({ wikiUrl, useWiki, isEditMode, onUrlChange 
         if (lastSegment) titleCandidates.push(lastSegment);
       }
 
-      const resolveSectionIndex = async (base: string, title: string, anchor: string): Promise<string | number | null> => {
+      const resolveSectionIndex = async (
+        base: string,
+        title: string,
+        anchor: string,
+      ): Promise<string | number | null> => {
         const q = `?action=parse&page=${encodeURIComponent(title)}&prop=sections&format=json&formatversion=2`;
         const result = await fetchWikiApi(base + q);
         if (!result?.success) return null;
@@ -316,7 +323,11 @@ export default function WikiSection({ wikiUrl, useWiki, isEditMode, onUrlChange 
         return match ? match.index : null;
       };
 
-      const tryApi = async (base: string, title: string, sectionIndex: string | number | null): Promise<WikiApiData | null> => {
+      const tryApi = async (
+        base: string,
+        title: string,
+        sectionIndex: string | number | null,
+      ): Promise<WikiApiData | null> => {
         let q = `?action=parse&page=${encodeURIComponent(title)}&prop=text&disabletoc=1&format=json&formatversion=2`;
         if (sectionIndex != null) q += `&section=${sectionIndex}`;
         const result = await fetchWikiApi(base + q);

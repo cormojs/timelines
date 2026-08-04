@@ -16,8 +16,13 @@ const { buildPackage, readPackage, strToU8 } = require('../electron/timelinePack
 const { parseTimelineJson } = require('../src/utils/json.ts');
 
 type LibraryTimeline = {
-  uid: string; relativeId: string; title: string; elements: Array<Record<string, unknown>>;
-  notes: Record<string, string>; assets: Record<string, Uint8Array>; neverSync?: boolean;
+  uid: string;
+  relativeId: string;
+  title: string;
+  elements: Array<Record<string, unknown>>;
+  notes: Record<string, string>;
+  assets: Record<string, Uint8Array>;
+  neverSync?: boolean;
 };
 type Library = {
   timelines: Map<string, LibraryTimeline>;
@@ -27,8 +32,13 @@ type Library = {
   ops: Record<string, unknown>;
 };
 type GitTestContext = {
-  root: string; remoteDir: string; url: string; server: Server;
-  remoteFiles: () => string[]; lastMessage: () => string; mergeCount: () => string;
+  root: string;
+  remoteDir: string;
+  url: string;
+  server: Server;
+  remoteFiles: () => string[];
+  lastMessage: () => string;
+  mergeCount: () => string;
 };
 
 const runGit = (args: string[], cwd: string): string => {

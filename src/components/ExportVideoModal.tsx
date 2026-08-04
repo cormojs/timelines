@@ -35,12 +35,7 @@ type ExportVideoModalProps = {
   timelineViewRef?: { current?: Pick<TimelineViewHandle, 'generatePreview'> | null };
 };
 
-export default function ExportVideoModal({
-  isOpen,
-  onClose,
-  timelineData,
-  timelineViewRef,
-}: ExportVideoModalProps) {
+export default function ExportVideoModal({ isOpen, onClose, timelineData, timelineViewRef }: ExportVideoModalProps) {
   const [filename, setFilename] = useState('');
   const [previewData, setPreviewData] = useState<TimelinePreview | null>(null);
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);

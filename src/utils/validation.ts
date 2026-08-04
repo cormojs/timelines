@@ -75,7 +75,10 @@ export const sanitizeTitle = (value: unknown): string =>
 
 // --- Scale section helpers (SettingsModal) ---
 
-export const loadScaleSections = (stored: ScaleSectionInput[] = [], legacyBreaks: ScaleSectionInput[] = []): Required<ScaleSectionInput>[] => {
+export const loadScaleSections = (
+  stored: ScaleSectionInput[] = [],
+  legacyBreaks: ScaleSectionInput[] = [],
+): Required<ScaleSectionInput>[] => {
   const source =
     Array.isArray(stored) && stored.length > 0
       ? stored

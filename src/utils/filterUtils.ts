@@ -8,9 +8,7 @@ type LeafKind = 'quoted' | 'date' | 'type' | 'has' | 'contains' | 'tag' | 'text'
 type LeafToken = { t: 'LEAF'; kind: LeafKind; value: string; op?: DateOperator };
 type Token = { t: 'LPAREN' | 'RPAREN' | 'OR' | 'NOT' | 'PENDING_CONTAINS' } | LeafToken;
 type FilterNode =
-  | LeafToken
-  | { t: 'AND' | 'OR'; left: FilterNode; right: FilterNode }
-  | { t: 'NOT'; operand: FilterNode };
+  LeafToken | { t: 'AND' | 'OR'; left: FilterNode; right: FilterNode } | { t: 'NOT'; operand: FilterNode };
 
 function tokenize(input: string): Token[] {
   const s = input;
@@ -267,7 +265,11 @@ export function parseFilterQuery(query: string): FilterNode | null {
   return parse(tokens);
 }
 
-export function matchesFilter(el: TimelineElement, parsedQuery: FilterNode | null, noteContent: string | null = null): boolean {
+export function matchesFilter(
+  el: TimelineElement,
+  parsedQuery: FilterNode | null,
+  noteContent: string | null = null,
+): boolean {
   if (!parsedQuery) return true;
   return evalNode(parsedQuery, el, noteContent);
 }

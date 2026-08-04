@@ -56,9 +56,17 @@ type LibraryFile = {
   conflict?: boolean;
 };
 type GitSyncStatus = {
-  state?: string; machineLabel?: string; autoSync?: boolean; debounceMs?: number; lastSyncedAt?: string;
-  error?: string; excludedPaths?: string[]; writeReadme?: boolean | string; exportErrors?: Array<{ error?: string; path?: string }>;
-  importErrors?: Array<{ error?: string; path?: string }>; repo?: { url?: string; branch?: string; owner?: string; repo?: string; htmlUrl?: string };
+  state?: string;
+  machineLabel?: string;
+  autoSync?: boolean;
+  debounceMs?: number;
+  lastSyncedAt?: string;
+  error?: string;
+  excludedPaths?: string[];
+  writeReadme?: boolean | string;
+  exportErrors?: Array<{ error?: string; path?: string }>;
+  importErrors?: Array<{ error?: string; path?: string }>;
+  repo?: { url?: string; branch?: string; owner?: string; repo?: string; htmlUrl?: string };
 };
 type GitSyncShareInfo = {
   canShareViewer?: boolean;
@@ -70,16 +78,59 @@ type GitSyncShareInfo = {
   github?: { htmlUrl?: string };
   [key: string]: string | boolean | { htmlUrl?: string } | undefined;
 };
-type GitSyncShareDialog = { file: LibraryFile; info: GitSyncShareInfo | null; loading: boolean; error: string; copied: string };
+type GitSyncShareDialog = {
+  file: LibraryFile;
+  info: GitSyncShareInfo | null;
+  loading: boolean;
+  error: string;
+  copied: string;
+};
 type GitSyncLinkKind = 'githubBlobUrl' | 'viewerUrl' | 'exactViewerUrl';
-type GitSyncHistoryEntry = { oid: string; subject?: string; committedAt?: string; authorName?: string; summary?: string; viewerUrl?: string };
-type GitSyncHistoryDialog = { file: LibraryFile; history: { entries: GitSyncHistoryEntry[] } | null; loading: boolean; error: string; restoringOid: string };
-type FolderTarget = { folderPath: string; folderName?: string; nearRight?: boolean; x?: number; y?: number; fileCount?: number };
+type GitSyncHistoryEntry = {
+  oid: string;
+  subject?: string;
+  committedAt?: string;
+  authorName?: string;
+  summary?: string;
+  viewerUrl?: string;
+};
+type GitSyncHistoryDialog = {
+  file: LibraryFile;
+  history: { entries: GitSyncHistoryEntry[] } | null;
+  loading: boolean;
+  error: string;
+  restoringOid: string;
+};
+type FolderTarget = {
+  folderPath: string;
+  folderName?: string;
+  nearRight?: boolean;
+  x?: number;
+  y?: number;
+  fileCount?: number;
+};
 type SyncFolderNode = { type: 'folder'; id: string; label: string; children: SyncNode[]; sortKey: string };
-type SyncTimelineNode = { type: 'timeline'; id: string; label: string; sortKey: string; conflict: boolean; neverSync: boolean };
+type SyncTimelineNode = {
+  type: 'timeline';
+  id: string;
+  label: string;
+  sortKey: string;
+  conflict: boolean;
+  neverSync: boolean;
+};
 type SyncNode = SyncFolderNode | SyncTimelineNode;
 
-function MovePicker({ folders, currentFolder, onConfirm, onCancel }: { folders: string[]; currentFolder: string; onConfirm: (folder: string) => void; onCancel: () => void }) {
+function MovePicker({
+  folders,
+  currentFolder,
+  onConfirm,
+  onCancel,
+}: {
+  folders: string[];
+  currentFolder: string;
+  onConfirm: (folder: string) => void;
+  onCancel: () => void;
+}) {
   const [dest, setDest] = useState<string | null>(null);
   return (
     <div className="folder-modal folder-modal-pick" onClick={(e) => e.stopPropagation()}>
@@ -100,7 +151,17 @@ function MovePicker({ folders, currentFolder, onConfirm, onCancel }: { folders: 
   );
 }
 
-function FolderTree({ folders, currentFolder, selected, onSelect }: { folders: string[]; currentFolder: string; selected: string | null; onSelect: (folder: string) => void }) {
+function FolderTree({
+  folders,
+  currentFolder,
+  selected,
+  onSelect,
+}: {
+  folders: string[];
+  currentFolder: string;
+  selected: string | null;
+  onSelect: (folder: string) => void;
+}) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   const toggle = (path: string) => setCollapsed((prev) => ({ ...prev, [path]: !prev[path] }));
@@ -227,7 +288,9 @@ function formatMirrorBytes(n: number | null | undefined) {
 function buildSyncTree(files: LibraryFile[]): SyncFolderNode {
   const root: SyncFolderNode = { type: 'folder', id: '', label: 'Library', children: [], sortKey: '' };
   const folderMap = new Map<string, SyncFolderNode>([['', root]]);
-  const sorted = [...files].filter((file: LibraryFile) => !file.isPackage).sort((a: LibraryFile, b: LibraryFile) => a.id.localeCompare(b.id));
+  const sorted = [...files]
+    .filter((file: LibraryFile) => !file.isPackage)
+    .sort((a: LibraryFile, b: LibraryFile) => a.id.localeCompare(b.id));
 
   for (const file of sorted) {
     const parts = String(file.id || '').split('/');
@@ -301,23 +364,46 @@ const clampHomeSidebar = (w: number, shellWidth = NaN) => {
 
 type HomeAction = (...args: unknown[]) => unknown | Promise<unknown>;
 type HomePageProps = {
-  settingsOnly?: boolean; reuseExistingBackdrop?: boolean;
-  onSelectTimeline: HomeAction; onRenameTimeline: HomeAction; onTimelineRenamed: HomeAction;
+  settingsOnly?: boolean;
+  reuseExistingBackdrop?: boolean;
+  onSelectTimeline: HomeAction;
+  onRenameTimeline: HomeAction;
+  onTimelineRenamed: HomeAction;
   onCreateTimeline: (config: Record<string, unknown>) => Promise<{ success?: boolean }>;
   onImportTimeline?: HomeAction;
-  appThemeKey?: string; appFontFamily?: string; appFontSize?: number;
-  fonts: { name?: string }[]; themes: Record<string, unknown>;
-  onAppThemeChange: (theme: string) => void; oldFormatThemeCount?: number; onMigrateOldThemes: () => void;
-  onAppFontChange: (font: string) => void; onAppFontSizeChange: (size: number | string) => void;
-  timelineStorageDir?: string; notesStorageDir?: string; assetsStorageDir?: string;
-  onAssetsStorageDirChange: (path: string) => void; onTimelineStorageDirChange: (path: string) => void;
-  onNotesStorageDirChange: (path: string) => void; onPickTimelinesDir: () => void; onPickNotesDir: () => void;
-  onPickAssetsDir: () => void; onOpenFontsFolder: () => void; onOpenTimelinesFolder: () => void;
-  onOpenNotesFolder: () => void; onOpenAssetsFolder: () => void; hardwareAcceleration?: boolean;
-  onHardwareAccelerationChange: (enabled: boolean) => void; startMaximized?: boolean;
-  onStartMaximizedChange: (enabled: boolean) => void; onRefreshThemes: () => void | Promise<void>;
-  openSettingsSignal?: number; onAppSettingsClosed: () => void; keybinds?: Keybinds;
-  onKeybindsChange: (...args: unknown[]) => void; thumbnailRefreshSignal?: number;
+  appThemeKey?: string;
+  appFontFamily?: string;
+  appFontSize?: number;
+  fonts: { name?: string }[];
+  themes: Record<string, unknown>;
+  onAppThemeChange: (theme: string) => void;
+  oldFormatThemeCount?: number;
+  onMigrateOldThemes: () => void;
+  onAppFontChange: (font: string) => void;
+  onAppFontSizeChange: (size: number | string) => void;
+  timelineStorageDir?: string;
+  notesStorageDir?: string;
+  assetsStorageDir?: string;
+  onAssetsStorageDirChange: (path: string) => void;
+  onTimelineStorageDirChange: (path: string) => void;
+  onNotesStorageDirChange: (path: string) => void;
+  onPickTimelinesDir: () => void;
+  onPickNotesDir: () => void;
+  onPickAssetsDir: () => void;
+  onOpenFontsFolder: () => void;
+  onOpenTimelinesFolder: () => void;
+  onOpenNotesFolder: () => void;
+  onOpenAssetsFolder: () => void;
+  hardwareAcceleration?: boolean;
+  onHardwareAccelerationChange: (enabled: boolean) => void;
+  startMaximized?: boolean;
+  onStartMaximizedChange: (enabled: boolean) => void;
+  onRefreshThemes: () => void | Promise<void>;
+  openSettingsSignal?: number;
+  onAppSettingsClosed: () => void;
+  keybinds?: Keybinds;
+  onKeybindsChange: (...args: unknown[]) => void;
+  thumbnailRefreshSignal?: number;
 };
 
 export default function HomePage({
@@ -377,7 +463,11 @@ export default function HomePage({
   const [newFolderName, setNewFolderName] = useState('');
   const [moveDialogFile, setMoveDialogFile] = useState<LibraryFile | null>(null);
   const [availableFolders, setAvailableFolders] = useState<string[]>([]);
-  const [renameTarget, setRenameTarget] = useState<{ type: 'folder' | 'timeline'; id: string; currentName?: string } | null>(null);
+  const [renameTarget, setRenameTarget] = useState<{
+    type: 'folder' | 'timeline';
+    id: string;
+    currentName?: string;
+  } | null>(null);
   const [renameName, setRenameName] = useState('');
   const [renameError, setRenameError] = useState('');
   const [folderContextMenu, setFolderContextMenu] = useState<FolderTarget | null>(null);
@@ -556,7 +646,12 @@ export default function HomePage({
   const timelinePathIssue = getPathIssue(timelineStorageDir);
   const notesPathIssue = getPathIssue(notesStorageDir);
 
-  const applyGitSyncStatus = (status: { machineLabel?: string; autoSync?: boolean; debounceMs?: number; repo?: { url?: string; branch?: string } } | null | undefined) => {
+  const applyGitSyncStatus = (
+    status:
+      | { machineLabel?: string; autoSync?: boolean; debounceMs?: number; repo?: { url?: string; branch?: string } }
+      | null
+      | undefined,
+  ) => {
     setGitSyncStatus(status);
     if (status?.machineLabel) setGitSyncMachineLabel(status.machineLabel);
     if (typeof status?.autoSync === 'boolean') setGitSyncAuto(status.autoSync);
@@ -1168,7 +1263,9 @@ export default function HomePage({
     setMoveDialogFile(file);
     const folders = await listFolders();
     setAvailableFolders(
-      folders.filter((f: string) => !f.split('/').some((part: string) => part.startsWith('.') || part.endsWith('.assets'))),
+      folders.filter(
+        (f: string) => !f.split('/').some((part: string) => part.startsWith('.') || part.endsWith('.assets')),
+      ),
     );
   };
 
@@ -1476,7 +1573,9 @@ export default function HomePage({
     }
 
     const flattenLeaves = (current: SyncFolderNode): SyncTimelineNode[] =>
-      current.children.flatMap((child: SyncNode): SyncTimelineNode[] => child.type === 'folder' ? flattenLeaves(child) : [child]);
+      current.children.flatMap((child: SyncNode): SyncTimelineNode[] =>
+        child.type === 'folder' ? flattenLeaves(child) : [child],
+      );
     const leaves = flattenLeaves(node);
     const selectableLeaves = leaves.filter((leaf: SyncTimelineNode) => !leaf.neverSync);
     const checkedCount = selectableLeaves.filter((leaf: SyncTimelineNode) => !isGitSyncExcluded(leaf.id)).length;

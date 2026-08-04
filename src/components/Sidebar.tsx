@@ -43,12 +43,28 @@ type ElementId = TimelineElement['id'];
 type EventElement = TimelineElement & { type: 'event'; date: number };
 type SpanElement = TimelineElement & { type: 'span'; start: number; end: number };
 type EraElement = TimelineElement & { type: 'era'; start: number; end: number };
-type EraTreeNode = { era: EraElement; items: Array<EventElement | SpanElement>; children: EraTreeNode[]; barLeft: number; barWidth: number };
+type EraTreeNode = {
+  era: EraElement;
+  items: Array<EventElement | SpanElement>;
+  children: EraTreeNode[];
+  barLeft: number;
+  barWidth: number;
+};
 type TimelineListItem = { id: string; name: string; isPackage?: boolean };
 type MenuPosition = { x: number; y: number };
 type DragPlacement = { id: string; position: 'top' | 'bottom' };
-type EraGroup = { era: EraElement; items: Array<EventElement | SpanElement>; subGroups: Array<{ era: EraElement; items: Array<EventElement | SpanElement> }>; barLeft: number; barWidth: number };
-type SpanGroup = { span: SpanElement; items: EventElement[]; subGroups: Array<{ span: SpanElement; items: EventElement[] }> };
+type EraGroup = {
+  era: EraElement;
+  items: Array<EventElement | SpanElement>;
+  subGroups: Array<{ era: EraElement; items: Array<EventElement | SpanElement> }>;
+  barLeft: number;
+  barWidth: number;
+};
+type SpanGroup = {
+  span: SpanElement;
+  items: EventElement[];
+  subGroups: Array<{ span: SpanElement; items: EventElement[] }>;
+};
 
 type ElementMenu = {
   x: number;
@@ -213,7 +229,16 @@ function compareEraGroupItems(a: EventElement | SpanElement, b: EventElement | S
   return String(a.title || a.id).localeCompare(String(b.title || b.id));
 }
 
-function SidebarRow({ item, rightText, level = 0, selectedId, onSelect, listRef, lastScrollTopRef, setElementMenu }: SidebarRowProps) {
+function SidebarRow({
+  item,
+  rightText,
+  level = 0,
+  selectedId,
+  onSelect,
+  listRef,
+  lastScrollTopRef,
+  setElementMenu,
+}: SidebarRowProps) {
   const isSelected = selectedId && selectedId === item.id;
   const leftIndent = 16 + level * 16;
 
@@ -371,9 +396,15 @@ export default function Sidebar({
       .join('+');
   };
   const file = timelineData.file;
-  const events = timelineData.elements.filter((e): e is EventElement => e.type === 'event' && typeof e.date === 'number');
-  const spans = timelineData.elements.filter((e): e is SpanElement => e.type === 'span' && typeof e.start === 'number' && typeof e.end === 'number');
-  const eras = timelineData.elements.filter((e): e is EraElement => e.type === 'era' && typeof e.start === 'number' && typeof e.end === 'number');
+  const events = timelineData.elements.filter(
+    (e): e is EventElement => e.type === 'event' && typeof e.date === 'number',
+  );
+  const spans = timelineData.elements.filter(
+    (e): e is SpanElement => e.type === 'span' && typeof e.start === 'number' && typeof e.end === 'number',
+  );
+  const eras = timelineData.elements.filter(
+    (e): e is EraElement => e.type === 'era' && typeof e.start === 'number' && typeof e.end === 'number',
+  );
 
   const [openEras, setOpenEras] = useState(true);
   const [openSpans, setOpenSpans] = useState(true);
@@ -459,7 +490,12 @@ export default function Sidebar({
         return { start, end, scale: Math.max(0, Math.min(2, Number(item?.scale) || 0)) };
       })
       .filter(Boolean)
-      .sort((a: ScaleSection & { start: number; end: number; scale: number }, b: ScaleSection & { start: number; end: number; scale: number }) => a.start - b.start);
+      .sort(
+        (
+          a: ScaleSection & { start: number; end: number; scale: number },
+          b: ScaleSection & { start: number; end: number; scale: number },
+        ) => a.start - b.start,
+      );
     const compressYear = (year: number): number => {
       let adjustment = 0;
       for (const section of normalizedSections) {
@@ -570,7 +606,9 @@ export default function Sidebar({
     const childSpans = spans.filter((s: SpanElement) => !!s.parent);
 
     // Map each span to its root ancestor
-    const spanParentMap = new Map<ElementId, ElementId>(childSpans.flatMap((s: SpanElement) => s.parent ? [[s.id, s.parent]] : []));
+    const spanParentMap = new Map<ElementId, ElementId>(
+      childSpans.flatMap((s: SpanElement) => (s.parent ? [[s.id, s.parent]] : [])),
+    );
     const getRootSpanId = (spanId: ElementId): ElementId => {
       let current = spanId;
       while (spanParentMap.has(current)) current = spanParentMap.get(current);
@@ -853,7 +891,8 @@ export default function Sidebar({
   useEffect(() => {
     if (!newMenuOpen) return;
     const handleClick = (e: globalThis.MouseEvent) => {
-      if (!(e.target instanceof Node) || (newMenuRef.current && !newMenuRef.current.contains(e.target))) setNewMenuOpen(false);
+      if (!(e.target instanceof Node) || (newMenuRef.current && !newMenuRef.current.contains(e.target)))
+        setNewMenuOpen(false);
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
@@ -862,7 +901,8 @@ export default function Sidebar({
   useEffect(() => {
     if (!groupMenuOpenId) return;
     const handleClick = (e: globalThis.MouseEvent) => {
-      if (!(e.target instanceof Node) || (groupMenuRef.current && !groupMenuRef.current.contains(e.target))) setGroupMenuOpenId(null);
+      if (!(e.target instanceof Node) || (groupMenuRef.current && !groupMenuRef.current.contains(e.target)))
+        setGroupMenuOpenId(null);
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
@@ -976,10 +1016,14 @@ export default function Sidebar({
   const hasChipFilter = !!chipFilter;
   const searchActive = searchQuery.trim().length > 0 || hasChipFilter;
   const q = searchQuery.trim().toLowerCase();
-  const matchesSearch = (value: unknown): boolean => String(value || '').toLowerCase().includes(q);
+  const matchesSearch = (value: unknown): boolean =>
+    String(value || '')
+      .toLowerCase()
+      .includes(q);
   const parsedFilter = useMemo(() => parseFilterQuery(searchQuery), [searchQuery]);
   // Combine the sidebar's own search with the timeline's active chip filter (AND semantics).
-  const elMatches = (el: TimelineElement) => matchesFilter(el, parsedFilter) && (!hasChipFilter || matchesFilter(el, chipFilter));
+  const elMatches = (el: TimelineElement) =>
+    matchesFilter(el, parsedFilter) && (!hasChipFilter || matchesFilter(el, chipFilter));
   const searchPlaceholder =
     sidebarTab === 'timeline'
       ? 'Search spans, events, eras...'
@@ -1042,8 +1086,12 @@ export default function Sidebar({
     ? (() => {
         const filterNode = (node: EraTreeNode): EraTreeNode | null => {
           const eraMatches = elMatches(node.era);
-          const filteredItems = eraMatches ? node.items : node.items.filter((el: EventElement | SpanElement) => elMatches(el));
-          const filteredChildren = node.children.map(filterNode).filter((child): child is EraTreeNode => child !== null);
+          const filteredItems = eraMatches
+            ? node.items
+            : node.items.filter((el: EventElement | SpanElement) => elMatches(el));
+          const filteredChildren = node.children
+            .map(filterNode)
+            .filter((child): child is EraTreeNode => child !== null);
           if (!eraMatches && filteredItems.length === 0 && filteredChildren.length === 0) return null;
           return { ...node, items: filteredItems, children: filteredChildren };
         };
@@ -1111,7 +1159,8 @@ export default function Sidebar({
         visibleCount: groupCounts.get(group.id) || 0,
       }));
 
-  const countEraTreeItems = (node: EraTreeNode): number => node.items.length + node.children.reduce((s: number, c: EraTreeNode) => s + countEraTreeItems(c), 0);
+  const countEraTreeItems = (node: EraTreeNode): number =>
+    node.items.length + node.children.reduce((s: number, c: EraTreeNode) => s + countEraTreeItems(c), 0);
   const renderEraTreeNode = (node: EraTreeNode, depth: number): React.ReactNode => {
     const { era, items, children, barLeft, barWidth } = node;
     const isOpen = searchActive || openEraGroups[era.id] !== false;
@@ -1674,7 +1723,12 @@ export default function Sidebar({
                 <div className="sb-era-groups">
                   {sortedVisibleSpanGroups.map(({ span, items, subGroups }: SpanGroup) => {
                     const isOpen = searchActive || openSpanGroups[span.id] !== false;
-                    const renderSpanHeader = (s: SpanElement, isRoot: boolean, isOpenState: boolean, onToggle: () => void) => (
+                    const renderSpanHeader = (
+                      s: SpanElement,
+                      isRoot: boolean,
+                      isOpenState: boolean,
+                      onToggle: () => void,
+                    ) => (
                       <div className={`sb-sub-era-header${isRoot ? ' is-root-span' : ''}`}>
                         <button className="sb-era-toggle" onClick={onToggle}>
                           <ChevronDown
@@ -1735,34 +1789,42 @@ export default function Sidebar({
                                 fmtYear={fmtYear}
                               />
                             ))}
-                            {subGroups?.map(({ span: childSpan, items: childItems }: { span: SpanElement; items: EventElement[] }) => {
-                              const isChildOpen = searchActive || openSpanGroups[childSpan.id] !== false;
-                              return (
-                                <div key={childSpan.id} className="sb-sub-era-group">
-                                  {renderSpanHeader(childSpan, false, isChildOpen, () =>
-                                    setOpenSpanGroups((prev) => ({ ...prev, [childSpan.id]: !isChildOpen })),
-                                  )}
-                                  {isChildOpen && childItems.length > 0 && (
-                                    <div className="sb-sub-era-items">
-                                      {childItems.map((el: EventElement) => (
-                                        <ElementRow
-                                          key={el.id}
-                                          element={el}
-                                          selectedId={selectedId}
-                                          onSelect={onSelect}
-                                          listRef={listRef}
-                                          lastScrollTopRef={lastScrollTopRef}
-                                          setElementMenu={setElementMenu}
-                                          tagColors={tagColors}
-                                          spanById={spanById}
-                                          fmtYear={fmtYear}
-                                        />
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
+                            {subGroups?.map(
+                              ({
+                                span: childSpan,
+                                items: childItems,
+                              }: {
+                                span: SpanElement;
+                                items: EventElement[];
+                              }) => {
+                                const isChildOpen = searchActive || openSpanGroups[childSpan.id] !== false;
+                                return (
+                                  <div key={childSpan.id} className="sb-sub-era-group">
+                                    {renderSpanHeader(childSpan, false, isChildOpen, () =>
+                                      setOpenSpanGroups((prev) => ({ ...prev, [childSpan.id]: !isChildOpen })),
+                                    )}
+                                    {isChildOpen && childItems.length > 0 && (
+                                      <div className="sb-sub-era-items">
+                                        {childItems.map((el: EventElement) => (
+                                          <ElementRow
+                                            key={el.id}
+                                            element={el}
+                                            selectedId={selectedId}
+                                            onSelect={onSelect}
+                                            listRef={listRef}
+                                            lastScrollTopRef={lastScrollTopRef}
+                                            setElementMenu={setElementMenu}
+                                            tagColors={tagColors}
+                                            spanById={spanById}
+                                            fmtYear={fmtYear}
+                                          />
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              },
+                            )}
                           </div>
                         )}
                       </div>

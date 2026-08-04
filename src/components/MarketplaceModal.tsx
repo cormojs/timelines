@@ -24,8 +24,14 @@ type ThemeMetadata = Theme & { type?: string; author?: string; description?: str
 type MarketplaceTheme = ThemeMetadata & { id: string; paths?: { theme?: string; thumbnail?: string } };
 type BundledTheme = ThemeMetadata;
 type ThemeCard = {
-  id: string; name: string; origin: 'built-in' | 'marketplace' | 'local'; collection: string | null;
-  type: string | null; author: string | null; thumbnailUrl: string | null; description: string | null;
+  id: string;
+  name: string;
+  origin: 'built-in' | 'marketplace' | 'local';
+  collection: string | null;
+  type: string | null;
+  author: string | null;
+  thumbnailUrl: string | null;
+  description: string | null;
 };
 type ImportResult = { results?: Array<{ success: boolean }> };
 type BulkProgress = { done: number; total: number };
@@ -39,17 +45,17 @@ const optionalString = (value: unknown): string | undefined => (typeof value ===
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
 
 type MarketplaceModalProps = {
-  isOpen: boolean
-  onClose: () => void
-  appThemes: [string, Theme][]
-  userThemes: [string, Theme][]
-  userThemeIds: Set<string>
-  bundledThemes: Record<string, BundledTheme>
-  defaultThemeKey?: string
-  appThemeKey?: string
-  onAppThemeChange?: (themeKey: string) => void
-  onRefreshThemes?: () => Promise<void> | void
-}
+  isOpen: boolean;
+  onClose: () => void;
+  appThemes: [string, Theme][];
+  userThemes: [string, Theme][];
+  userThemeIds: Set<string>;
+  bundledThemes: Record<string, BundledTheme>;
+  defaultThemeKey?: string;
+  appThemeKey?: string;
+  onAppThemeChange?: (themeKey: string) => void;
+  onRefreshThemes?: () => Promise<void> | void;
+};
 
 export default function MarketplaceModal({
   isOpen,
@@ -132,8 +138,10 @@ export default function MarketplaceModal({
   useEffect(() => {
     if (!moreMenuOpen && !bulkMenuOpen) return;
     const handler = (e: MouseEvent) => {
-      if (!(e.target instanceof Node) || (moreMenuRef.current && !moreMenuRef.current.contains(e.target))) setMoreMenuOpen(false);
-      if (!(e.target instanceof Node) || (bulkMenuRef.current && !bulkMenuRef.current.contains(e.target))) setBulkMenuOpen(false);
+      if (!(e.target instanceof Node) || (moreMenuRef.current && !moreMenuRef.current.contains(e.target)))
+        setMoreMenuOpen(false);
+      if (!(e.target instanceof Node) || (bulkMenuRef.current && !bulkMenuRef.current.contains(e.target)))
+        setBulkMenuOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -284,7 +292,9 @@ export default function MarketplaceModal({
         collection: optionalString(theme.collection) || optionalString(mktData?.collection) || null,
         type: optionalString(theme.type) || optionalString(mktData?.type) || null,
         author: optionalString(mktData?.author) || (isMkt ? null : 'you'),
-        thumbnailUrl: optionalString(mktData?.paths?.thumbnail) ? `${MARKETPLACE_BASE}${mktData.paths.thumbnail}` : null,
+        thumbnailUrl: optionalString(mktData?.paths?.thumbnail)
+          ? `${MARKETPLACE_BASE}${mktData.paths.thumbnail}`
+          : null,
         description: optionalString(mktData?.description) || null,
       };
     }),

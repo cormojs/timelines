@@ -64,7 +64,11 @@ const DEFAULT_GROUP: TimelineGroup = {
   visible: true,
   locked: false,
 };
-const EMPTY_SELECTION_NAVIGATION: Readonly<{ selectedElement: TimelineElement | null; prevElement: TimelineElement | null; nextElement: TimelineElement | null }> = Object.freeze({
+const EMPTY_SELECTION_NAVIGATION: Readonly<{
+  selectedElement: TimelineElement | null;
+  prevElement: TimelineElement | null;
+  nextElement: TimelineElement | null;
+}> = Object.freeze({
   selectedElement: null,
   prevElement: null,
   nextElement: null,
@@ -146,13 +150,21 @@ function App() {
     const mergeParentMap: Record<string | number, string | number> = {};
     for (const el of elements) {
       if (el.type !== 'span') continue;
-      const branches = Array.isArray(el.branches) ? el.branches.filter((value): value is string | number => typeof value === 'string' || typeof value === 'number') : [];
-      const forks = Array.isArray(el.forks) ? el.forks.filter((value): value is string | number => typeof value === 'string' || typeof value === 'number') : [];
+      const branches = Array.isArray(el.branches)
+        ? el.branches.filter(
+            (value): value is string | number => typeof value === 'string' || typeof value === 'number',
+          )
+        : [];
+      const forks = Array.isArray(el.forks)
+        ? el.forks.filter((value): value is string | number => typeof value === 'string' || typeof value === 'number')
+        : [];
       const allBranches = Array.from(new Set([...branches, ...forks]));
       for (const childId of allBranches) {
         branchParentMap[childId] = el.id;
       }
-      const merges = Array.isArray(el.merges) ? el.merges.filter((value): value is string | number => typeof value === 'string' || typeof value === 'number') : [];
+      const merges = Array.isArray(el.merges)
+        ? el.merges.filter((value): value is string | number => typeof value === 'string' || typeof value === 'number')
+        : [];
       for (const childId of merges) {
         mergeParentMap[childId] = el.id;
       }
@@ -534,22 +546,25 @@ function App() {
     setIsSettingsOpen(false);
   }, []);
 
-  const handleLibraryTimelineRenamed = useCallback(({ oldId, newId, title, fileId }: { oldId: string; newId: string; title?: string; fileId?: string }) => {
-    if (!oldId || !newId || currentTimelineIdRef.current !== oldId) return;
-    currentTimelineIdRef.current = newId;
-    setCurrentTimelineId(newId);
-    setTimelineData((prevData) => {
-      if (!prevData) return prevData;
-      return {
-        ...prevData,
-        file: {
-          ...prevData.file,
-          id: fileId || `${newId.split('/').pop() || 'timeline'}-timeline`,
-          title: title ?? prevData.file?.title,
-        },
-      };
-    });
-  }, []);
+  const handleLibraryTimelineRenamed = useCallback(
+    ({ oldId, newId, title, fileId }: { oldId: string; newId: string; title?: string; fileId?: string }) => {
+      if (!oldId || !newId || currentTimelineIdRef.current !== oldId) return;
+      currentTimelineIdRef.current = newId;
+      setCurrentTimelineId(newId);
+      setTimelineData((prevData) => {
+        if (!prevData) return prevData;
+        return {
+          ...prevData,
+          file: {
+            ...prevData.file,
+            id: fileId || `${newId.split('/').pop() || 'timeline'}-timeline`,
+            title: title ?? prevData.file?.title,
+          },
+        };
+      });
+    },
+    [],
+  );
 
   const handleRenameTimelineFromLibrary = useCallback(
     async (id: string, title: string) => {
@@ -1377,7 +1392,9 @@ function App() {
     }
   };
 
-  const finishImport = async (result: { success?: boolean; id?: string; skipped?: string[]; canceled?: boolean; error?: string } | undefined) => {
+  const finishImport = async (
+    result: { success?: boolean; id?: string; skipped?: string[]; canceled?: boolean; error?: string } | undefined,
+  ) => {
     if (result?.success && result.id) {
       if (result.skipped?.length > 0) {
         setSkippedFilesNotice({
@@ -1534,7 +1551,21 @@ function App() {
   };
 
   // Failures return { error } for inline display; native alerts break input focus in Electron
-  const handleCreateTimeline = async (timelineConfig: { title: string; start: number; end: number; detailLevel?: number; theme?: string; startLabel?: string; endLabel?: string; layout?: string; branchOrdering?: string; useSpreadsheet?: boolean; useMaps?: boolean; useWiki?: boolean; folder?: string }) => {
+  const handleCreateTimeline = async (timelineConfig: {
+    title: string;
+    start: number;
+    end: number;
+    detailLevel?: number;
+    theme?: string;
+    startLabel?: string;
+    endLabel?: string;
+    layout?: string;
+    branchOrdering?: string;
+    useSpreadsheet?: boolean;
+    useMaps?: boolean;
+    useWiki?: boolean;
+    folder?: string;
+  }) => {
     // Create new timeline data structure
     const timelineId = generateIdFromTitle(timelineConfig.title, 'timeline').replace(/^timeline-/, '');
     const newTimeline: TimelineData = {

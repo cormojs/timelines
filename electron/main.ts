@@ -2016,7 +2016,8 @@ ipcMain.handle('get-assets-base-dir', async () => {
   }
 });
 
-const toAssetUrl = (absPath: string): string => `timelines-asset://asset?p=${encodeURIComponent(path.normalize(absPath))}`;
+const toAssetUrl = (absPath: string): string =>
+  `timelines-asset://asset?p=${encodeURIComponent(path.normalize(absPath))}`;
 
 const toPosixRelative = (from: string, to: string): string | null => {
   const rel = path.relative(from, path.normalize(to));
@@ -2072,7 +2073,11 @@ function thumbnailCandidatePaths(ref: string, assetsRoot: string, timelineAssets
     .filter((candidate) => candidate.startsWith(normalizedRoot + path.sep));
 }
 
-async function findThumbnailFile(ref: string, assetsRoot: string, timelineAssetsDir: string | null): Promise<string | null> {
+async function findThumbnailFile(
+  ref: string,
+  assetsRoot: string,
+  timelineAssetsDir: string | null,
+): Promise<string | null> {
   if (!ref) return null;
   for (const candidate of thumbnailCandidatePaths(ref, assetsRoot, timelineAssetsDir)) {
     try {
@@ -2083,7 +2088,11 @@ async function findThumbnailFile(ref: string, assetsRoot: string, timelineAssets
   return null;
 }
 
-async function resolveThumbnailRef(ref: string, assetsRoot: string, timelineAssetsDir: string | null): Promise<string | null> {
+async function resolveThumbnailRef(
+  ref: string,
+  assetsRoot: string,
+  timelineAssetsDir: string | null,
+): Promise<string | null> {
   if (!ref) return null;
   const existing = await findThumbnailFile(ref, assetsRoot, timelineAssetsDir);
   if (existing) return toAssetUrl(existing);
