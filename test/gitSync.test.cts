@@ -8,8 +8,8 @@ const path = require('node:path');
 const fsp = require('node:fs/promises');
 const { spawnSync } = require('node:child_process');
 const { createGitHttpServer } = require('./gitHttpServer.cts');
-const { createEngine, summarizePackageDiff, isConflictCopyPath } = require('../electron/gitSync.cts');
-const { buildPackage, readPackage, strToU8 } = require('../electron/timelinePackage.cts');
+const { createEngine, summarizePackageDiff, isConflictCopyPath } = require('../electron/gitSync.ts');
+const { buildPackage, readPackage, strToU8 } = require('../electron/timelinePackage.ts');
 
 const runGit = (args, cwd) => {
   const r = spawnSync('git', args, { cwd, encoding: 'utf8' });
@@ -17,7 +17,7 @@ const runGit = (args, cwd) => {
   return r.stdout;
 };
 
-// In-memory stand-in for the library ops main.cts will inject
+// In-memory stand-in for the library ops main.ts will inject
 function makeLibrary() {
   const timelines = new Map(); // uid -> { uid, relativeId, title, elements, notes, assets, neverSync }
   const lib = {

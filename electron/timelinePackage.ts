@@ -1,3 +1,5 @@
+export {};
+
 // Packaged .timeline format: a zip holding timeline.json (identical to the bare
 // format), assets/, notes/, and manifest.json. The same shape is read in the
 // browser viewer via src/utils/packageReader.ts; keep the two in sync.
@@ -63,7 +65,7 @@ function readPackage(buf) {
   return { timelineJson: strFromU8(timelineRaw), manifest, assets, notes };
 }
 
-module.exports = {
+export {
   PACKAGE_FORMAT_VERSION,
   isZipBuffer,
   sanitizeEntryPath,

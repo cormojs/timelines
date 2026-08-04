@@ -1,11 +1,12 @@
-// Git sync engine; main.cts injects all library ops. See docs/private/git_sync_plan.md
+// Git sync engine; main.ts injects all library ops. See docs/private/git_sync_plan.md
+export {};
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
 const fsp = fs.promises;
 const git = require('isomorphic-git');
 const httpNode = require('isomorphic-git/http/node');
-const { readPackage } = require('./timelinePackage.cts');
+const { readPackage } = require('./timelinePackage');
 
 const safeName = (value) => String(value || '')
   .trim()
@@ -1177,7 +1178,7 @@ function createEngine(opts) {
   return new GitSyncEngine(opts);
 }
 
-module.exports = {
+export {
   createEngine,
   GitSyncEngine,
   summarizePackageDiff,

@@ -6,7 +6,7 @@ import { defineConfig, globalIgnores } from 'eslint/config'
 import tseslint from 'typescript-eslint'
 
 export default defineConfig([
-  globalIgnores(['dist', 'dist-viewer', 'release']),
+  globalIgnores(['dist', 'dist-viewer', 'out', 'release']),
   {
     files: ['**/*.{ts,tsx,cts}'],
     extends: [
@@ -59,7 +59,7 @@ export default defineConfig([
     },
   },
   {
-    files: ['electron/**/*.cts', 'test/**/*.cts'],
+    files: ['electron/**/*.ts', 'test/**/*.cts'],
     rules: {
       '@typescript-eslint/no-unused-vars': 'off',
     },

@@ -15,6 +15,7 @@ dist-ssr
 *.local
 release
 electron-build/*.js
+out
 
 # Editor directories and files
 .vscode/*

@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { pathToFileURL } = require('node:url');
 const path = require('node:path');
-const { buildPackage, readPackage, strToU8, strFromU8 } = require('../electron/timelinePackage.cts');
+const { buildPackage, readPackage, strToU8, strFromU8 } = require('../electron/timelinePackage.ts');
 
 const fixture = () => ({
   json: JSON.stringify({ file: { uid: 'fx', title: 'Fixture' }, elements: [{ id: 1, title: 'One' }] }, null, 2),

@@ -46,7 +46,7 @@ logic with applicable tests.
 - Treat timeline files as user data: keep changes backward-compatible, validate
   imported data, and preserve unknown fields when practical.
 - Do not call Node/Electron APIs directly from React components. Add narrowly
-  scoped bridge methods through `electron/preload.cts` and consume them via
+  scoped bridge methods through `electron/preload.ts` and consume them via
   `src/utils/electronApi.ts`.
 
 ## Viewer boundary

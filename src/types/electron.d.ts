@@ -1,4 +1,4 @@
-import type { ElectronApi } from '../../electron/preload.cts'
+import type { ElectronApi } from '../../electron/preload.ts'
 
 export {}
 

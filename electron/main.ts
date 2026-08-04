@@ -1,3 +1,5 @@
+export {};
+
 const { app, BrowserWindow, ipcMain, dialog, Menu, shell, protocol, net, session, safeStorage } = require('electron');
 const path = require('path');
 const { pathToFileURL } = require('url');
@@ -5,11 +7,10 @@ const fs = require('fs').promises;
 const fsSync = require('fs');
 const http = require('http');
 const { autoUpdater } = require('electron-updater');
-const { isZipBuffer, readPackage, buildPackage, strToU8 } = require('./timelinePackage.cts');
-const { createEngine } = require('./gitSync.cts');
+const { isZipBuffer, readPackage, buildPackage, strToU8 } = require('./timelinePackage');
+const { createEngine } = require('./gitSync');
 const DEFAULT_THEME_KEY = 'parchment';
-const devServerUrl = process.env.TIMELINES_DEV_SERVER_URL;
-const isDevelopment = typeof devServerUrl === 'string' && devServerUrl.length > 0;
+const devServerUrl = process.env.ELECTRON_RENDERER_URL;
 
 // Force sRGB color profile to prevent washed-out appearance in screenshots/screenshare on HDR displays
 app.commandLine.appendSwitch('force-color-profile', 'srgb');
@@ -251,10 +252,9 @@ async function getStartupBackgroundColor() {
 
 async function createWindow() {
   const backgroundColor = await getStartupBackgroundColor();
-  // Bun embeds __dirname from the build machine. Resolve resources through
-  // Electron instead so this remains an absolute path in packaged Windows apps.
   const appRoot = app.getAppPath();
-  const electronRuntimeDir = path.join(appRoot, 'electron-build');
+  const rendererDir = path.join(appRoot, 'out', 'renderer');
+  const isDevelopment = !app.isPackaged && typeof devServerUrl === 'string' && devServerUrl.length > 0;
 
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -262,11 +262,11 @@ async function createWindow() {
     backgroundColor,
     frame: false,
     webPreferences: {
-      preload: path.join(electronRuntimeDir, 'preload.js'),
+      preload: path.join(__dirname, '../preload/preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
     },
-    icon: path.join(appRoot, 'public/favicon/favicon-light.ico'),
+    icon: path.join(isDevelopment ? appRoot : rendererDir, 'favicon/favicon-light.ico'),
   });
 
   Menu.setApplicationMenu(null);
@@ -281,7 +281,7 @@ async function createWindow() {
     mainWindow.webContents.openDevTools();
   } else {
     const debugProd = process.env.TIMELINES_DEBUG === 'true';
-    mainWindow.loadFile(path.join(appRoot, 'dist/index.html'));
+    mainWindow.loadFile(path.join(rendererDir, 'index.html'));
     if (debugProd) {
       mainWindow.webContents.openDevTools();
     }
@@ -333,7 +333,7 @@ protocol.registerSchemesAsPrivileged([
 
 // Auto-updater setup
 function setupAutoUpdater() {
-  if (isDevelopment) return;
+  if (!app.isPackaged) return;
 
   autoUpdater.allowPrerelease = true;
   autoUpdater.autoDownload = false;
@@ -395,7 +395,7 @@ function setupOsmTileRequestHeaders() {
 }
 
 ipcMain.handle('check-for-updates', async () => {
-  if (isDevelopment) {
+  if (!app.isPackaged) {
     return { status: 'dev' };
   }
   try {
