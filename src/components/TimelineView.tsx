@@ -1,5 +1,19 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, forwardRef, useImperativeHandle, Fragment, useCallback, lazy, Suspense, useDeferredValue, type CSSProperties } from "react";
-import { createPortal } from "react-dom";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  forwardRef,
+  useImperativeHandle,
+  Fragment,
+  useCallback,
+  lazy,
+  Suspense,
+  useDeferredValue,
+  type CSSProperties,
+} from 'react';
+import { createPortal } from 'react-dom';
 import {
   pickStep,
   buildSpanChildPlacement,
@@ -11,15 +25,47 @@ import {
   calculateDetailLevel,
   getReadableTextColor,
   MONTH_LABELS,
-} from "../utils/timelineUtils";
-import { isFontReady, watchFontLoad } from "../utils/fontGate";
-import { parseTimelineInput, snapToMonthGrid, snapToDayGrid, fractionalYearToDate, daysInMonth, todayFractionalYear, displayDateLabel } from "../utils/dateUtils";
-import { withAlpha, blendColors, normalizeColor } from "../utils/colorUtils";
-import { parseFilterQuery, matchesFilter, tokenizeFilterQuery } from "../utils/filterUtils";
-import { FileJson, Image, Video, Settings, Plus, Minus, CopyPlus, Trash2, Edit2, ListFilter, Play, Pause, Tag, Eye, EyeOff, Map as MapIcon, GanttChartSquare, Table2, ExternalLink, HelpCircle, Maximize2, X, History } from "lucide-react";
-import { ICON_MAP } from "../config/elementIcons";
+} from '../utils/timelineUtils';
+import { isFontReady, watchFontLoad } from '../utils/fontGate';
+import {
+  parseTimelineInput,
+  snapToMonthGrid,
+  snapToDayGrid,
+  fractionalYearToDate,
+  daysInMonth,
+  todayFractionalYear,
+  displayDateLabel,
+} from '../utils/dateUtils';
+import { withAlpha, blendColors, normalizeColor } from '../utils/colorUtils';
+import { parseFilterQuery, matchesFilter, tokenizeFilterQuery } from '../utils/filterUtils';
+import {
+  FileJson,
+  Image,
+  Video,
+  Settings,
+  Plus,
+  Minus,
+  CopyPlus,
+  Trash2,
+  Edit2,
+  ListFilter,
+  Play,
+  Pause,
+  Tag,
+  Eye,
+  EyeOff,
+  Map as MapIcon,
+  GanttChartSquare,
+  Table2,
+  ExternalLink,
+  HelpCircle,
+  Maximize2,
+  X,
+  History,
+} from 'lucide-react';
+import { ICON_MAP } from '../config/elementIcons';
 
-const FILTER_HISTORY_KEY = "timelines-filter-query-history";
+const FILTER_HISTORY_KEY = 'timelines-filter-query-history';
 const FILTER_HISTORY_MAX = 8;
 
 const FONT_FALLBACK_STACK = '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
@@ -27,38 +73,45 @@ const FONT_WAIT_MS = 3000;
 
 const readAppFontStack = () => {
   const root = document.documentElement;
-  return root.style.getPropertyValue("--app-font-family").trim()
-    || getComputedStyle(root).getPropertyValue("--app-font-family").trim();
+  return (
+    root.style.getPropertyValue('--app-font-family').trim() ||
+    getComputedStyle(root).getPropertyValue('--app-font-family').trim()
+  );
 };
 
-const FILTER_TYPE_TERMS = ["is:event", "is:span", "is:era", "has:coords"];
-const FILTER_DATE_OPS = [[">", ">"], [">=", "≥"], ["<", "<"], ["<=", "≤"]];
-const FILTER_OP_GLYPH = { ">": ">", ">=": "≥", "<": "<", "<=": "≤" };
+const FILTER_TYPE_TERMS = ['is:event', 'is:span', 'is:era', 'has:coords'];
+const FILTER_DATE_OPS = [
+  ['>', '>'],
+  ['>=', '≥'],
+  ['<', '<'],
+  ['<=', '≤'],
+];
+const FILTER_OP_GLYPH = { '>': '>', '>=': '≥', '<': '<', '<=': '≤' };
 
 const HTML2CANVAS_COLOR_PROPERTIES = [
-  "color",
-  "background-color",
-  "background-image",
-  "border-top-color",
-  "border-right-color",
-  "border-bottom-color",
-  "border-left-color",
-  "outline-color",
-  "text-decoration-color",
-  "-webkit-text-stroke-color",
-  "box-shadow",
-  "text-shadow",
-  "fill",
-  "stroke",
+  'color',
+  'background-color',
+  'background-image',
+  'border-top-color',
+  'border-right-color',
+  'border-bottom-color',
+  'border-left-color',
+  'outline-color',
+  'text-decoration-color',
+  '-webkit-text-stroke-color',
+  'box-shadow',
+  'text-shadow',
+  'fill',
+  'stroke',
 ];
 const UNSUPPORTED_COLOR_FUNCTION = /(?:color|color-mix|lab|lch|oklab|oklch)\(/i;
 
 // html2canvas 1.4 can't parse color-mix()/color(srgb ...) values, so rasterize them to rgba() in its detached clone
 const normalizeHtml2CanvasColors = (clonedDocument, clonedRoot) => {
-  const canvas = clonedDocument.createElement("canvas");
+  const canvas = clonedDocument.createElement('canvas');
   canvas.width = 1;
   canvas.height = 1;
-  const context = canvas.getContext("2d", { willReadFrequently: true });
+  const context = canvas.getContext('2d', { willReadFrequently: true });
   if (!context || !clonedRoot) return;
 
   const cache = new Map();
@@ -83,8 +136,8 @@ const normalizeHtml2CanvasColors = (clonedDocument, clonedRoot) => {
       let depth = 0;
       let end = -1;
       for (let i = start; i < output.length; i += 1) {
-        if (output[i] === "(") depth += 1;
-        else if (output[i] === ")") {
+        if (output[i] === '(') depth += 1;
+        else if (output[i] === ')') {
           depth -= 1;
           if (depth === 0) {
             end = i + 1;
@@ -101,14 +154,14 @@ const normalizeHtml2CanvasColors = (clonedDocument, clonedRoot) => {
     return output;
   };
 
-  const elements = [clonedRoot, ...clonedRoot.querySelectorAll("*")];
+  const elements = [clonedRoot, ...clonedRoot.querySelectorAll('*')];
   for (const element of elements) {
     const styles = clonedDocument.defaultView?.getComputedStyle(element);
     if (!styles) continue;
     for (const property of HTML2CANVAS_COLOR_PROPERTIES) {
       const value = styles.getPropertyValue(property);
       if (UNSUPPORTED_COLOR_FUNCTION.test(value)) {
-        element.style.setProperty(property, replaceColorFunctions(value), "important");
+        element.style.setProperty(property, replaceColorFunctions(value), 'important');
       }
     }
   }
@@ -121,75 +174,83 @@ const simplifyTimelinePreview = (clonedDocument, clonedTimeline) => {
   );
   const textNodes = [];
   while (walker.nextNode()) textNodes.push(walker.currentNode);
-  for (const node of textNodes) node.nodeValue = "";
+  for (const node of textNodes) node.nodeValue = '';
 
   for (const element of clonedTimeline.querySelectorAll(
-    "img, svg, .event-thumbnail-tile, .event-thumbnail-banner, .event-thumbnail-square, .event-thumbnail-circle",
+    'img, svg, .event-thumbnail-tile, .event-thumbnail-banner, .event-thumbnail-square, .event-thumbnail-circle',
   )) {
     element.remove();
   }
 
-  for (const item of clonedTimeline.querySelectorAll(".event, .span-item, .era-item")) {
+  for (const item of clonedTimeline.querySelectorAll('.event, .span-item, .era-item')) {
     item.replaceChildren();
     item.classList.remove(
-      "is-selected",
-      "has-source-link",
-      "has-thumbnail",
-      "has-thumbnail-banner",
-      "has-thumbnail-square",
-      "has-thumbnail-circle",
+      'is-selected',
+      'has-source-link',
+      'has-thumbnail',
+      'has-thumbnail-banner',
+      'has-thumbnail-square',
+      'has-thumbnail-circle',
     );
   }
 
-  for (const element of [clonedTimeline, ...clonedTimeline.querySelectorAll("*")]) {
+  for (const element of [clonedTimeline, ...clonedTimeline.querySelectorAll('*')]) {
     const backgroundImage = clonedDocument.defaultView?.getComputedStyle(element).backgroundImage;
-    if (backgroundImage?.includes("url(")) {
-      element.style.setProperty("background-image", "none", "important");
+    if (backgroundImage?.includes('url(')) {
+      element.style.setProperty('background-image', 'none', 'important');
     }
   }
 };
 
 const filterChipTerm = (chip) => {
   let term;
-  if (chip.kind === "date") term = `${chip.op}${chip.value}`;
-  else if (chip.kind === "tag") term = `#${chip.value}`;
-  else if (chip.kind === "text") term = /[\s|()~"<>]/.test(chip.value) ? `"${chip.value}"` : chip.value;
+  if (chip.kind === 'date') term = `${chip.op}${chip.value}`;
+  else if (chip.kind === 'tag') term = `#${chip.value}`;
+  else if (chip.kind === 'text') term = /[\s|()~"<>]/.test(chip.value) ? `"${chip.value}"` : chip.value;
   else term = chip.value; // "type" kind holds the literal term: is:event / has:coords
-  return (chip.negated ? "~" : "") + term;
+  return (chip.negated ? '~' : '') + term;
 };
 
 const filterChipLabel = (chip) =>
-  chip.kind === "date" ? `${FILTER_OP_GLYPH[chip.op] ?? chip.op} ${chip.value}`
-    : chip.kind === "tag" ? `#${chip.value}`
-    : chip.value;
+  chip.kind === 'date'
+    ? `${FILTER_OP_GLYPH[chip.op] ?? chip.op} ${chip.value}`
+    : chip.kind === 'tag'
+      ? `#${chip.value}`
+      : chip.value;
 
 const buildChipQuery = (chips) =>
-  chips.map((c, i) => (i > 0 && c.join === "or" ? "| " : "") + filterChipTerm(c)).join(" ");
+  chips.map((c, i) => (i > 0 && c.join === 'or' ? '| ' : '') + filterChipTerm(c)).join(' ');
 
 const chipsFromQuery = (query, nextId) => {
   const chips = [];
-  let join = "and";
+  let join = 'and';
   let negated = false;
   for (const tok of tokenizeFilterQuery(query)) {
-    if (tok.t === "OR") { join = "or"; continue; }
-    if (tok.t === "NOT") { negated = true; continue; }
-    if (tok.t !== "LEAF") continue;
+    if (tok.t === 'OR') {
+      join = 'or';
+      continue;
+    }
+    if (tok.t === 'NOT') {
+      negated = true;
+      continue;
+    }
+    if (tok.t !== 'LEAF') continue;
     let chip;
-    if (tok.kind === "type") chip = { kind: "type", value: `is:${tok.value}` };
-    else if (tok.kind === "has") chip = { kind: "type", value: `has:${tok.value}` };
-    else if (tok.kind === "tag") chip = { kind: "tag", value: tok.value };
-    else if (tok.kind === "date") chip = { kind: "date", op: tok.op, value: tok.value };
-    else if (tok.kind === "contains") chip = { kind: "text", value: `contains:${tok.value}` };
-    else chip = { kind: "text", value: tok.value };
-    chips.push({ id: nextId(), negated, join: chips.length === 0 ? "and" : join, ...chip });
-    join = "and";
+    if (tok.kind === 'type') chip = { kind: 'type', value: `is:${tok.value}` };
+    else if (tok.kind === 'has') chip = { kind: 'type', value: `has:${tok.value}` };
+    else if (tok.kind === 'tag') chip = { kind: 'tag', value: tok.value };
+    else if (tok.kind === 'date') chip = { kind: 'date', op: tok.op, value: tok.value };
+    else if (tok.kind === 'contains') chip = { kind: 'text', value: `contains:${tok.value}` };
+    else chip = { kind: 'text', value: tok.value };
+    chips.push({ id: nextId(), negated, join: chips.length === 0 ? 'and' : join, ...chip });
+    join = 'and';
     negated = false;
   }
   return chips;
 };
-const MapView = lazy(() => import("./MapView"));
-import "../styles/04-timeline.css";
-import "../styles/07-modals-menus.css";
+const MapView = lazy(() => import('./MapView'));
+import '../styles/04-timeline.css';
+import '../styles/07-modals-menus.css';
 
 function assignEraLanes(eras, bandHeight, bandGap) {
   if (eras.length === 0) return new Map();
@@ -198,13 +259,12 @@ function assignEraLanes(eras, bandHeight, bandGap) {
   const dur = (e) => e.end - e.start;
   const overlaps = (a, b) => a.start < b.end && a.end > b.start;
   const getEraHeight = (era) => {
-    const size = era?.eraSize || "normal";
-    if (size === "extra-thick") return bandHeight * 3;
-    if (size === "thick") return bandHeight * 2;
+    const size = era?.eraSize || 'normal';
+    if (size === 'extra-thick') return bandHeight * 3;
+    if (size === 'thick') return bandHeight * 2;
     return bandHeight;
   };
-  const verticalOverlap = (topA, heightA, topB, heightB) =>
-    topA < topB + heightB && topA + heightA > topB;
+  const verticalOverlap = (topA, heightA, topB, heightB) => topA < topB + heightB && topA + heightA > topB;
 
   // Implicit parent = the shortest strictly-longer era that overlaps this one.
   // Overlapping eras are stacked automatically: shorter above longer, touching.
@@ -225,9 +285,8 @@ function assignEraLanes(eras, bandHeight, bandGap) {
   const getAboveHeight = (era) => {
     if (aboveHeightOf.has(era.id)) return aboveHeightOf.get(era.id);
     const children = eras.filter((e) => implicitParentOf.get(e.id)?.id === era.id);
-    const h = children.length === 0
-      ? 0
-      : Math.max(...children.map((child) => getEraHeight(child) + getAboveHeight(child)));
+    const h =
+      children.length === 0 ? 0 : Math.max(...children.map((child) => getEraHeight(child) + getAboveHeight(child)));
     aboveHeightOf.set(era.id, h);
     return h;
   };
@@ -245,9 +304,7 @@ function assignEraLanes(eras, bandHeight, bandGap) {
   [...eras].sort((a, b) => a.start - b.start).forEach(visit);
 
   // All root eras share the same base offset so they sit in the same bottommost lane.
-  const commonRootBottom = Math.max(0, ...eras
-    .filter((e) => !implicitParentOf.has(e.id))
-    .map((e) => getEraHeight(e)));
+  const commonRootBottom = Math.max(0, ...eras.filter((e) => !implicitParentOf.has(e.id)).map((e) => getEraHeight(e)));
 
   const offsetOf = new Map();
 
@@ -338,46 +395,51 @@ function OverflowTags({ tags, tagColors, getReadableTextColor: readableColor }) 
   );
 }
 
-const TimelineView = forwardRef(function TimelineView({
-  selectedId,
-  onSelect,
-  timelineData,
-  onZoomChange,
-  onHeightChange,
-  onAddEvent,
-  onAddSpan,
-  onAddEra,
-  onOpenSettings,
-  onDelete,
-  onDuplicateElement,
-  onEditElement,
-  downloadPngTrigger,
-  exportPngOptions,
-  onExportPng,
-  onExportVideo,
-  rightPanelWidth = 0,
-  isRightPanelOpen = false,
-  leftPanelWidth = 0,
-  isLeftPanelOpen = false,
-  activeTags = [],
-  hiddenTags = [],
-  allTags = [],
-  onToggleTag,
-  onToggleHiddenTag,
-  onClearTags,
-  pinnedTags = [],
-  onTogglePinnedTag,
-  onViewportYearChange,
-  onChipQueryChange,
-  tagColors = {},
-  keybinds = {},
-  onSetViewMode,
-  readOnly = false,
-}: Record<string, DynamicValue>, ref: DynamicValue) {
-  const isMac = navigator.userAgent?.includes("Mac");
+const TimelineView = forwardRef(function TimelineView(
+  {
+    selectedId,
+    onSelect,
+    timelineData,
+    onZoomChange,
+    onHeightChange,
+    onAddEvent,
+    onAddSpan,
+    onAddEra,
+    onOpenSettings,
+    onDelete,
+    onDuplicateElement,
+    onEditElement,
+    downloadPngTrigger,
+    exportPngOptions,
+    onExportPng,
+    onExportVideo,
+    rightPanelWidth = 0,
+    isRightPanelOpen = false,
+    leftPanelWidth = 0,
+    isLeftPanelOpen = false,
+    activeTags = [],
+    hiddenTags = [],
+    allTags = [],
+    onToggleTag,
+    onToggleHiddenTag,
+    onClearTags,
+    pinnedTags = [],
+    onTogglePinnedTag,
+    onViewportYearChange,
+    onChipQueryChange,
+    tagColors = {},
+    keybinds = {},
+    onSetViewMode,
+    readOnly = false,
+  }: Record<string, DynamicValue>,
+  ref: DynamicValue,
+) {
+  const isMac = navigator.userAgent?.includes('Mac');
   const fmtKey = (bind) => {
-    if (!bind?.keys?.length) return "";
-    return bind.keys.map((k) => k === "Ctrl" ? (isMac ? "Cmd" : "Ctrl") : k === "Alt" ? (isMac ? "Option" : "Alt") : k).join("+");
+    if (!bind?.keys?.length) return '';
+    return bind.keys
+      .map((k) => (k === 'Ctrl' ? (isMac ? 'Cmd' : 'Ctrl') : k === 'Alt' ? (isMac ? 'Option' : 'Alt') : k))
+      .join('+');
   };
   const btnTip = (label, bind) => {
     const s = fmtKey(bind);
@@ -396,18 +458,20 @@ const TimelineView = forwardRef(function TimelineView({
   const [filterMenu, setFilterMenu] = useState(null);
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [filterChips, setFilterChips] = useState([]);
-  const [filterText, setFilterText] = useState("");
-  const [filterDateOp, setFilterDateOp] = useState(">=");
-  const [filterDateVal, setFilterDateVal] = useState("");
+  const [filterText, setFilterText] = useState('');
+  const [filterDateOp, setFilterDateOp] = useState('>=');
+  const [filterDateVal, setFilterDateVal] = useState('');
   const [historyOpen, setHistoryOpen] = useState(false);
   const [filterHistory, setFilterHistory] = useState(() => {
     try {
-      const stored = JSON.parse(window.localStorage.getItem(FILTER_HISTORY_KEY) ?? "[]");
-      return Array.isArray(stored) ? stored.filter((q) => typeof q === "string").slice(0, FILTER_HISTORY_MAX) : [];
-    } catch { return []; }
+      const stored = JSON.parse(window.localStorage.getItem(FILTER_HISTORY_KEY) ?? '[]');
+      return Array.isArray(stored) ? stored.filter((q) => typeof q === 'string').slice(0, FILTER_HISTORY_MAX) : [];
+    } catch {
+      return [];
+    }
   });
   const filterInputRef = useRef(null);
-  const filterQueryRef = useRef("");
+  const filterQueryRef = useRef('');
   const filterChipIdRef = useRef(0);
 
   const chipsQuery = useMemo(() => buildChipQuery(filterChips), [filterChips]);
@@ -418,9 +482,11 @@ const TimelineView = forwardRef(function TimelineView({
   }, [chipsQuery, onChipQueryChange]);
   const fullFilterQuery = useMemo(() => {
     const extraTags = activeTags
-      .filter((t) => !filterChips.some((c) => c.kind === "tag" && !c.negated && c.value.toLowerCase() === t.toLowerCase()))
+      .filter(
+        (t) => !filterChips.some((c) => c.kind === 'tag' && !c.negated && c.value.toLowerCase() === t.toLowerCase()),
+      )
       .map((t) => `#${t}`);
-    return [chipsQuery, ...extraTags].filter(Boolean).join(" ");
+    return [chipsQuery, ...extraTags].filter(Boolean).join(' ');
   }, [chipsQuery, filterChips, activeTags]);
   const shownElementCount = useMemo(() => {
     const elements = timelineData?.elements ?? [];
@@ -430,7 +496,7 @@ const TimelineView = forwardRef(function TimelineView({
   const [showMap, setShowMap] = useState(false);
   const mapViewRef = useRef(null);
   const [sliderValue, setSliderValue] = useState(0);
-  const [sliderYearLabel, setSliderYearLabel] = useState("");
+  const [sliderYearLabel, setSliderYearLabel] = useState('');
   const [currentScale, setCurrentScale] = useState(1);
   const [isPlaying, setIsPlaying] = useState(false);
   const filterMenuRef = useRef(null);
@@ -441,7 +507,7 @@ const TimelineView = forwardRef(function TimelineView({
   const lastViewportYearRef = useRef(null);
   const [mapViewportYear, setMapViewportYear] = useState(null);
   const deferredMapViewportYear = useDeferredValue(mapViewportYear);
-  const lastSliderLabelRef = useRef("");
+  const lastSliderLabelRef = useRef('');
   const sliderRafRef = useRef(null);
   const zoomVelocityRef = useRef(0);
   const zoomMomentumRafRef = useRef(null);
@@ -457,38 +523,42 @@ const TimelineView = forwardRef(function TimelineView({
   const zoomButtonOffset = isRightPanelOpen ? rightPanelWidth + 20 : 20;
   const sliderOffset = (isLeftPanelOpen ? leftPanelWidth : 0) - (isRightPanelOpen ? rightPanelWidth : 0);
 
-  const publishViewportYear = useCallback((nextYear) => {
-    setMapViewportYear((current) => (current === nextYear ? current : nextYear));
-    onViewportYearChange?.(nextYear);
-  }, [onViewportYearChange]);
+  const publishViewportYear = useCallback(
+    (nextYear) => {
+      setMapViewportYear((current) => (current === nextYear ? current : nextYear));
+      onViewportYearChange?.(nextYear);
+    },
+    [onViewportYearChange],
+  );
 
   const mapElements = useMemo(() => {
     if (!showMap) return [];
     const hiddenGroupIds = new Set(
-      (timelineData?.file?.groups ?? []).filter((g) => g.visible === false).map((g) => g.id)
+      (timelineData?.file?.groups ?? []).filter((g) => g.visible === false).map((g) => g.id),
     );
     return (timelineData?.elements ?? []).filter(
-      (el) => (!el.groupId || !hiddenGroupIds.has(el.groupId)) &&
-        (!parsedChipQuery || matchesFilter(el, parsedChipQuery))
+      (el) =>
+        (!el.groupId || !hiddenGroupIds.has(el.groupId)) && (!parsedChipQuery || matchesFilter(el, parsedChipQuery)),
     );
   }, [showMap, timelineData?.file?.groups, timelineData?.elements, parsedChipQuery]);
 
   const [appFontStack, setAppFontStack] = useState(() => readAppFontStack());
   useEffect(() => {
-    const sync = () => setAppFontStack((prev) => {
-      const next = readAppFontStack();
-      return next === prev ? prev : next;
-    });
+    const sync = () =>
+      setAppFontStack((prev) => {
+        const next = readAppFontStack();
+        return next === prev ? prev : next;
+      });
     sync();
     const observer = new MutationObserver(sync);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['style'] });
     return () => observer.disconnect();
   }, []);
 
   const fileFontSetting = timelineData?.file?.font;
   const resolvedFont = useMemo(() => {
-    if (fileFontSetting && String(fileFontSetting).toLowerCase() !== "default") {
-      const safeName = String(fileFontSetting).replace(/([\\"])/g, "\\$1");
+    if (fileFontSetting && String(fileFontSetting).toLowerCase() !== 'default') {
+      const safeName = String(fileFontSetting).replace(/([\\"])/g, '\\$1');
       return `"${safeName}", ${FONT_FALLBACK_STACK}`;
     }
     return appFontStack || FONT_FALLBACK_STACK;
@@ -496,7 +566,10 @@ const TimelineView = forwardRef(function TimelineView({
 
   const [fontReady, setFontReady] = useState(() => isFontReady(document.fonts, resolvedFont));
   useEffect(() => {
-    if (isFontReady(document.fonts, resolvedFont)) { setFontReady(true); return undefined; }
+    if (isFontReady(document.fonts, resolvedFont)) {
+      setFontReady(true);
+      return undefined;
+    }
     setFontReady(false);
     return watchFontLoad(document.fonts, resolvedFont, () => setFontReady(true), FONT_WAIT_MS);
   }, [resolvedFont]);
@@ -523,13 +596,16 @@ const TimelineView = forwardRef(function TimelineView({
   } = useMemo(() => {
     const file = timelineData.file;
     const passesQuery = (el) => !parsedChipQuery || matchesFilter(el, parsedChipQuery);
-    const events = timelineData.elements.filter(e => e.type === "event" && passesQuery(e));
-    const spans = timelineData.elements.filter(e => e.type === "span" && passesQuery(e));
-    const eras = timelineData.elements.filter(e => e.type === "era" && passesQuery(e));
+    const events = timelineData.elements.filter((e) => e.type === 'event' && passesQuery(e));
+    const spans = timelineData.elements.filter((e) => e.type === 'span' && passesQuery(e));
+    const eras = timelineData.elements.filter((e) => e.type === 'era' && passesQuery(e));
     const useCalendar = file?.useCalendar === true;
     const hasDayPrecision = (label) => {
-      if (!label || typeof label !== "string") return false;
-      const parts = label.split("/").map((part) => part.trim()).filter(Boolean);
+      if (!label || typeof label !== 'string') return false;
+      const parts = label
+        .split('/')
+        .map((part) => part.trim())
+        .filter(Boolean);
       return parts.length === 3;
     };
     const adjustDate = (value, label) => {
@@ -542,7 +618,7 @@ const TimelineView = forwardRef(function TimelineView({
       return snapToMonthGrid(value);
     };
     const resolveDate = (value, label) => {
-      if (!label || typeof label !== "string") {
+      if (!label || typeof label !== 'string') {
         return adjustDate(value, label);
       }
       const parsed = parseTimelineInput(label);
@@ -553,16 +629,16 @@ const TimelineView = forwardRef(function TimelineView({
     };
 
     const DEFAULT_GROUP = {
-      id: "g-main",
-      title: "Main",
+      id: 'g-main',
+      title: 'Main',
       order: 0,
       stack: 0,
       visible: true,
       locked: false,
     };
     const DEFAULT_BELOW_GROUP = {
-      id: "g-main-below",
-      title: "Main (Below)",
+      id: 'g-main-below',
+      title: 'Main (Below)',
       order: 1,
       stack: 1,
       visible: true,
@@ -578,7 +654,7 @@ const TimelineView = forwardRef(function TimelineView({
         sourceGroups.map((g, index) => [
           g?.id || `g-${index}`,
           hasBelowLineSource && g?.belowLine ? DEFAULT_BELOW_GROUP.id : DEFAULT_GROUP.id,
-        ])
+        ]),
       );
       return hasBelowLineSource ? [DEFAULT_GROUP, DEFAULT_BELOW_GROUP] : [DEFAULT_GROUP];
     })();
@@ -589,11 +665,9 @@ const TimelineView = forwardRef(function TimelineView({
       stack: Number.isFinite(group?.stack) ? group.stack : index,
       visible: group?.visible !== false,
     }));
-    const visibleGroupIds = new Set(
-      groups.filter((group) => group.visible !== false).map((group) => group.id)
-    );
+    const visibleGroupIds = new Set(groups.filter((group) => group.visible !== false).map((group) => group.id));
     const groupIdSet = new Set(groups.map((group) => group.id));
-    const defaultGroupId = groups[0]?.id || "g-main";
+    const defaultGroupId = groups[0]?.id || 'g-main';
     const getSafeGroupId = (groupId) => {
       if (disabledGroupIdMap) return disabledGroupIdMap.get(groupId) ?? defaultGroupId;
       return groupIdSet.has(groupId) ? groupId : defaultGroupId;
@@ -631,8 +705,8 @@ const TimelineView = forwardRef(function TimelineView({
     const maxYear = file?.end ?? rawMax;
 
     const parseScaleValue = (value) => {
-      if (typeof value === "number") return value;
-      if (typeof value === "string") {
+      if (typeof value === 'number') return value;
+      if (typeof value === 'string') {
         const parsed = parseTimelineInput(value);
         return Number.isFinite(parsed.value) ? parsed.value : null;
       }
@@ -641,11 +715,12 @@ const TimelineView = forwardRef(function TimelineView({
 
     const normalizeScaleSections = (sections, legacyBreaks, min, max) => {
       // Support old breaks format as scale=0 sections
-      let raw = Array.isArray(sections) && sections.length > 0
-        ? sections
-        : Array.isArray(legacyBreaks) && legacyBreaks.length > 0
-          ? legacyBreaks.map((b) => ({ ...b, scale: 0 }))
-          : [];
+      let raw =
+        Array.isArray(sections) && sections.length > 0
+          ? sections
+          : Array.isArray(legacyBreaks) && legacyBreaks.length > 0
+            ? legacyBreaks.map((b) => ({ ...b, scale: 0 }))
+            : [];
       if (raw.length === 0) return [];
 
       const cleaned = raw
@@ -678,7 +753,7 @@ const TimelineView = forwardRef(function TimelineView({
       return merged;
     };
 
-    const isLogScale = (file?.scaleType || "default") === "logarithmic";
+    const isLogScale = (file?.scaleType || 'default') === 'logarithmic';
     const logFactor = Math.max(1, Number(file?.logScaleFactor) || 10);
     const logSpan = maxYear - minYear;
 
@@ -742,10 +817,9 @@ const TimelineView = forwardRef(function TimelineView({
     const detailMultiplier = file?.detailLevel ?? 1;
     const PX_PER_YEAR = baseDetailLevel * detailMultiplier;
     const TIMELINE_PADDING = 200; // px padding on each end
-    const timelineWidth = range * PX_PER_YEAR + (TIMELINE_PADDING * 2);
+    const timelineWidth = range * PX_PER_YEAR + TIMELINE_PADDING * 2;
 
-    const yearToPx = (year) =>
-      (compressYear(year) - compressedMin) * PX_PER_YEAR + TIMELINE_PADDING;
+    const yearToPx = (year) => (compressYear(year) - compressedMin) * PX_PER_YEAR + TIMELINE_PADDING;
 
     if (showMap || !fontReady) {
       return {
@@ -779,7 +853,10 @@ const TimelineView = forwardRef(function TimelineView({
     // events
     let evWidth = file?.eventWidth;
     let evFontSize = file?.eventFontSize;
-    if (evWidth == null && file?.compactEvents) { evWidth = 130; evFontSize = 7; }
+    if (evWidth == null && file?.compactEvents) {
+      evWidth = 130;
+      evFontSize = 7;
+    }
     evWidth = evWidth ?? 150;
     evFontSize = evFontSize ?? 10;
     const evHeight = Math.round(evWidth / 6);
@@ -824,13 +901,13 @@ const TimelineView = forwardRef(function TimelineView({
     const groupsByStack = groups
       .filter((group) => group.visible !== false)
       .sort((a, b) => {
-      const stackDiff = (a.stack ?? 0) - (b.stack ?? 0); // bottom -> top
-      if (stackDiff !== 0) return stackDiff;
-      return (a.order ?? 0) - (b.order ?? 0);
-    });
+        const stackDiff = (a.stack ?? 0) - (b.stack ?? 0); // bottom -> top
+        if (stackDiff !== 0) return stackDiff;
+        return (a.order ?? 0) - (b.order ?? 0);
+      });
     const globalSpanChildPlacement = buildSpanChildPlacement(
       visibleAdjustedSpans,
-      timelineData?.file?.branchOrdering || "later-first"
+      timelineData?.file?.branchOrdering || 'later-first',
     );
     const globalSpanMergePlacement = buildSpanMergePlacement(visibleAdjustedSpans);
 
@@ -845,13 +922,15 @@ const TimelineView = forwardRef(function TimelineView({
       const spanIdsInGroup = new Set(spansInGroup.map((span) => span.id));
       const groupSpanChildPlacement = Object.fromEntries(
         Object.entries(globalSpanChildPlacement).filter(
-          ([childId, placement]) => spanIdsInGroup.has(childId) && spanIdsInGroup.has((placement as { parentId?: string }).parentId)
-        )
+          ([childId, placement]) =>
+            spanIdsInGroup.has(childId) && spanIdsInGroup.has((placement as { parentId?: string }).parentId),
+        ),
       );
       const groupSpanMergePlacement = Object.fromEntries(
         Object.entries(globalSpanMergePlacement).filter(
-          ([childId, placement]) => spanIdsInGroup.has(childId) && spanIdsInGroup.has((placement as { parentId?: string }).parentId)
-        )
+          ([childId, placement]) =>
+            spanIdsInGroup.has(childId) && spanIdsInGroup.has((placement as { parentId?: string }).parentId),
+        ),
       );
 
       const isBelowLine = group.belowLine === true;
@@ -868,12 +947,7 @@ const TimelineView = forwardRef(function TimelineView({
         timelineEnd: file.end,
         belowLine: isBelowLine,
       });
-      const spanBandHeight = calcSpanBandHeight(
-        spanLaneEnds.length,
-        SPAN_OFFSET,
-        SPAN_HEIGHT,
-        SPAN_VERTICAL_GAP
-      );
+      const spanBandHeight = calcSpanBandHeight(spanLaneEnds.length, SPAN_OFFSET, SPAN_HEIGHT, SPAN_VERTICAL_GAP);
       const tempEvents = layoutEvents({
         events: eventsInGroup,
         yearToPx,
@@ -901,12 +975,16 @@ const TimelineView = forwardRef(function TimelineView({
       const hasItems = itemTops.length > 0 && itemBottoms.length > 0;
       const contentTop = hasItems
         ? Math.min(...itemTops)
-        : isBelowLine ? TEMP_BASE_LINE_Y + 20 : TEMP_BASE_LINE_Y - (EMPTY_GROUP_HEIGHT + 20);
+        : isBelowLine
+          ? TEMP_BASE_LINE_Y + 20
+          : TEMP_BASE_LINE_Y - (EMPTY_GROUP_HEIGHT + 20);
       const contentBottom = hasItems
         ? Math.max(...itemBottoms)
-        : isBelowLine ? TEMP_BASE_LINE_Y + EMPTY_GROUP_HEIGHT + 20 : TEMP_BASE_LINE_Y - 20;
+        : isBelowLine
+          ? TEMP_BASE_LINE_Y + EMPTY_GROUP_HEIGHT + 20
+          : TEMP_BASE_LINE_Y - 20;
       const contentHeight = hasItems
-        ? Math.max(EVENT_MIN_HEIGHT, (contentBottom - contentTop) + GROUP_BAND_PADDING_Y * 2)
+        ? Math.max(EVENT_MIN_HEIGHT, contentBottom - contentTop + GROUP_BAND_PADDING_Y * 2)
         : EMPTY_GROUP_HEIGHT;
 
       return {
@@ -934,9 +1012,8 @@ const TimelineView = forwardRef(function TimelineView({
 
     // Auto-hide empty groups: drop groups with no spans/events so they take no
     // vertical space and render no empty band on the timeline.
-    const visibleGroupLayoutsRaw = file?.autoHideEmptyGroups === true
-      ? tempGroupLayoutsRaw.filter((g) => g.hasItems)
-      : tempGroupLayoutsRaw;
+    const visibleGroupLayoutsRaw =
+      file?.autoHideEmptyGroups === true ? tempGroupLayoutsRaw.filter((g) => g.hasItems) : tempGroupLayoutsRaw;
 
     const aboveLineRaw = visibleGroupLayoutsRaw.filter((g) => !g.belowLine);
     const belowLineRaw = visibleGroupLayoutsRaw.filter((g) => g.belowLine);
@@ -963,14 +1040,11 @@ const TimelineView = forwardRef(function TimelineView({
       return next;
     });
 
-    const tempGroupLayouts = [...aboveLineLayouts, ...belowLineLayouts]
-      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    const tempGroupLayouts = [...aboveLineLayouts, ...belowLineLayouts].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
     // Calculate dynamic timeline height based on temporary layout
     const aboveLineTopExtents = aboveLineLayouts.map((g) => g.topExtent).filter(Number.isFinite);
-    const maxGroupTop = aboveLineTopExtents.length > 0
-      ? Math.min(...aboveLineTopExtents)
-      : TEMP_BASE_LINE_Y;
+    const maxGroupTop = aboveLineTopExtents.length > 0 ? Math.min(...aboveLineTopExtents) : TEMP_BASE_LINE_Y;
     const tempEraTop = TEMP_BASE_LINE_Y + ERA_OFFSET;
     const maxEraTop = eras.length > 0 ? tempEraTop : TEMP_BASE_LINE_Y;
 
@@ -978,23 +1052,22 @@ const TimelineView = forwardRef(function TimelineView({
     const aboveBaseline = TEMP_BASE_LINE_Y - topExtent;
     const ERA_GAP = 0;
     const eraOffsets = assignEraLanes(adjustedEras, ERA_BAND_HEIGHT, ERA_GAP);
-    const maxEraBottom = adjustedEras.length > 0
-      ? Math.max(...adjustedEras.map((era) => {
-          const sizeMultiplier = era.eraSize === "extra-thick" ? 3 : era.eraSize === "thick" ? 2 : 1;
-          return (eraOffsets.get(era.id) ?? 0) + ERA_BAND_HEIGHT * sizeMultiplier;
-        }))
-      : 0;
+    const maxEraBottom =
+      adjustedEras.length > 0
+        ? Math.max(
+            ...adjustedEras.map((era) => {
+              const sizeMultiplier = era.eraSize === 'extra-thick' ? 3 : era.eraSize === 'thick' ? 2 : 1;
+              return (eraOffsets.get(era.id) ?? 0) + ERA_BAND_HEIGHT * sizeMultiplier;
+            }),
+          )
+        : 0;
 
     const belowLineBottomExtents = belowLineLayouts.map((g) => g.bottomExtent).filter(Number.isFinite);
-    const belowLineGroupsExtent = belowLineBottomExtents.length > 0
-      ? Math.max(...belowLineBottomExtents) - TEMP_BASE_LINE_Y
-      : 0;
+    const belowLineGroupsExtent =
+      belowLineBottomExtents.length > 0 ? Math.max(...belowLineBottomExtents) - TEMP_BASE_LINE_Y : 0;
 
-    const eraSpace = adjustedEras.length > 0
-      ? ERA_OFFSET + maxEraBottom + 8
-      : 0;
-    const belowBaseline = belowLineGroupsExtent + eraSpace
-      + (belowLineGroupsExtent === 0 && eraSpace === 0 ? 30 : 0);
+    const eraSpace = adjustedEras.length > 0 ? ERA_OFFSET + maxEraBottom + 8 : 0;
+    const belowBaseline = belowLineGroupsExtent + eraSpace + (belowLineGroupsExtent === 0 && eraSpace === 0 ? 30 : 0);
 
     const calculatedHeight = aboveBaseline + belowBaseline;
     const BASE_LINE_Y = calculatedHeight;
@@ -1055,18 +1128,13 @@ const TimelineView = forwardRef(function TimelineView({
 
     const getGroupExtent = (group) => {
       const MIN_GROUP_BAND_HEIGHT = EVENT_MIN_HEIGHT;
-      const tops = [
-        ...group.finalSpans.map((span) => span.top),
-        ...group.finalEvents.map((event) => event.top),
-      ];
+      const tops = [...group.finalSpans.map((span) => span.top), ...group.finalEvents.map((event) => event.top)];
       const bottoms = [
         ...group.finalSpans.map((span) => span.top + (span.spanHeight ?? 20)),
         ...group.finalEvents.map((event) => event.top + (event._boxHeight || 29)),
       ];
       if (tops.length === 0 || bottoms.length === 0) {
-        const center = group.belowLine
-          ? BASE_LINE_Y + group.yOffset + 20
-          : BASE_LINE_Y + group.yOffset - 20;
+        const center = group.belowLine ? BASE_LINE_Y + group.yOffset + 20 : BASE_LINE_Y + group.yOffset - 20;
         const half = Math.round(EVENT_MIN_HEIGHT / 2);
         return { top: center - half, bottom: center + half };
       }
@@ -1091,9 +1159,7 @@ const TimelineView = forwardRef(function TimelineView({
     const aboveByStack = groupLayoutsRaw.filter((g) => !g.belowLine).sort(stackSort);
     const belowByStack = groupLayoutsRaw.filter((g) => g.belowLine).sort(stackSort);
 
-    const extentById = new Map(
-      groupLayoutsRaw.map((group) => [group.id, getGroupExtent(group)])
-    );
+    const extentById = new Map(groupLayoutsRaw.map((group) => [group.id, getGroupExtent(group)]));
 
     const shiftGroup = (group, delta) => {
       group.yOffset += delta;
@@ -1149,48 +1215,54 @@ const TimelineView = forwardRef(function TimelineView({
 
     const tlStartPx = file.start != null ? yearToPx(file.start) : null;
     const tlEndPx = file.end != null ? yearToPx(file.end) : null;
-    const ERA_FUZZ = 24; 
-    const finalEras = adjustedEras.map((era) => {
-      const rawLeft = yearToPx(era.start);
-      const rawRight = yearToPx(era.end);
-      const clampedLeft = tlStartPx != null ? Math.max(rawLeft, tlStartPx) : rawLeft;
-      const clampedRight = tlEndPx != null ? Math.min(rawRight, tlEndPx) : rawRight;
-      const laneOffset = eraOffsets.get(era.id) ?? 0;
-      const sizeMultiplier = era.eraSize === "extra-thick" ? 3 : era.eraSize === "thick" ? 2 : 1;
-      const top = Math.floor(BASE_LINE_Y + belowLineGroupsExtent + ERA_OFFSET + laneOffset);
-      const left = Math.floor(clampedLeft);
-      const width = Math.ceil(clampedRight) - left;
-      const height = ERA_BAND_HEIGHT * sizeMultiplier;
-      const fuzzStart = era.fuzzyStart === true && clampedLeft === rawLeft ? ERA_FUZZ : 0;
-      const fuzzEnd = era.fuzzyEnd === true && clampedRight === rawRight ? ERA_FUZZ : 0;
-      let fuzz = null;
-      if (fuzzStart || fuzzEnd) {
-        const fuzzWidth = width + fuzzStart + fuzzEnd;
-        let fadeInPx = fuzzStart * 2;
-        let fadeOutPx = fuzzEnd * 2;
-        if (fadeInPx + fadeOutPx > fuzzWidth) {
-          const scale = fuzzWidth / (fadeInPx + fadeOutPx);
-          fadeInPx *= scale;
-          fadeOutPx *= scale;
+    const ERA_FUZZ = 24;
+    const finalEras = adjustedEras
+      .map((era) => {
+        const rawLeft = yearToPx(era.start);
+        const rawRight = yearToPx(era.end);
+        const clampedLeft = tlStartPx != null ? Math.max(rawLeft, tlStartPx) : rawLeft;
+        const clampedRight = tlEndPx != null ? Math.min(rawRight, tlEndPx) : rawRight;
+        const laneOffset = eraOffsets.get(era.id) ?? 0;
+        const sizeMultiplier = era.eraSize === 'extra-thick' ? 3 : era.eraSize === 'thick' ? 2 : 1;
+        const top = Math.floor(BASE_LINE_Y + belowLineGroupsExtent + ERA_OFFSET + laneOffset);
+        const left = Math.floor(clampedLeft);
+        const width = Math.ceil(clampedRight) - left;
+        const height = ERA_BAND_HEIGHT * sizeMultiplier;
+        const fuzzStart = era.fuzzyStart === true && clampedLeft === rawLeft ? ERA_FUZZ : 0;
+        const fuzzEnd = era.fuzzyEnd === true && clampedRight === rawRight ? ERA_FUZZ : 0;
+        let fuzz = null;
+        if (fuzzStart || fuzzEnd) {
+          const fuzzWidth = width + fuzzStart + fuzzEnd;
+          let fadeInPx = fuzzStart * 2;
+          let fadeOutPx = fuzzEnd * 2;
+          if (fadeInPx + fadeOutPx > fuzzWidth) {
+            const scale = fuzzWidth / (fadeInPx + fadeOutPx);
+            fadeInPx *= scale;
+            fadeOutPx *= scale;
+          }
+          fuzz = { left: left - fuzzStart, width: fuzzWidth, fadeInPx, fadeOutPx };
         }
-        fuzz = { left: left - fuzzStart, width: fuzzWidth, fadeInPx, fadeOutPx };
-      }
-      return {
-        ...era,
-        height,
-        left,
-        width,
-        top,
-        fuzz,
-      };
-    }).filter((era) => era.width > 0);
+        return {
+          ...era,
+          height,
+          left,
+          width,
+          top,
+          fuzz,
+        };
+      })
+      .filter((era) => era.width > 0);
     // abutting fuzzy edges: keep the earlier era solid under the later one's fade-in so the crossfade stays opaque
     for (const era of finalEras) {
       if (!era.fuzz?.fadeOutPx) continue;
       const endPx = yearToPx(era.end);
-      const next = finalEras.find((o) => o !== era && o.fuzz?.fadeInPx > 0
-        && Math.abs(yearToPx(o.start) - endPx) < 0.5
-        && (eraOffsets.get(o.id) ?? 0) === (eraOffsets.get(era.id) ?? 0));
+      const next = finalEras.find(
+        (o) =>
+          o !== era &&
+          o.fuzz?.fadeInPx > 0 &&
+          Math.abs(yearToPx(o.start) - endPx) < 0.5 &&
+          (eraOffsets.get(o.id) ?? 0) === (eraOffsets.get(era.id) ?? 0),
+      );
       if (next) era.fuzz.fadeOutPx = 0;
     }
     // later fuzz layers paint on top so fade-ins blend over the solid underlap
@@ -1266,7 +1338,7 @@ const TimelineView = forwardRef(function TimelineView({
       nextTicks.push({ ...tick, value: normalizedValue });
     };
 
-    if (file?.scaleType === "logarithmic") {
+    if (file?.scaleType === 'logarithmic') {
       const lf = Math.max(1, Number(file?.logScaleFactor) || 10);
       const ls = maxYear - minYear;
       const logDecompress = (c) => {
@@ -1343,25 +1415,19 @@ const TimelineView = forwardRef(function TimelineView({
     return nextTicks;
   }, [file, PX_PER_YEAR, currentScale, normalizedScaleSections]);
 
-  const finalSpanById = useMemo(
-    () => new Map(finalSpans.map((span) => [span.id, span])),
-    [finalSpans]
-  );
-  const groupLayoutById = useMemo(
-    () => new Map(groupLayouts.map((group) => [group.id, group])),
-    [groupLayouts]
-  );
+  const finalSpanById = useMemo(() => new Map(finalSpans.map((span) => [span.id, span])), [finalSpans]);
+  const groupLayoutById = useMemo(() => new Map(groupLayouts.map((group) => [group.id, group])), [groupLayouts]);
   const extensionParentRoundedSet = useMemo(() => {
     const ids = new Set();
     finalSpans.forEach((childSpan) => {
       const placement = spanChildPlacement[childSpan.id];
-      if (!placement || placement.mode !== "extend") return;
+      if (!placement || placement.mode !== 'extend') return;
       const parentSpan = finalSpanById.get(placement.parentId);
       if (!parentSpan) return;
       const childH = childSpan.spanHeight ?? 20;
       const parentH = parentSpan.spanHeight ?? 20;
       const parentIsLarger = parentH > childH + 0.1;
-      if (parentIsLarger && parentSpan.spanSize !== "thin") {
+      if (parentIsLarger && parentSpan.spanSize !== 'thin') {
         ids.add(parentSpan.id);
       }
     });
@@ -1373,7 +1439,7 @@ const TimelineView = forwardRef(function TimelineView({
     finalSpans.forEach((span) => adjacency.set(span.id, new Set()));
     finalSpans.forEach((span) => {
       const placement = spanChildPlacement[span.id];
-      if (!placement || placement.mode !== "extend") return;
+      if (!placement || placement.mode !== 'extend') return;
       const parentId = placement.parentId;
       if (!adjacency.has(parentId)) return;
       adjacency.get(span.id)?.add(parentId);
@@ -1396,9 +1462,7 @@ const TimelineView = forwardRef(function TimelineView({
       }
       if (componentIds.length <= 1) return;
 
-      const componentSpans = componentIds
-        .map((id) => finalSpanById.get(id))
-        .filter(Boolean);
+      const componentSpans = componentIds.map((id) => finalSpanById.get(id)).filter(Boolean);
       if (componentSpans.length <= 1) return;
 
       // Keep the largest span fixed in its lane; center smaller spans around it.
@@ -1458,15 +1522,15 @@ const TimelineView = forwardRef(function TimelineView({
   useLayoutEffect(() => {
     const timelineEl = timelineRef.current;
     if (!timelineEl) return;
-    const spanNodes = timelineEl.querySelectorAll(".span-item");
+    const spanNodes = timelineEl.querySelectorAll('.span-item');
     spanNodes.forEach((spanNode) => {
       // Measure with years visible so the decision is consistent.
-      spanNode.classList.remove("hide-span-years");
-      const titleNode = spanNode.querySelector(".span-title");
-      const yearsNode = spanNode.querySelector(".span-years");
+      spanNode.classList.remove('hide-span-years');
+      const titleNode = spanNode.querySelector('.span-title');
+      const yearsNode = spanNode.querySelector('.span-years');
       if (!titleNode || !yearsNode) return;
       const isTitleTruncated = titleNode.scrollWidth - titleNode.clientWidth > 1;
-      spanNode.classList.toggle("hide-span-years", isTitleTruncated);
+      spanNode.classList.toggle('hide-span-years', isTitleTruncated);
     });
   }, [
     finalSpans,
@@ -1498,12 +1562,8 @@ const TimelineView = forwardRef(function TimelineView({
     const viewportWidth = container.clientWidth;
     const centerPx = -panPosition + viewportWidth / 2;
     const timelineX = centerPx / scale;
-    const compressedYear =
-      (timelineX - TIMELINE_PADDING) / PX_PER_YEAR + compressedMin;
-    const clampedCompressed = Math.min(
-      Math.max(compressedYear, compressedMin),
-      compressedMax
-    );
+    const compressedYear = (timelineX - TIMELINE_PADDING) / PX_PER_YEAR + compressedMin;
+    const clampedCompressed = Math.min(Math.max(compressedYear, compressedMin), compressedMax);
     const rawYear = decompressYear(clampedCompressed);
     const showCalendar = file?.useCalendar === true;
     const snappedYear = showCalendar ? snapToDayGrid(rawYear) : Math.round(rawYear);
@@ -1539,7 +1599,7 @@ const TimelineView = forwardRef(function TimelineView({
       applyTransform();
     }
     prevCalculatedHeightRef.current = calculatedHeight;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [calculatedHeight]);
 
   const applyTransform = ({ skipLabels = false } = {}) => {
@@ -1548,14 +1608,11 @@ const TimelineView = forwardRef(function TimelineView({
 
     const { x, y } = translateRef.current;
     const scale = scaleRef.current;
-    timelineEl.style.transformOrigin = "0 0";
+    timelineEl.style.transformOrigin = '0 0';
     timelineEl.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
     // Counter-scale group band labels
     const GROUP_LABEL_MAX_INV_SCALE = 2;
-    timelineEl.style.setProperty(
-      "--group-label-inv-scale",
-      String(Math.min(1 / scale, GROUP_LABEL_MAX_INV_SCALE))
-    );
+    timelineEl.style.setProperty('--group-label-inv-scale', String(Math.min(1 / scale, GROUP_LABEL_MAX_INV_SCALE)));
     const overlay = gridLabelsRef.current;
     if (overlay) {
       overlay.style.transform = `translateX(${x}px)`;
@@ -1578,7 +1635,7 @@ const TimelineView = forwardRef(function TimelineView({
       sliderRafRef.current = null;
       const value = pendingSliderValueRef.current;
       pendingSliderValueRef.current = null;
-      if (typeof value === "number") {
+      if (typeof value === 'number') {
         const delta = Math.abs(value - sliderValueRef.current);
         if (delta >= 0.001) {
           sliderValueRef.current = value;
@@ -1600,8 +1657,6 @@ const TimelineView = forwardRef(function TimelineView({
       range: baseMaxPan + extra * 2,
     };
   };
-
-
 
   const zoomToPoint = (zoomFactor, mouseX, mouseY, { commitState = true, skipLabels = false } = {}) => {
     const container = containerRef.current;
@@ -1675,7 +1730,10 @@ const TimelineView = forwardRef(function TimelineView({
         return;
       }
       const c = containerRef.current;
-      if (!c) { panMomentumRafRef.current = null; return; }
+      if (!c) {
+        panMomentumRafRef.current = null;
+        return;
+      }
       translateRef.current.x -= panVelocityRef.current.x;
       translateRef.current.y -= panVelocityRef.current.y;
       const { minX: mn, maxX: mx, range: r } = getPanBounds(c);
@@ -1716,7 +1774,10 @@ const TimelineView = forwardRef(function TimelineView({
   zoomTimelineFromWheelRef.current = zoomTimelineFromWheel;
 
   const handleZoomIn = () => {
-    if (showMap) { mapViewRef.current?.zoomIn(); return; }
+    if (showMap) {
+      mapViewRef.current?.zoomIn();
+      return;
+    }
     const container = containerRef.current;
     if (!container) return;
     const rect = container.getBoundingClientRect();
@@ -1724,7 +1785,10 @@ const TimelineView = forwardRef(function TimelineView({
   };
 
   const handleZoomOut = () => {
-    if (showMap) { mapViewRef.current?.zoomOut(); return; }
+    if (showMap) {
+      mapViewRef.current?.zoomOut();
+      return;
+    }
     const container = containerRef.current;
     if (!container) return;
     const rect = container.getBoundingClientRect();
@@ -1741,7 +1805,7 @@ const TimelineView = forwardRef(function TimelineView({
     setFilterMenu({
       x: rect.left,
       y: rect.bottom + 4,
-      align: "left",
+      align: 'left',
       anchorLeft: rect.left,
       ready: false,
     });
@@ -1753,15 +1817,14 @@ const TimelineView = forwardRef(function TimelineView({
     const padding = 8;
     const maxX = window.innerWidth - menuRect.width - padding;
     const maxY = window.innerHeight - menuRect.height - padding;
-    const preferredX = filterMenu.align === "left" && Number.isFinite(filterMenu.anchorLeft)
-      ? filterMenu.anchorLeft - menuRect.width
-      : filterMenu.x;
+    const preferredX =
+      filterMenu.align === 'left' && Number.isFinite(filterMenu.anchorLeft)
+        ? filterMenu.anchorLeft - menuRect.width
+        : filterMenu.x;
     const nextX = Math.min(Math.max(padding, preferredX), Math.max(padding, maxX));
     const nextY = Math.min(Math.max(padding, filterMenu.y), Math.max(padding, maxY));
     if (nextX !== filterMenu.x || nextY !== filterMenu.y || !filterMenu.ready) {
-      setFilterMenu((prev) =>
-        prev ? { ...prev, x: nextX, y: nextY, ready: true } : prev
-      );
+      setFilterMenu((prev) => (prev ? { ...prev, x: nextX, y: nextY, ready: true } : prev));
     }
   }, [filterMenu]);
 
@@ -1776,30 +1839,38 @@ const TimelineView = forwardRef(function TimelineView({
         setFilterMenu(null);
       }
     };
-    const handleKeyDown = (e) => { if (e.key === "Escape") setFilterMenu(null); };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setFilterMenu(null);
+    };
 
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
     };
   }, [filterMenu]);
 
   useEffect(() => {
     if (!filterModalOpen) return;
-    const handleKeyDown = (e) => { if (e.key === "Escape") setFilterModalOpen(false); };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setFilterModalOpen(false);
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [filterModalOpen]);
 
   const commitFilterHistory = useCallback((q) => {
-    const query = (q ?? "").trim();
+    const query = (q ?? '').trim();
     if (!query) return;
     setFilterHistory((prev) => {
       // Drop entries the new query extends, so growing one filter doesn't fill history with its drafts
       const next = [query, ...prev.filter((x) => x !== query && !query.startsWith(x))].slice(0, FILTER_HISTORY_MAX);
-      try { window.localStorage.setItem(FILTER_HISTORY_KEY, JSON.stringify(next)); } catch { /* storage unavailable */ }
+      try {
+        window.localStorage.setItem(FILTER_HISTORY_KEY, JSON.stringify(next));
+      } catch {
+        /* storage unavailable */
+      }
       return next;
     });
   }, []);
@@ -1807,12 +1878,18 @@ const TimelineView = forwardRef(function TimelineView({
   const removeFilterHistory = useCallback((q) => {
     setFilterHistory((prev) => {
       const next = prev.filter((x) => x !== q);
-      try { window.localStorage.setItem(FILTER_HISTORY_KEY, JSON.stringify(next)); } catch { /* storage unavailable */ }
+      try {
+        window.localStorage.setItem(FILTER_HISTORY_KEY, JSON.stringify(next));
+      } catch {
+        /* storage unavailable */
+      }
       return next;
     });
   }, []);
 
-  useEffect(() => { filterQueryRef.current = chipsQuery; }, [chipsQuery]);
+  useEffect(() => {
+    filterQueryRef.current = chipsQuery;
+  }, [chipsQuery]);
   const filterUiOpen = Boolean(filterMenu) || filterModalOpen;
   useEffect(() => {
     if (!filterUiOpen && filterQueryRef.current.trim()) commitFilterHistory(filterQueryRef.current);
@@ -1827,272 +1904,330 @@ const TimelineView = forwardRef(function TimelineView({
     return () => clearTimeout(timer);
   }, [chipsQuery, filterUiOpen, commitFilterHistory]);
 
-  const nextChipId = () => { filterChipIdRef.current += 1; return `chip-${filterChipIdRef.current}`; };
+  const nextChipId = () => {
+    filterChipIdRef.current += 1;
+    return `chip-${filterChipIdRef.current}`;
+  };
   const addFilterChip = (chip) =>
-    setFilterChips((prev) => [...prev, { id: nextChipId(), negated: false, join: "and", ...chip }]);
+    setFilterChips((prev) => [...prev, { id: nextChipId(), negated: false, join: 'and', ...chip }]);
   const removeFilterChip = (id) => setFilterChips((prev) => prev.filter((c) => c.id !== id));
   const toggleChipNegate = (id) =>
     setFilterChips((prev) => prev.map((c) => (c.id === id ? { ...c, negated: !c.negated } : c)));
   const toggleChipJoin = (id) =>
-    setFilterChips((prev) => prev.map((c) => (c.id === id ? { ...c, join: c.join === "or" ? "and" : "or" } : c)));
+    setFilterChips((prev) => prev.map((c) => (c.id === id ? { ...c, join: c.join === 'or' ? 'and' : 'or' } : c)));
   const toggleTypeChip = (value) =>
     setFilterChips((prev) =>
-      prev.some((c) => c.kind === "type" && c.value === value)
-        ? prev.filter((c) => !(c.kind === "type" && c.value === value))
-        : [...prev, { id: nextChipId(), kind: "type", value, negated: false, join: "and" }]);
+      prev.some((c) => c.kind === 'type' && c.value === value)
+        ? prev.filter((c) => !(c.kind === 'type' && c.value === value))
+        : [...prev, { id: nextChipId(), kind: 'type', value, negated: false, join: 'and' }],
+    );
   const addDateChip = () => {
     const v = filterDateVal.trim();
     if (!v) return;
-    addFilterChip({ kind: "date", op: filterDateOp, value: v });
-    setFilterDateVal("");
+    addFilterChip({ kind: 'date', op: filterDateOp, value: v });
+    setFilterDateVal('');
   };
-  const clearFilterChips = () => { setFilterChips([]); setFilterText(""); setFilterDateVal(""); };
-  const clearAllFilters = () => { clearFilterChips(); onClearTags?.(); };
+  const clearFilterChips = () => {
+    setFilterChips([]);
+    setFilterText('');
+    setFilterDateVal('');
+  };
+  const clearAllFilters = () => {
+    clearFilterChips();
+    onClearTags?.();
+  };
 
   const renderFilterMenuContent = (isModal) => {
-    const hasOr = filterChips.some((c, i) => i > 0 && c.join === "or");
+    const hasOr = filterChips.some((c, i) => i > 0 && c.join === 'or');
     const historyNeedle = filterText.trim().toLowerCase();
     const historyMatches = filterHistory.filter((q) => !historyNeedle || q.toLowerCase().includes(historyNeedle));
     return (
-    <>
-      <div className="fm-header">
-        <span className="fm-header-title"><ListFilter size={12} /> Filters</span>
-        {isModal ? (
-          <button
-            type="button"
-            className="fm-header-btn"
-            onClick={() => setFilterModalOpen(false)}
-            title="Close"
-            aria-label="Close filters"
-          >
-            <X size={14} />
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="fm-header-btn"
-            onClick={() => { setFilterMenu(null); setFilterModalOpen(true); }}
-            title="Expand"
-            aria-label="Open filters in a larger panel"
-          >
-            <Maximize2 size={16} />
-          </button>
-        )}
-      </div>
-      <div className="fm-query-section">
-        <div className="fm-field-wrap">
-        <div
-          className="fm-field"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) { e.preventDefault(); filterInputRef.current?.focus(); }
-          }}
-        >
-          {filterChips.map((chip, i) => {
-            const startsGroup = i === 0 || chip.join === "or";
-            const endsGroup = i === filterChips.length - 1 || filterChips[i + 1].join === "or";
-            return (
-            <Fragment key={chip.id}>
-              {i > 0 && (
-                <button
-                  type="button"
-                  className="fm-join"
-                  title="Toggle AND / OR"
-                  onClick={() => toggleChipJoin(chip.id)}
-                >{chip.join === "or" ? "OR" : "AND"}</button>
-              )}
-              {hasOr && startsGroup && !endsGroup && <span className="fm-paren">(</span>}
-              <span className={`fm-fchip fm-fchip-${chip.kind}${chip.negated ? " is-negated" : ""}`}>
-                <button
-                  type="button"
-                  className="fm-fchip-label"
-                  title={chip.negated ? "Include (remove ~)" : "Exclude (~)"}
-                  onClick={() => toggleChipNegate(chip.id)}
-                >{filterChipLabel(chip)}</button>
-                <button
-                  type="button"
-                  className="fm-fchip-remove"
-                  aria-label="Remove filter"
-                  onClick={() => removeFilterChip(chip.id)}
-                >×</button>
-              </span>
-              {hasOr && endsGroup && !startsGroup && <span className="fm-paren">)</span>}
-            </Fragment>
-            );
-          })}
-          <input
-            ref={filterInputRef}
-            autoFocus
-            className="fm-field-input"
-            placeholder={filterChips.length ? "Filter…" : "Filter elements…"}
-            value={filterText}
-            onChange={(e) => { setFilterText(e.target.value); setHistoryOpen(true); }}
-            onFocus={() => setHistoryOpen(true)}
-            onClick={() => setHistoryOpen(true)}
-            onBlur={() => setHistoryOpen(false)}
-            spellCheck={false}
-            autoComplete="off"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                const v = filterText.trim().replace(/^"+|"+$/g, "");
-                if (v) { addFilterChip({ kind: "text", value: v }); setFilterText(""); }
-                setHistoryOpen(false);
-                return;
-              }
-              if (e.key === "Backspace" && !filterText && filterChips.length) {
-                setFilterChips((prev) => prev.slice(0, -1));
-                return;
-              }
-              if (e.key === "Escape" && historyOpen) { e.stopPropagation(); setHistoryOpen(false); return; }
-              if (e.key === "Escape" && filterText) { e.stopPropagation(); setFilterText(""); }
-            }}
-          />
-        </div>
-        {historyOpen && historyMatches.length > 0 && (
-          <div className="fm-history-dropdown">
-            <div className="fm-history-dropdown-header"><History size={10} /> Recent filters</div>
-            {historyMatches.map((q) => (
-              <div key={q} className="fm-history-item">
-                <button
-                  type="button"
-                  className="fm-history-item-text"
-                  title={q}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    setFilterChips(chipsFromQuery(q, nextChipId));
-                    setFilterText("");
-                    setHistoryOpen(false);
-                    filterInputRef.current?.focus();
-                  }}
-                >{q}</button>
-                <button
-                  type="button"
-                  className="fm-history-item-x"
-                  title="Remove from history"
-                  aria-label={`Remove "${q}" from history`}
-                  onMouseDown={(e) => { e.preventDefault(); removeFilterHistory(q); }}
-                >×</button>
-              </div>
-            ))}
-          </div>
-        )}
-        </div>
-        <div className="fm-chip-row">
-          <span className="fm-chip-label">TYPE</span>
-          {FILTER_TYPE_TERMS.map((value) => {
-            const active = filterChips.some((c) => c.kind === "type" && c.value === value);
-            return (
-              <button
-                key={value}
-                type="button"
-                className={`fm-chip${active ? " is-active" : ""}`}
-                aria-pressed={active}
-                onClick={() => toggleTypeChip(value)}
-              >{value.replace(":", ": ")}</button>
-            );
-          })}
-        </div>
-        <div className="fm-chip-row">
-          <span className="fm-chip-label">DATE</span>
-          <div className="fm-date-ops">
-            {FILTER_DATE_OPS.map(([op, glyph]) => (
-              <button
-                key={op}
-                type="button"
-                className={`fm-date-op${filterDateOp === op ? " is-active" : ""}`}
-                aria-pressed={filterDateOp === op}
-                onClick={() => setFilterDateOp(op)}
-              >{glyph}</button>
-            ))}
-          </div>
-          <input
-            className="fm-date-input"
-            placeholder="year / date"
-            value={filterDateVal}
-            onChange={(e) => setFilterDateVal(e.target.value)}
-            spellCheck={false}
-            autoComplete="off"
-            onKeyDown={(e) => { if (e.key === "Enter") addDateChip(); }}
-          />
-          <button
-            type="button"
-            className="fm-date-add"
-            title="Add date filter"
-            disabled={!filterDateVal.trim()}
-            onClick={addDateChip}
-          >+</button>
-        </div>
-      </div>
-      <div className="fm-tags-header">
-        <span className="fm-tags-title">TAGS</span>
-        <span className="fm-tags-subtitle">CLICK TO FILTER</span>
-        <span className="fm-tags-count">{allTags.length} tags</span>
-      </div>
-      <div className="filter-menu-dropdown">
-        {allTags.length === 0 && (
-          <div className="filter-menu-empty">No tags found</div>
-        )}
-        {allTags.map((tag) => {
-          const isShown = activeTags.includes(tag);
-          const isHidden = hiddenTags.includes(tag);
-          const isPinned = pinnedTags.includes(tag);
-          const count = timelineData?.elements?.filter((el) => el.tags?.includes(tag)).length || 0;
-          return (
-            <div
-              key={tag}
-              className={`sb-tag-row${isHidden ? " is-hidden" : ""}${isShown ? " is-selected" : ""}`}
-              onClick={() => onToggleTag?.(tag)}
-              title={isShown ? "Remove tag filter" : "Filter by this tag"}
+      <>
+        <div className="fm-header">
+          <span className="fm-header-title">
+            <ListFilter size={12} /> Filters
+          </span>
+          {isModal ? (
+            <button
+              type="button"
+              className="fm-header-btn"
+              onClick={() => setFilterModalOpen(false)}
+              title="Close"
+              aria-label="Close filters"
             >
-              <span className="sb-tag-name"><span className="sb-tag-hash">#</span>{tag}</span>
-              <span className="sb-tag-count">{count}</span>
-              <div className="sb-tag-actions">
-                <button
-                  type="button"
-                  className={`filter-menu-icon-btn filter-menu-hide-btn${isHidden ? " is-active" : ""}`}
-                  onClick={(e) => { e.stopPropagation(); onToggleHiddenTag?.(tag); }}
-                  title={isHidden ? "Show tag" : "Hide tag"}
-                >
-                  {isHidden ? <EyeOff size={12} /> : <Eye size={12} />}
-                </button>
-                <button
-                  type="button"
-                  className={`filter-menu-icon-btn filter-menu-pin-btn${isPinned ? " is-pinned" : ""}`}
-                  onClick={(e) => { e.stopPropagation(); onTogglePinnedTag?.(tag); }}
-                  title={isPinned ? "Remove label" : "Use as label"}
-                >
-                  <Tag size={12} />
-                </button>
-              </div>
+              <X size={14} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="fm-header-btn"
+              onClick={() => {
+                setFilterMenu(null);
+                setFilterModalOpen(true);
+              }}
+              title="Expand"
+              aria-label="Open filters in a larger panel"
+            >
+              <Maximize2 size={16} />
+            </button>
+          )}
+        </div>
+        <div className="fm-query-section">
+          <div className="fm-field-wrap">
+            <div
+              className="fm-field"
+              onMouseDown={(e) => {
+                if (e.target === e.currentTarget) {
+                  e.preventDefault();
+                  filterInputRef.current?.focus();
+                }
+              }}
+            >
+              {filterChips.map((chip, i) => {
+                const startsGroup = i === 0 || chip.join === 'or';
+                const endsGroup = i === filterChips.length - 1 || filterChips[i + 1].join === 'or';
+                return (
+                  <Fragment key={chip.id}>
+                    {i > 0 && (
+                      <button
+                        type="button"
+                        className="fm-join"
+                        title="Toggle AND / OR"
+                        onClick={() => toggleChipJoin(chip.id)}
+                      >
+                        {chip.join === 'or' ? 'OR' : 'AND'}
+                      </button>
+                    )}
+                    {hasOr && startsGroup && !endsGroup && <span className="fm-paren">(</span>}
+                    <span className={`fm-fchip fm-fchip-${chip.kind}${chip.negated ? ' is-negated' : ''}`}>
+                      <button
+                        type="button"
+                        className="fm-fchip-label"
+                        title={chip.negated ? 'Include (remove ~)' : 'Exclude (~)'}
+                        onClick={() => toggleChipNegate(chip.id)}
+                      >
+                        {filterChipLabel(chip)}
+                      </button>
+                      <button
+                        type="button"
+                        className="fm-fchip-remove"
+                        aria-label="Remove filter"
+                        onClick={() => removeFilterChip(chip.id)}
+                      >
+                        ×
+                      </button>
+                    </span>
+                    {hasOr && endsGroup && !startsGroup && <span className="fm-paren">)</span>}
+                  </Fragment>
+                );
+              })}
+              <input
+                ref={filterInputRef}
+                autoFocus
+                className="fm-field-input"
+                placeholder={filterChips.length ? 'Filter…' : 'Filter elements…'}
+                value={filterText}
+                onChange={(e) => {
+                  setFilterText(e.target.value);
+                  setHistoryOpen(true);
+                }}
+                onFocus={() => setHistoryOpen(true)}
+                onClick={() => setHistoryOpen(true)}
+                onBlur={() => setHistoryOpen(false)}
+                spellCheck={false}
+                autoComplete="off"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const v = filterText.trim().replace(/^"+|"+$/g, '');
+                    if (v) {
+                      addFilterChip({ kind: 'text', value: v });
+                      setFilterText('');
+                    }
+                    setHistoryOpen(false);
+                    return;
+                  }
+                  if (e.key === 'Backspace' && !filterText && filterChips.length) {
+                    setFilterChips((prev) => prev.slice(0, -1));
+                    return;
+                  }
+                  if (e.key === 'Escape' && historyOpen) {
+                    e.stopPropagation();
+                    setHistoryOpen(false);
+                    return;
+                  }
+                  if (e.key === 'Escape' && filterText) {
+                    e.stopPropagation();
+                    setFilterText('');
+                  }
+                }}
+              />
             </div>
-          );
-        })}
-      </div>
-      <div className="fm-preview">
-        <span className="fm-preview-label">QUERY</span>
-        <code className="fm-preview-text">{fullFilterQuery || "No active filter"}</code>
-      </div>
-      <div className="fm-footer">
-        <button
-          className="fm-footer-clear"
-          type="button"
-          onClick={clearAllFilters}
-        >
-          Clear
-        </button>
-        <span className="fm-footer-count">
-          <strong>{shownElementCount}</strong> shown
-        </span>
-        <a
-          className="fm-footer-syntax"
-          title="Filter syntax help"
-          href="https://www.timelines.studio/wiki/Searching"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <HelpCircle size={11} /> syntax
-        </a>
-      </div>
-    </>
+            {historyOpen && historyMatches.length > 0 && (
+              <div className="fm-history-dropdown">
+                <div className="fm-history-dropdown-header">
+                  <History size={10} /> Recent filters
+                </div>
+                {historyMatches.map((q) => (
+                  <div key={q} className="fm-history-item">
+                    <button
+                      type="button"
+                      className="fm-history-item-text"
+                      title={q}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        setFilterChips(chipsFromQuery(q, nextChipId));
+                        setFilterText('');
+                        setHistoryOpen(false);
+                        filterInputRef.current?.focus();
+                      }}
+                    >
+                      {q}
+                    </button>
+                    <button
+                      type="button"
+                      className="fm-history-item-x"
+                      title="Remove from history"
+                      aria-label={`Remove "${q}" from history`}
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        removeFilterHistory(q);
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="fm-chip-row">
+            <span className="fm-chip-label">TYPE</span>
+            {FILTER_TYPE_TERMS.map((value) => {
+              const active = filterChips.some((c) => c.kind === 'type' && c.value === value);
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  className={`fm-chip${active ? ' is-active' : ''}`}
+                  aria-pressed={active}
+                  onClick={() => toggleTypeChip(value)}
+                >
+                  {value.replace(':', ': ')}
+                </button>
+              );
+            })}
+          </div>
+          <div className="fm-chip-row">
+            <span className="fm-chip-label">DATE</span>
+            <div className="fm-date-ops">
+              {FILTER_DATE_OPS.map(([op, glyph]) => (
+                <button
+                  key={op}
+                  type="button"
+                  className={`fm-date-op${filterDateOp === op ? ' is-active' : ''}`}
+                  aria-pressed={filterDateOp === op}
+                  onClick={() => setFilterDateOp(op)}
+                >
+                  {glyph}
+                </button>
+              ))}
+            </div>
+            <input
+              className="fm-date-input"
+              placeholder="year / date"
+              value={filterDateVal}
+              onChange={(e) => setFilterDateVal(e.target.value)}
+              spellCheck={false}
+              autoComplete="off"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') addDateChip();
+              }}
+            />
+            <button
+              type="button"
+              className="fm-date-add"
+              title="Add date filter"
+              disabled={!filterDateVal.trim()}
+              onClick={addDateChip}
+            >
+              +
+            </button>
+          </div>
+        </div>
+        <div className="fm-tags-header">
+          <span className="fm-tags-title">TAGS</span>
+          <span className="fm-tags-subtitle">CLICK TO FILTER</span>
+          <span className="fm-tags-count">{allTags.length} tags</span>
+        </div>
+        <div className="filter-menu-dropdown">
+          {allTags.length === 0 && <div className="filter-menu-empty">No tags found</div>}
+          {allTags.map((tag) => {
+            const isShown = activeTags.includes(tag);
+            const isHidden = hiddenTags.includes(tag);
+            const isPinned = pinnedTags.includes(tag);
+            const count = timelineData?.elements?.filter((el) => el.tags?.includes(tag)).length || 0;
+            return (
+              <div
+                key={tag}
+                className={`sb-tag-row${isHidden ? ' is-hidden' : ''}${isShown ? ' is-selected' : ''}`}
+                onClick={() => onToggleTag?.(tag)}
+                title={isShown ? 'Remove tag filter' : 'Filter by this tag'}
+              >
+                <span className="sb-tag-name">
+                  <span className="sb-tag-hash">#</span>
+                  {tag}
+                </span>
+                <span className="sb-tag-count">{count}</span>
+                <div className="sb-tag-actions">
+                  <button
+                    type="button"
+                    className={`filter-menu-icon-btn filter-menu-hide-btn${isHidden ? ' is-active' : ''}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleHiddenTag?.(tag);
+                    }}
+                    title={isHidden ? 'Show tag' : 'Hide tag'}
+                  >
+                    {isHidden ? <EyeOff size={12} /> : <Eye size={12} />}
+                  </button>
+                  <button
+                    type="button"
+                    className={`filter-menu-icon-btn filter-menu-pin-btn${isPinned ? ' is-pinned' : ''}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onTogglePinnedTag?.(tag);
+                    }}
+                    title={isPinned ? 'Remove label' : 'Use as label'}
+                  >
+                    <Tag size={12} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="fm-preview">
+          <span className="fm-preview-label">QUERY</span>
+          <code className="fm-preview-text">{fullFilterQuery || 'No active filter'}</code>
+        </div>
+        <div className="fm-footer">
+          <button className="fm-footer-clear" type="button" onClick={clearAllFilters}>
+            Clear
+          </button>
+          <span className="fm-footer-count">
+            <strong>{shownElementCount}</strong> shown
+          </span>
+          <a
+            className="fm-footer-syntax"
+            title="Filter syntax help"
+            href="https://www.timelines.studio/wiki/Searching"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <HelpCircle size={11} /> syntax
+          </a>
+        </div>
+      </>
     );
   };
 
@@ -2125,11 +2260,11 @@ const TimelineView = forwardRef(function TimelineView({
 
     // Zoom to cursor with transforms
     const handleWheel = (e) => {
-      if (e.target?.closest?.(".timeline-context-menu")) {
+      if (e.target?.closest?.('.timeline-context-menu')) {
         return;
       }
 
-      const insideLeaflet = e.target.closest(".leaflet-container");
+      const insideLeaflet = e.target.closest('.leaflet-container');
       if (insideLeaflet) {
         if (e.altKey) {
           e.preventDefault();
@@ -2176,18 +2311,18 @@ const TimelineView = forwardRef(function TimelineView({
       const isLeftClick = e.button === 0;
       const isShiftPan = isLeftClick && e.shiftKey;
       const interactiveSelector = [
-        ".event",
-        ".span-item",
-        ".era-item",
-        ".leaflet-container",
-        ".timeline-canvas-bar",
-        ".timeline-canvas-button",
-        ".timeline-slider",
-        ".timeline-slider-container",
-        ".timeline-context-menu",
-      ].join(", ");
+        '.event',
+        '.span-item',
+        '.era-item',
+        '.leaflet-container',
+        '.timeline-canvas-bar',
+        '.timeline-canvas-button',
+        '.timeline-slider',
+        '.timeline-slider-container',
+        '.timeline-context-menu',
+      ].join(', ');
       const clickedInteractive = e.target.closest(interactiveSelector);
-      const clickedFormControl = e.target.closest("input, textarea, button, select, a");
+      const clickedFormControl = e.target.closest('input, textarea, button, select, a');
       const allowLeftDrag = isLeftClick && !clickedInteractive && !clickedFormControl;
 
       // Allow middle mouse, shift+left, or left-drag on empty canvas.
@@ -2231,12 +2366,16 @@ const TimelineView = forwardRef(function TimelineView({
 
     // No preventDefault on touchstart so taps still become clicks (selection)
     const touchExcludeSelector = [
-      ".leaflet-container",
-      ".timeline-canvas-bar",
-      ".timeline-slider-container",
-      ".timeline-context-menu",
-      "input", "textarea", "button", "select", "a",
-    ].join(", ");
+      '.leaflet-container',
+      '.timeline-canvas-bar',
+      '.timeline-slider-container',
+      '.timeline-context-menu',
+      'input',
+      'textarea',
+      'button',
+      'select',
+      'a',
+    ].join(', ');
     let touchPanning = false;
     let pinching = false;
     let lastTouch = { x: 0, y: 0 };
@@ -2302,24 +2441,24 @@ const TimelineView = forwardRef(function TimelineView({
       if (e.touches.length === 0) touchPanning = false;
     };
 
-    container.addEventListener("wheel", handleWheel, { passive: false });
-    container.addEventListener("mousedown", handleMouseDown);
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-    container.addEventListener("touchstart", handleTouchStart, { passive: true });
-    container.addEventListener("touchmove", handleTouchMove, { passive: false });
-    container.addEventListener("touchend", handleTouchEnd);
-    container.addEventListener("touchcancel", handleTouchEnd);
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    container.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    container.addEventListener('touchstart', handleTouchStart, { passive: true });
+    container.addEventListener('touchmove', handleTouchMove, { passive: false });
+    container.addEventListener('touchend', handleTouchEnd);
+    container.addEventListener('touchcancel', handleTouchEnd);
 
     return () => {
-      container.removeEventListener("wheel", handleWheel);
-      container.removeEventListener("mousedown", handleMouseDown);
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-      container.removeEventListener("touchstart", handleTouchStart);
-      container.removeEventListener("touchmove", handleTouchMove);
-      container.removeEventListener("touchend", handleTouchEnd);
-      container.removeEventListener("touchcancel", handleTouchEnd);
+      container.removeEventListener('wheel', handleWheel);
+      container.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      container.removeEventListener('touchstart', handleTouchStart);
+      container.removeEventListener('touchmove', handleTouchMove);
+      container.removeEventListener('touchend', handleTouchEnd);
+      container.removeEventListener('touchcancel', handleTouchEnd);
     };
   }, [onZoomChange, timelineWidth, isPlaying]);
 
@@ -2403,7 +2542,9 @@ const TimelineView = forwardRef(function TimelineView({
     };
 
     let rafId = requestAnimationFrame(animate);
-    return () => { if (rafId) cancelAnimationFrame(rafId); };
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId);
+    };
   }, [selectedId, showMap, isRightPanelOpen, isLeftPanelOpen]);
 
   // Scrollbar position to selected element's year in map view
@@ -2411,7 +2552,7 @@ const TimelineView = forwardRef(function TimelineView({
     if (!showMap || !selectedId) return;
     const el = timelineData?.elements?.find((e) => e.id === selectedId);
     if (!el) return;
-    const targetYear = el.type === "event" ? el.date : el.start;
+    const targetYear = el.type === 'event' ? el.date : el.start;
     if (!Number.isFinite(targetYear)) return;
     const container = containerRef.current;
     if (!container) return;
@@ -2420,7 +2561,7 @@ const TimelineView = forwardRef(function TimelineView({
     const yearPx = yearToPx(targetYear);
     const viewportWidth = container.clientWidth;
     const targetX = Math.min(maxX, Math.max(maxX - range, viewportWidth / 2 - yearPx * scaleRef.current));
-    const pct = Math.min(100, Math.max(0, (maxX - targetX) / range * 100));
+    const pct = Math.min(100, Math.max(0, ((maxX - targetX) / range) * 100));
     queueSliderValue(pct);
   }, [selectedId, showMap]);
 
@@ -2434,27 +2575,27 @@ const TimelineView = forwardRef(function TimelineView({
         setContextMenu(null);
       }
     };
-    const handleKeyDown = (e) => { if (e.key === "Escape") setContextMenu(null); };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setContextMenu(null);
+    };
 
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
     };
   }, [contextMenu]);
 
   const handleContextMenu = (e) => {
     if (readOnly) return;
     const target = e.target;
-    if (target?.closest?.(".leaflet-container")) {
+    if (target?.closest?.('.leaflet-container')) {
       return;
     }
     const elementNode = target.closest('.event, .span-item, .era-item');
     const elementId = elementNode?.getAttribute('data-id');
-    const element = elementId
-      ? timelineData.elements.find((el) => el.id === elementId)
-      : null;
+    const element = elementId ? timelineData.elements.find((el) => el.id === elementId) : null;
 
     let groupId = null;
     let clickYear = null;
@@ -2464,7 +2605,7 @@ const TimelineView = forwardRef(function TimelineView({
       const scale = scaleRef.current || 1;
       const clickYInTimeline = (e.clientY - timelineRect.top) / scale;
       const matched = groupBandBoxes.find(
-        (box) => clickYInTimeline >= box.top && clickYInTimeline <= box.top + box.height
+        (box) => clickYInTimeline >= box.top && clickYInTimeline <= box.top + box.height,
       );
       groupId = matched?.groupId || null;
       const clickXInTimeline = (e.clientX - timelineRect.left) / scale;
@@ -2485,18 +2626,21 @@ const TimelineView = forwardRef(function TimelineView({
     });
   };
 
-  const handleMapContextMenu = useCallback(({ x, y, lat, lng }) => {
-    if (readOnly) return;
-    setContextMenu({
-      x,
-      y,
-      element: null,
-      groupId: null,
-      clickYear: null,
-      lat,
-      lng,
-    });
-  }, [readOnly]);
+  const handleMapContextMenu = useCallback(
+    ({ x, y, lat, lng }) => {
+      if (readOnly) return;
+      setContextMenu({
+        x,
+        y,
+        element: null,
+        groupId: null,
+        clickYear: null,
+        lat,
+        lng,
+      });
+    },
+    [readOnly],
+  );
 
   const handleMenuAction = (action) => {
     setContextMenu(null);
@@ -2555,14 +2699,10 @@ const TimelineView = forwardRef(function TimelineView({
       let scale = 2;
       if (targetW) {
         // For fixed export presets, use range width as the zoom window so output width stays at targetW.
-        scale = hasCustomRange
-          ? targetW / sourceWidthPxBase
-          : targetW / timelineEl.scrollWidth;
+        scale = hasCustomRange ? targetW / sourceWidthPxBase : targetW / timelineEl.scrollWidth;
       }
 
-      const bgColor = exportPngOptions?.transparentBg
-        ? null
-        : (exportPngOptions?.customBg || originalPrimaryBg);
+      const bgColor = exportPngOptions?.transparentBg ? null : exportPngOptions?.customBg || originalPrimaryBg;
 
       const targetH = exportPngOptions?.targetHeight;
 
@@ -2570,10 +2710,7 @@ const TimelineView = forwardRef(function TimelineView({
       const exportHeight = calculatedHeight + 100;
       // Clamp so canvas pixel dimensions stay within browser limits
       const MAX_CANVAS_DIM = 16384;
-      const maxScale = Math.min(
-        MAX_CANVAS_DIM / elFullWidth,
-        MAX_CANVAS_DIM / exportHeight,
-      );
+      const maxScale = Math.min(MAX_CANVAS_DIM / elFullWidth, MAX_CANVAS_DIM / exportHeight);
       const safeScale = Math.min(scale, maxScale);
       const canvas = await html2canvas(timelineEl, {
         backgroundColor: bgColor,
@@ -2616,7 +2753,7 @@ const TimelineView = forwardRef(function TimelineView({
             0,
             0,
             sourceWidth,
-            finalCanvas.height
+            finalCanvas.height,
           );
           finalCanvas = croppedCanvas;
         }
@@ -2661,12 +2798,10 @@ const TimelineView = forwardRef(function TimelineView({
         finalCanvas = outCanvas;
       }
 
-
       // Draw title watermark if requested
       const titleStyle = exportPngOptions?.titleStyle || 'title-logo';
       const canRenderTitleWatermark =
-        exportPngOptions?.showTitle &&
-        (titleStyle === 'logo-only' || Boolean(exportPngOptions?.title));
+        exportPngOptions?.showTitle && (titleStyle === 'logo-only' || Boolean(exportPngOptions?.title));
       if (canRenderTitleWatermark) {
         const w = finalCanvas.width;
         const h = finalCanvas.height;
@@ -2693,7 +2828,7 @@ const TimelineView = forwardRef(function TimelineView({
         const logoWidth = (67 / 25) * logoHeight;
         const logoGap = Math.round(fontSize * 0.35);
         const logoBaselineOffset = fontSize * 0.08;
-        const totalWidth = metrics.width + (showLogo ? ((showText ? logoGap : 0) + logoWidth) : 0);
+        const totalWidth = metrics.width + (showLogo ? (showText ? logoGap : 0) + logoWidth : 0);
         let x, y;
 
         if (pos.includes('left')) x = padding;
@@ -2786,7 +2921,7 @@ const TimelineView = forwardRef(function TimelineView({
       // Sync React state with current DOM values when pausing
       setSliderValue(sliderValueRef.current);
       if (yearLabelRef.current) {
-        setSliderYearLabel(yearLabelRef.current.textContent || "");
+        setSliderYearLabel(yearLabelRef.current.textContent || '');
       }
       if (lastViewportYearRef.current !== null) {
         publishViewportYear(lastViewportYearRef.current);
@@ -2799,24 +2934,24 @@ const TimelineView = forwardRef(function TimelineView({
     const handleKeyDown = (e) => {
       const target = e.target;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
-      const bind = keybinds.play ?? { keys: ["Space"] };
+      const bind = keybinds.play ?? { keys: ['Space'] };
       const keys = bind.keys.map((k) => k.toLowerCase());
-      const mainKey = keys.find((k) => !["ctrl","alt","shift"].includes(k));
+      const mainKey = keys.find((k) => !['ctrl', 'alt', 'shift'].includes(k));
       if (!mainKey) return;
-      const eventKey = e.key === " " ? "space" : e.key.toLowerCase();
+      const eventKey = e.key === ' ' ? 'space' : e.key.toLowerCase();
       if (eventKey !== mainKey) return;
-      const needsCtrl = keys.includes("ctrl");
-      const needsAlt = keys.includes("alt");
-      const needsShift = keys.includes("shift");
-      const isMac = navigator.platform.includes("Mac");
+      const needsCtrl = keys.includes('ctrl');
+      const needsAlt = keys.includes('alt');
+      const needsShift = keys.includes('shift');
+      const isMac = navigator.platform.includes('Mac');
       if (needsCtrl !== (isMac ? e.metaKey : e.ctrlKey)) return;
       if (needsAlt !== e.altKey) return;
       if (needsShift !== e.shiftKey) return;
       e.preventDefault();
       handlePlayPause();
     };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handlePlayPause, keybinds]);
 
   useEffect(() => {
@@ -2826,16 +2961,16 @@ const TimelineView = forwardRef(function TimelineView({
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const key = e.key?.toLowerCase();
       const code = e.code?.toLowerCase();
-      if (key === "=" || key === "+" || code === "equal" || code === "numpadadd") {
+      if (key === '=' || key === '+' || code === 'equal' || code === 'numpadadd') {
         e.preventDefault();
         handleZoomIn();
-      } else if (key === "-" || key === "_" || code === "minus" || code === "numpadsubtract") {
+      } else if (key === '-' || key === '_' || code === 'minus' || code === 'numpadsubtract') {
         e.preventDefault();
         handleZoomOut();
       }
     };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleZoomIn, handleZoomOut]);
 
   // Stop animation and select an element
@@ -2844,7 +2979,7 @@ const TimelineView = forwardRef(function TimelineView({
       // Stop animation and sync state
       setSliderValue(sliderValueRef.current);
       if (yearLabelRef.current) {
-        setSliderYearLabel(yearLabelRef.current.textContent || "");
+        setSliderYearLabel(yearLabelRef.current.textContent || '');
       }
       if (lastViewportYearRef.current !== null) {
         publishViewportYear(lastViewportYearRef.current);
@@ -2933,7 +3068,13 @@ const TimelineView = forwardRef(function TimelineView({
       const rawYear = capturedDecompress(clampedCompressed);
       const showCalendar = capturedFile?.useCalendar === true;
       const snappedYear = showCalendar ? snapToDayGrid(rawYear) : Math.round(rawYear);
-      const nextLabel = formatYear(snappedYear, capturedFile.negID, capturedFile.posID, showCalendar, capturedFile.hideDecimals);
+      const nextLabel = formatYear(
+        snappedYear,
+        capturedFile.negID,
+        capturedFile.posID,
+        showCalendar,
+        capturedFile.hideDecimals,
+      );
 
       if (yearLabelRef.current && nextLabel !== lastSliderLabelRef.current) {
         lastSliderLabelRef.current = nextLabel;
@@ -3013,127 +3154,139 @@ const TimelineView = forwardRef(function TimelineView({
     }
   }, [downloadPngTrigger]);
 
-  useImperativeHandle(ref, () => ({
-    generatePreview: async (options) => {
-      const timelineEl = timelineRef.current;
-      if (!timelineEl) return null;
+  useImperativeHandle(
+    ref,
+    () => ({
+      generatePreview: async (options) => {
+        const timelineEl = timelineRef.current;
+        if (!timelineEl) return null;
 
-      try {
-        const html2canvas = (await import('html2canvas')).default;
+        try {
+          const html2canvas = (await import('html2canvas')).default;
 
-        const elWidth = timelineEl.scrollWidth;
-        const elHeight = calculatedHeight + 100;
-        const originalPrimaryBg = getComputedStyle(document.documentElement)
-          .getPropertyValue('--app-bg')
-          .trim();
+          const elWidth = timelineEl.scrollWidth;
+          const elHeight = calculatedHeight + 100;
+          const originalPrimaryBg = getComputedStyle(document.documentElement).getPropertyValue('--app-bg').trim();
 
-        // Clamp scale so canvas pixel dimensions stay within browser limits
-        const MAX_CANVAS_DIM = 16384;
-        const maxPreviewWidth = Number(options?.maxWidth);
-        const maxPreviewHeight = Number(options?.maxHeight);
-        const previewScale = Math.min(
-          1,
-          MAX_CANVAS_DIM / elWidth,
-          MAX_CANVAS_DIM / elHeight,
-          Number.isFinite(maxPreviewWidth) ? maxPreviewWidth / elWidth : 1,
-          Number.isFinite(maxPreviewHeight) ? maxPreviewHeight / elHeight : 1,
-        );
+          // Clamp scale so canvas pixel dimensions stay within browser limits
+          const MAX_CANVAS_DIM = 16384;
+          const maxPreviewWidth = Number(options?.maxWidth);
+          const maxPreviewHeight = Number(options?.maxHeight);
+          const previewScale = Math.min(
+            1,
+            MAX_CANVAS_DIM / elWidth,
+            MAX_CANVAS_DIM / elHeight,
+            Number.isFinite(maxPreviewWidth) ? maxPreviewWidth / elWidth : 1,
+            Number.isFinite(maxPreviewHeight) ? maxPreviewHeight / elHeight : 1,
+          );
 
-        const previewBgColor = options?.transparentBg
-          ? null
-          : (options?.customBg || originalPrimaryBg);
+          const previewBgColor = options?.transparentBg ? null : options?.customBg || originalPrimaryBg;
 
-        const canvas = await html2canvas(timelineEl, {
-          backgroundColor: previewBgColor,
-          scale: previewScale,
-          logging: false,
-          width: elWidth,
-          height: elHeight,
-          windowWidth: elWidth,
-          windowHeight: elHeight,
-          onclone: (clonedDocument, clonedTimeline) => {
-            clonedTimeline.style.transform = 'none';
-            clonedTimeline.style.transformOrigin = '';
-            if (options?.transparentBg) {
-              clonedDocument.documentElement.style.setProperty('--app-bg', 'transparent');
-            } else if (options?.customBg) {
-              clonedDocument.documentElement.style.setProperty('--app-bg', options.customBg);
-            }
-            if (options?.simplifyContent) {
-              simplifyTimelinePreview(clonedDocument, clonedTimeline);
-            }
-            normalizeHtml2CanvasColors(clonedDocument, clonedTimeline);
-          },
-        });
+          const canvas = await html2canvas(timelineEl, {
+            backgroundColor: previewBgColor,
+            scale: previewScale,
+            logging: false,
+            width: elWidth,
+            height: elHeight,
+            windowWidth: elWidth,
+            windowHeight: elHeight,
+            onclone: (clonedDocument, clonedTimeline) => {
+              clonedTimeline.style.transform = 'none';
+              clonedTimeline.style.transformOrigin = '';
+              if (options?.transparentBg) {
+                clonedDocument.documentElement.style.setProperty('--app-bg', 'transparent');
+              } else if (options?.customBg) {
+                clonedDocument.documentElement.style.setProperty('--app-bg', options.customBg);
+              }
+              if (options?.simplifyContent) {
+                simplifyTimelinePreview(clonedDocument, clonedTimeline);
+              }
+              normalizeHtml2CanvasColors(clonedDocument, clonedTimeline);
+            },
+          });
 
-        const minYear = file?.start ?? 0;
-        const maxYear = file?.end ?? 2024;
+          const minYear = file?.start ?? 0;
+          const maxYear = file?.end ?? 2024;
 
-        // Use original (unscaled) element width for coordinate mapping
-        const coordWidth = elWidth;
+          // Use original (unscaled) element width for coordinate mapping
+          const coordWidth = elWidth;
 
-        return {
-          imageUrl: canvas.toDataURL('image/png'),
-          canvasWidth: canvas.width,
-          canvasHeight: canvas.height,
-          elementWidth: elWidth,
-          elementHeight: elHeight,
-          timelineWidth,
-          minYear,
-          maxYear,
-          yearToPercent: (year) => {
-            const px = yearToPx(year);
-            return (px / coordWidth) * 100;
-          },
-          percentToYear: (percent) => {
-            const px = (percent / 100) * coordWidth;
-            const compressedYear = (px - TIMELINE_PADDING) / PX_PER_YEAR + compressedMin;
-            const clampedCompressed = Math.min(Math.max(compressedYear, compressedMin), compressedMax);
-            const year = decompressYear(clampedCompressed);
-            return Math.round(year * 100) / 100;
-          },
-        };
-      } catch (error) {
-        console.error('Error generating preview:', error);
-        return null;
-      }
-    },
-    scrollToElement: (elementId) => {
-      const el = timelineData?.elements?.find((e) => e.id === elementId);
-      if (!el) return;
-      let targetYear;
-      if (el.type === "event") {
-        targetYear = el.date;
-      } else {
-        targetYear = (el.start + el.end) / 2;
-      }
-      if (!Number.isFinite(targetYear)) return;
-      const container = containerRef.current;
-      if (!container) return;
-      const yearPx = yearToPx(targetYear);
-      const scale = scaleRef.current;
-      const viewportWidth = container.clientWidth;
-      const scaledTimelineWidth = timelineWidth * scale;
-      const baseMaxPan = Math.max(0, scaledTimelineWidth - viewportWidth);
-      const extra = Math.max(0, viewportWidth / 2 - TIMELINE_PADDING * scale);
-      const minX = -baseMaxPan - extra;
-      const maxX = extra;
-      const newX = viewportWidth / 2 - yearPx * scale;
-      translateRef.current.x = Math.min(maxX, Math.max(minX, newX));
-      applyTransform();
-    },
+          return {
+            imageUrl: canvas.toDataURL('image/png'),
+            canvasWidth: canvas.width,
+            canvasHeight: canvas.height,
+            elementWidth: elWidth,
+            elementHeight: elHeight,
+            timelineWidth,
+            minYear,
+            maxYear,
+            yearToPercent: (year) => {
+              const px = yearToPx(year);
+              return (px / coordWidth) * 100;
+            },
+            percentToYear: (percent) => {
+              const px = (percent / 100) * coordWidth;
+              const compressedYear = (px - TIMELINE_PADDING) / PX_PER_YEAR + compressedMin;
+              const clampedCompressed = Math.min(Math.max(compressedYear, compressedMin), compressedMax);
+              const year = decompressYear(clampedCompressed);
+              return Math.round(year * 100) / 100;
+            },
+          };
+        } catch (error) {
+          console.error('Error generating preview:', error);
+          return null;
+        }
+      },
+      scrollToElement: (elementId) => {
+        const el = timelineData?.elements?.find((e) => e.id === elementId);
+        if (!el) return;
+        let targetYear;
+        if (el.type === 'event') {
+          targetYear = el.date;
+        } else {
+          targetYear = (el.start + el.end) / 2;
+        }
+        if (!Number.isFinite(targetYear)) return;
+        const container = containerRef.current;
+        if (!container) return;
+        const yearPx = yearToPx(targetYear);
+        const scale = scaleRef.current;
+        const viewportWidth = container.clientWidth;
+        const scaledTimelineWidth = timelineWidth * scale;
+        const baseMaxPan = Math.max(0, scaledTimelineWidth - viewportWidth);
+        const extra = Math.max(0, viewportWidth / 2 - TIMELINE_PADDING * scale);
+        const minX = -baseMaxPan - extra;
+        const maxX = extra;
+        const newX = viewportWidth / 2 - yearPx * scale;
+        translateRef.current.x = Math.min(maxX, Math.max(minX, newX));
+        applyTransform();
+      },
 
-    scrollToGroup: (groupId) => {
-      const container = containerRef.current;
-      if (!container) return;
-      const box = groupBandBoxes.find((b) => b.groupId === groupId);
-      if (!box) return;
-      const scale = scaleRef.current;
-      const centerY = box.top + box.height / 2;
-      translateRef.current.y = container.clientHeight / 2 - centerY * scale;
-      applyTransform();
-    },
-  }), [calculatedHeight, yearToPx, timelineWidth, file, TIMELINE_PADDING, PX_PER_YEAR, compressedMin, compressedMax, decompressYear, timelineData, groupBandBoxes]);
+      scrollToGroup: (groupId) => {
+        const container = containerRef.current;
+        if (!container) return;
+        const box = groupBandBoxes.find((b) => b.groupId === groupId);
+        if (!box) return;
+        const scale = scaleRef.current;
+        const centerY = box.top + box.height / 2;
+        translateRef.current.y = container.clientHeight / 2 - centerY * scale;
+        applyTransform();
+      },
+    }),
+    [
+      calculatedHeight,
+      yearToPx,
+      timelineWidth,
+      file,
+      TIMELINE_PADDING,
+      PX_PER_YEAR,
+      compressedMin,
+      compressedMax,
+      decompressYear,
+      timelineData,
+      groupBandBoxes,
+    ],
+  );
 
   // Reapply transform when timeline DOM is recreated after switching back from map view
   useLayoutEffect(() => {
@@ -3228,7 +3381,7 @@ const TimelineView = forwardRef(function TimelineView({
 
     return { zeroScaleBreaks, axisBreakMarkers };
   }, [normalizedScaleSections, yearToPx, file.negID, file.posID, file.hideDecimals]);
-  const timelineBreakMaskBg = file?.useSecondaryBg ? "var(--surface)" : "var(--app-bg)";
+  const timelineBreakMaskBg = file?.useSecondaryBg ? 'var(--surface)' : 'var(--app-bg)';
 
   // Resolve CSS variables to hex for inline styles (avoids color-mix / color() which html2canvas can't parse)
   const rootStyles = getComputedStyle(document.documentElement);
@@ -3238,564 +3391,884 @@ const TimelineView = forwardRef(function TimelineView({
 
   return (
     <>
-    <div
-      ref={containerRef}
-      className={`timeline-scroll${file?.fixedEventHeight ? ' fixed-event-height' : ''}`}
-      style={file?.useSecondaryBg ? { backgroundColor: "var(--surface)" } : undefined}
-      onClick={(e) => { if (!file?.keepSelection && (e.target === e.currentTarget || (e.target instanceof Element && e.target.closest(".timeline, .grid-year-labels-overlay")))) handleSelect(null); }}
-      onContextMenu={handleContextMenu}
-    >
-      {!fontReady && !showMap && <div className="timeline-loading">Loading…</div>}
-      {!showMap && (
-        <>
-          {(file.showGrid || todayMarkerPx != null) && (
-            <div ref={gridLabelsRef} className="grid-year-labels-overlay">
-              {file.showGrid && (() => {
-                const tx = translateRef.current.x;
-                const scale = scaleRef.current;
-                const SCREEN_LABEL_WIDTH = 14;
-                const MIN_SCREEN_GAP = Math.max(6, 20 / tickDensityMult);
-                let lastScreenX = -Infinity;
-                let lastTickPx = -Infinity;
-                return ticks.map((tick) => {
-                  const px = yearToPx(tick.value);
-                  if (px < lastTickPx + tickGapForYear(tick.value)) return null;
-                  lastTickPx = px;
-                  const screenX = tx + px * scale;
-                  if (screenX < lastScreenX + SCREEN_LABEL_WIDTH + MIN_SCREEN_GAP) return null;
-                  lastScreenX = screenX;
-                  const label = tick.label ?? formatYear(tick.value, file.negID, file.posID, false, file.hideDecimals);
-                  return (
-                    <Fragment key={`grid-label-${tick.value}`}>
-                      <div
-                        className="grid-year-label grid-year-label-top"
-                        data-px={px}
-                        style={{ left: `${px * scale + 4}px` }}
-                      >
-                        {label}
-                      </div>
-                      <div
-                        className="grid-year-label grid-year-label-bottom"
-                        data-px={px}
-                        style={{ left: `${px * scale + 4}px` }}
-                      >
-                        {label}
-                      </div>
-                    </Fragment>
-                  );
-                });
-              })()}
-              {todayMarkerPx != null && (
-                <>
-                  <div
-                    className="grid-year-label grid-year-label-top today-line-year-label"
-                    data-px={todayMarkerPx}
-                    style={{ left: `${todayMarkerPx * scaleRef.current + 4}px` }}
-                  >
-                    Today
-                  </div>
-                  <div
-                    className="grid-year-label grid-year-label-bottom today-line-year-label"
-                    data-px={todayMarkerPx}
-                    style={{ left: `${todayMarkerPx * scaleRef.current + 4}px` }}
-                  >
-                    Today
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-          <div
-            ref={timelineRef}
-            className="timeline"
-            style={{ width: `${timelineWidth}px`, height: `${calculatedHeight * 2}px` }}
-          >
-        {/* Timeline line with scale section gaps */}
-        {breakRendering.zeroScaleBreaks.length === 0 ? (
-          <div className="timeline-line" style={{ top: `${BASE_LINE_Y}px` }} />
-        ) : (
-          <div className="timeline-line-segments" style={{ top: `${BASE_LINE_Y}px` }}>
-            {(() => {
-              const segments = [];
-              let lastEnd = -100;
-
-              breakRendering.zeroScaleBreaks.forEach((gapBreak) => {
-
-                  segments.push(
+      <div
+        ref={containerRef}
+        className={`timeline-scroll${file?.fixedEventHeight ? ' fixed-event-height' : ''}`}
+        style={file?.useSecondaryBg ? { backgroundColor: 'var(--surface)' } : undefined}
+        onClick={(e) => {
+          if (
+            !file?.keepSelection &&
+            (e.target === e.currentTarget ||
+              (e.target instanceof Element && e.target.closest('.timeline, .grid-year-labels-overlay')))
+          )
+            handleSelect(null);
+        }}
+        onContextMenu={handleContextMenu}
+      >
+        {!fontReady && !showMap && <div className="timeline-loading">Loading…</div>}
+        {!showMap && (
+          <>
+            {(file.showGrid || todayMarkerPx != null) && (
+              <div ref={gridLabelsRef} className="grid-year-labels-overlay">
+                {file.showGrid &&
+                  (() => {
+                    const tx = translateRef.current.x;
+                    const scale = scaleRef.current;
+                    const SCREEN_LABEL_WIDTH = 14;
+                    const MIN_SCREEN_GAP = Math.max(6, 20 / tickDensityMult);
+                    let lastScreenX = -Infinity;
+                    let lastTickPx = -Infinity;
+                    return ticks.map((tick) => {
+                      const px = yearToPx(tick.value);
+                      if (px < lastTickPx + tickGapForYear(tick.value)) return null;
+                      lastTickPx = px;
+                      const screenX = tx + px * scale;
+                      if (screenX < lastScreenX + SCREEN_LABEL_WIDTH + MIN_SCREEN_GAP) return null;
+                      lastScreenX = screenX;
+                      const label =
+                        tick.label ?? formatYear(tick.value, file.negID, file.posID, false, file.hideDecimals);
+                      return (
+                        <Fragment key={`grid-label-${tick.value}`}>
+                          <div
+                            className="grid-year-label grid-year-label-top"
+                            data-px={px}
+                            style={{ left: `${px * scale + 4}px` }}
+                          >
+                            {label}
+                          </div>
+                          <div
+                            className="grid-year-label grid-year-label-bottom"
+                            data-px={px}
+                            style={{ left: `${px * scale + 4}px` }}
+                          >
+                            {label}
+                          </div>
+                        </Fragment>
+                      );
+                    });
+                  })()}
+                {todayMarkerPx != null && (
+                  <>
                     <div
-                      key={`${gapBreak.key}-segment-before`}
-                      className="timeline-line-segment"
+                      className="grid-year-label grid-year-label-top today-line-year-label"
+                      data-px={todayMarkerPx}
+                      style={{ left: `${todayMarkerPx * scaleRef.current + 4}px` }}
+                    >
+                      Today
+                    </div>
+                    <div
+                      className="grid-year-label grid-year-label-bottom today-line-year-label"
+                      data-px={todayMarkerPx}
+                      style={{ left: `${todayMarkerPx * scaleRef.current + 4}px` }}
+                    >
+                      Today
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            <div
+              ref={timelineRef}
+              className="timeline"
+              style={{ width: `${timelineWidth}px`, height: `${calculatedHeight * 2}px` }}
+            >
+              {/* Timeline line with scale section gaps */}
+              {breakRendering.zeroScaleBreaks.length === 0 ? (
+                <div className="timeline-line" style={{ top: `${BASE_LINE_Y}px` }} />
+              ) : (
+                <div className="timeline-line-segments" style={{ top: `${BASE_LINE_Y}px` }}>
+                  {(() => {
+                    const segments = [];
+                    let lastEnd = -100;
+
+                    breakRendering.zeroScaleBreaks.forEach((gapBreak) => {
+                      segments.push(
+                        <div
+                          key={`${gapBreak.key}-segment-before`}
+                          className="timeline-line-segment"
+                          style={{
+                            left: `${lastEnd}px`,
+                            width: `${gapBreak.px - lastEnd - gapBreak.width / 2 + gapBreak.overlap}px`,
+                          }}
+                        />,
+                      );
+
+                      segments.push(
+                        <div
+                          key={gapBreak.key}
+                          className="timeline-scale-break-indicator"
+                          style={{
+                            left: `${gapBreak.px - gapBreak.width / 2}px`,
+                            width: `${gapBreak.width}px`,
+                            backgroundColor: timelineBreakMaskBg,
+                          }}
+                        >
+                          <svg viewBox="0 0 20 10" preserveAspectRatio="none">
+                            <path
+                              d="M0,5 L4,5 L7,1 L10,9 L13,1 L16,5 L20,5"
+                              stroke="var(--text-primary)"
+                              strokeWidth="2.5"
+                              strokeLinecap="square"
+                              strokeLinejoin="miter"
+                              fill="none"
+                            />
+                          </svg>
+                          <div className="timeline-scale-break-label">
+                            {gapBreak.startLabel} – {gapBreak.endLabel}
+                          </div>
+                        </div>,
+                      );
+
+                      lastEnd = gapBreak.px + gapBreak.width / 2 - gapBreak.overlap;
+                    });
+
+                    segments.push(
+                      <div
+                        key="segment-final"
+                        className="timeline-line-segment"
+                        style={{
+                          left: `${lastEnd}px`,
+                          right: '0',
+                        }}
+                      />,
+                    );
+
+                    return segments;
+                  })()}
+                </div>
+              )}
+              {breakRendering.axisBreakMarkers.map((marker) => (
+                <div
+                  key={marker.key}
+                  className="axis-break"
+                  style={{
+                    left: `${marker.px}px`,
+                    top: `${BASE_LINE_Y - 6}px`,
+                  }}
+                >
+                  <svg viewBox="0 0 16 12" preserveAspectRatio="none">
+                    <path
+                      d="M3,10 L7,2 M9,10 L13,2"
+                      stroke="var(--text-primary)"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="miter"
+                      fill="none"
+                    />
+                  </svg>
+                </div>
+              ))}
+
+              {/* Today marker */}
+              {todayMarkerPx != null && <div className="today-line" style={{ left: `${todayMarkerPx}px` }} />}
+
+              <div className="eras-layer">
+                {finalEras.map((era) => {
+                  if (!era.fuzz) return null;
+                  const fuzzMask = `linear-gradient(to right, transparent 0, #000 ${era.fuzz.fadeInPx}px, #000 calc(100% - ${era.fuzz.fadeOutPx}px), transparent 100%)`;
+                  return (
+                    <div
+                      key={`fuzz-${era.id}`}
+                      className="era-fuzz"
                       style={{
-                        left: `${lastEnd}px`,
-                        width: `${gapBreak.px - lastEnd - gapBreak.width / 2 + gapBreak.overlap}px`,
+                        left: `${era.fuzz.left}px`,
+                        width: `${era.fuzz.width}px`,
+                        height: `${era.height}px`,
+                        top: `${era.top}px`,
+                        background: `${era.color || 'var(--light-bg)'}`,
+                        WebkitMaskImage: fuzzMask,
+                        maskImage: fuzzMask,
                       }}
                     />
                   );
-
-                  segments.push(
+                })}
+                {finalEras.map((era) => {
+                  const isSelected = selectedId === era.id;
+                  const eraTextColor = getReadableTextColor(era.color || 'var(--light-bg)');
+                  return (
                     <div
-                      key={gapBreak.key}
-                      className="timeline-scale-break-indicator"
+                      key={era.id}
+                      data-id={era.id}
+                      className={`era-item ${isSelected ? 'is-selected' : ''}${era.sourceLink ? ' has-source-link' : ''}`}
                       style={{
-                        left: `${gapBreak.px - gapBreak.width / 2}px`,
-                        width: `${gapBreak.width}px`,
-                        backgroundColor: timelineBreakMaskBg,
+                        left: `${era.left}px`,
+                        width: `${era.width}px`,
+                        height: `${era.height}px`,
+                        top: `${era.top}px`,
+                        background: era.fuzz ? 'transparent' : `${era.color || 'var(--light-bg)'}`,
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSelect(era.id);
                       }}
                     >
-                      <svg viewBox="0 0 20 10" preserveAspectRatio="none">
-                        <path
-                          d="M0,5 L4,5 L7,1 L10,9 L13,1 L16,5 L20,5"
-                          stroke="var(--text-primary)"
-                          strokeWidth="2.5"
-                          strokeLinecap="square"
-                          strokeLinejoin="miter"
-                          fill="none"
-                        />
-                      </svg>
-                      <div className="timeline-scale-break-label">{gapBreak.startLabel} – {gapBreak.endLabel}</div>
+                      {era.hideDetails !== true && (
+                        <span className="era-title-wrap">
+                          {era.icon &&
+                            ICON_MAP[era.icon] &&
+                            (() => {
+                              const I = ICON_MAP[era.icon];
+                              return <I size={10} className="era-title-icon" style={{ color: eraTextColor }} />;
+                            })()}
+                          <span className="era-title" style={{ color: eraTextColor, opacity: 1 }}>
+                            {era.title}
+                          </span>
+                          {era.sourceLink && (
+                            <a
+                              className="era-source-link"
+                              href={era.sourceLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              title="Open source"
+                              style={{ color: eraTextColor }}
+                            >
+                              <ExternalLink size={8} strokeWidth={2.5} />
+                            </a>
+                          )}
+                        </span>
+                      )}
                     </div>
                   );
-
-                  lastEnd = gapBreak.px + gapBreak.width / 2 - gapBreak.overlap;
-                });
-
-              segments.push(
-                <div
-                  key="segment-final"
-                  className="timeline-line-segment"
-                  style={{
-                    left: `${lastEnd}px`,
-                    right: '0',
-                  }}
-                />
-              );
-
-              return segments;
-            })()}
-          </div>
-        )}
-        {breakRendering.axisBreakMarkers.map((marker) => (
-          <div
-            key={marker.key}
-            className="axis-break"
-            style={{
-              left: `${marker.px}px`,
-              top: `${BASE_LINE_Y - 6}px`,
-            }}
-          >
-            <svg
-              viewBox="0 0 16 12"
-              preserveAspectRatio="none"
-            >
-              <path
-                d="M3,10 L7,2 M9,10 L13,2"
-                stroke="var(--text-primary)"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="miter"
-                fill="none"
-              />
-            </svg>
-          </div>
-        ))}
-
-        {/* Today marker */}
-        {todayMarkerPx != null && (
-          <div className="today-line" style={{ left: `${todayMarkerPx}px` }} />
-        )}
-
-        <div className="eras-layer">
-          {finalEras.map((era) => {
-            if (!era.fuzz) return null;
-            const fuzzMask = `linear-gradient(to right, transparent 0, #000 ${era.fuzz.fadeInPx}px, #000 calc(100% - ${era.fuzz.fadeOutPx}px), transparent 100%)`;
-            return (
-              <div
-                key={`fuzz-${era.id}`}
-                className="era-fuzz"
-                style={{
-                  left: `${era.fuzz.left}px`,
-                  width: `${era.fuzz.width}px`,
-                  height: `${era.height}px`,
-                  top: `${era.top}px`,
-                  background: `${era.color || "var(--light-bg)"}`,
-                  WebkitMaskImage: fuzzMask,
-                  maskImage: fuzzMask,
-                }}
-              />
-            );
-          })}
-          {finalEras.map((era) => {
-            const isSelected = selectedId === era.id;
-            const eraTextColor = getReadableTextColor(era.color || "var(--light-bg)");
-            return (
-              <div
-                key={era.id}
-                data-id={era.id}
-                className={`era-item ${isSelected ? "is-selected" : ""}${era.sourceLink ? " has-source-link" : ""}`}
-                style={{
-                  left: `${era.left}px`,
-                  width: `${era.width}px`,
-                  height: `${era.height}px`,
-                  top: `${era.top}px`,
-                  background: era.fuzz ? "transparent" : `${era.color || "var(--light-bg)"}`,
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleSelect(era.id);
-                }}
-              >
-                {era.hideDetails !== true && (
-                  <span className="era-title-wrap">
-                    {era.icon && ICON_MAP[era.icon] && (() => { const I = ICON_MAP[era.icon]; return <I size={10} className="era-title-icon" style={{ color: eraTextColor }} />; })()}
-                    <span
-                      className="era-title"
-                      style={{ color: eraTextColor, opacity: 1 }}
-                    >
-                      {era.title}
-                    </span>
-                    {era.sourceLink && (
-                      <a className="era-source-link" href={era.sourceLink} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} title="Open source" style={{ color: eraTextColor }}><ExternalLink size={8} strokeWidth={2.5} /></a>
-                    )}
-                  </span>
-                )}
+                })}
               </div>
-            );
-          })}
-        </div>
 
-        {/* Connectors layer - behind everything */}
-        <div className="connectors-layer">
-          {!file?.hideSpanConnectors && finalSpans.map((span) => {
-            const spanH = span.spanHeight ?? 20;
-            const placement = spanChildPlacement[span.id];
-            const isChild = !!placement && placement.mode !== "extend";
-            const thinConnectorMode = file?.thinConnectors === true;
-            const connectorThicknessBase = thinConnectorMode ? 11 : (spanH + 1);
+              {/* Connectors layer - behind everything */}
+              <div className="connectors-layer">
+                {!file?.hideSpanConnectors &&
+                  finalSpans.map((span) => {
+                    const spanH = span.spanHeight ?? 20;
+                    const placement = spanChildPlacement[span.id];
+                    const isChild = !!placement && placement.mode !== 'extend';
+                    const thinConnectorMode = file?.thinConnectors === true;
+                    const connectorThicknessBase = thinConnectorMode ? 11 : spanH + 1;
 
-            if (!isChild) return null;
-            if (span.width <= 0) return null;
+                    if (!isChild) return null;
+                    if (span.width <= 0) return null;
 
-            // Calculate actual visual distance for connector height and offset
-            let connectorHeight = undefined;
-            let connectorTransform = undefined;
-            let proximityPenalty = 2000;
-            const parentSpan = finalSpanById.get(placement.parentId);
-            const spanTop = spanRenderTopById.get(span.id) ?? span.top;
-            const parentTopRender = parentSpan ? (spanRenderTopById.get(parentSpan.id) ?? parentSpan.top) : undefined;
-            const isTopChild = parentSpan ? spanTop < parentTopRender : placement.offset > 0;
-            const isBottomChild = parentSpan ? spanTop > parentTopRender : placement.offset < 0;
-            const connectorOffsetX = connectorThicknessBase;
-            const laneDifference = parentSpan ? Math.abs(span.lane - parentSpan.lane) : 0;
-            if (parentSpan && Number.isFinite(parentTopRender)) {
-              const childTop = spanTop;
-              const parentTop = parentTopRender;
-              const deltaTop = parentTop - childTop;
-              proximityPenalty = Math.min(2000, Math.abs(Math.round(deltaTop)));
-              const parentH = parentSpan.spanHeight ?? 20;
-              // Thin connector mode: treat as connecting to a thin span
-              const thinH = Math.round(spanH / 2);
-              const childTrimPx = (thinConnectorMode && span.spanSize !== "thin")
-                ? (spanH - thinH) / 2 : 0;
-              if (Math.abs(deltaTop) < 0.5) {
-                connectorHeight = "0px";
-                connectorTransform = undefined;
-              } else if (laneDifference <= 1) {
-                if (deltaTop >= 0) {
-                  // Top child, 1 lane
-                  connectorHeight = `${Math.max(0, deltaTop + 1 - childTrimPx)}px`;
-                  if (childTrimPx > 0) connectorTransform = `translateY(${childTrimPx}px)`;
-                } else {
-                  // Bottom child, 1 lane
-                  const transformY = deltaTop + parentH - 1;
-                  connectorHeight = `${Math.max(0, -deltaTop + spanH - parentH + 1 - childTrimPx)}px`;
-                  connectorTransform = `translateY(${transformY}px)`;
-                }
-              } else {
-                if (deltaTop >= 0) {
-                  // Top child, >1 lane
-                  const extraTrim = Math.round(spanH / 2) + 2;
-                  connectorHeight = `${Math.max(0, deltaTop + spanH - extraTrim - childTrimPx)}px`;
-                  connectorTransform = childTrimPx > 0
-                    ? `translateY(${childTrimPx}px)` : "translate(0px, 0px)";
-                } else {
-                  // Bottom child, >1 lane
-                  const parentTrim = Math.round(parentH / 2) + 2;
-                  connectorHeight = `${Math.max(0, -deltaTop + spanH - parentTrim - childTrimPx)}px`;
-                  connectorTransform = `translate(0px, ${deltaTop + parentTrim}px)`;
-                }
-              }
-            }
+                    // Calculate actual visual distance for connector height and offset
+                    let connectorHeight = undefined;
+                    let connectorTransform = undefined;
+                    let proximityPenalty = 2000;
+                    const parentSpan = finalSpanById.get(placement.parentId);
+                    const spanTop = spanRenderTopById.get(span.id) ?? span.top;
+                    const parentTopRender = parentSpan
+                      ? (spanRenderTopById.get(parentSpan.id) ?? parentSpan.top)
+                      : undefined;
+                    const isTopChild = parentSpan ? spanTop < parentTopRender : placement.offset > 0;
+                    const isBottomChild = parentSpan ? spanTop > parentTopRender : placement.offset < 0;
+                    const connectorOffsetX = connectorThicknessBase;
+                    const laneDifference = parentSpan ? Math.abs(span.lane - parentSpan.lane) : 0;
+                    if (parentSpan && Number.isFinite(parentTopRender)) {
+                      const childTop = spanTop;
+                      const parentTop = parentTopRender;
+                      const deltaTop = parentTop - childTop;
+                      proximityPenalty = Math.min(2000, Math.abs(Math.round(deltaTop)));
+                      const parentH = parentSpan.spanHeight ?? 20;
+                      // Thin connector mode: treat as connecting to a thin span
+                      const thinH = Math.round(spanH / 2);
+                      const childTrimPx = thinConnectorMode && span.spanSize !== 'thin' ? (spanH - thinH) / 2 : 0;
+                      if (Math.abs(deltaTop) < 0.5) {
+                        connectorHeight = '0px';
+                        connectorTransform = undefined;
+                      } else if (laneDifference <= 1) {
+                        if (deltaTop >= 0) {
+                          // Top child, 1 lane
+                          connectorHeight = `${Math.max(0, deltaTop + 1 - childTrimPx)}px`;
+                          if (childTrimPx > 0) connectorTransform = `translateY(${childTrimPx}px)`;
+                        } else {
+                          // Bottom child, 1 lane
+                          const transformY = deltaTop + parentH - 1;
+                          connectorHeight = `${Math.max(0, -deltaTop + spanH - parentH + 1 - childTrimPx)}px`;
+                          connectorTransform = `translateY(${transformY}px)`;
+                        }
+                      } else {
+                        if (deltaTop >= 0) {
+                          // Top child, >1 lane
+                          const extraTrim = Math.round(spanH / 2) + 2;
+                          connectorHeight = `${Math.max(0, deltaTop + spanH - extraTrim - childTrimPx)}px`;
+                          connectorTransform = childTrimPx > 0 ? `translateY(${childTrimPx}px)` : 'translate(0px, 0px)';
+                        } else {
+                          // Bottom child, >1 lane
+                          const parentTrim = Math.round(parentH / 2) + 2;
+                          connectorHeight = `${Math.max(0, -deltaTop + spanH - parentTrim - childTrimPx)}px`;
+                          connectorTransform = `translate(0px, ${deltaTop + parentTrim}px)`;
+                        }
+                      }
+                    }
 
-            const connectorLeft = span.left - connectorOffsetX;
-            const connectorThickness = connectorThicknessBase;
-            const connectorZIndex = 5000 - proximityPenalty * 2 - connectorThickness * 10;
-            const thinRadius = thinConnectorMode ? Math.round(connectorThicknessBase * 0.45) : undefined;
+                    const connectorLeft = span.left - connectorOffsetX;
+                    const connectorThickness = connectorThicknessBase;
+                    const connectorZIndex = 5000 - proximityPenalty * 2 - connectorThickness * 10;
+                    const thinRadius = thinConnectorMode ? Math.round(connectorThicknessBase * 0.45) : undefined;
 
-            return (
-              <div
-                key={`connector-${span.id}`}
-                style={{
-                  position: 'absolute',
-                  left: `${connectorLeft}px`,
-                  top: `${spanTop}px`,
-                  zIndex: connectorZIndex,
-                  pointerEvents: 'none',
-                }}
-              >
-                {isTopChild && (
-                  <div
-                    className="span-connector-top"
-                    style={{
-                      backgroundColor: span.color || "var(--secondary-text)",
-                      paddingTop: connectorHeight,
-                      transform: connectorTransform,
-                      width: `${connectorThicknessBase}px`,
-                      ...(thinRadius != null && { borderTopLeftRadius: `${thinRadius}px` }),
-                    }}
-                  />
-                )}
-                {isBottomChild && (
-                  <div
-                    className="span-connector-bottom"
-                    style={{
-                      backgroundColor: span.color || "var(--secondary-text)",
-                      paddingTop: connectorHeight,
-                      transform: connectorTransform,
-                      width: `${connectorThicknessBase}px`,
-                      ...(thinRadius != null && { borderBottomLeftRadius: `${thinRadius}px` }),
-                    }}
-                  />
-                )}
+                    return (
+                      <div
+                        key={`connector-${span.id}`}
+                        style={{
+                          position: 'absolute',
+                          left: `${connectorLeft}px`,
+                          top: `${spanTop}px`,
+                          zIndex: connectorZIndex,
+                          pointerEvents: 'none',
+                        }}
+                      >
+                        {isTopChild && (
+                          <div
+                            className="span-connector-top"
+                            style={{
+                              backgroundColor: span.color || 'var(--secondary-text)',
+                              paddingTop: connectorHeight,
+                              transform: connectorTransform,
+                              width: `${connectorThicknessBase}px`,
+                              ...(thinRadius != null && { borderTopLeftRadius: `${thinRadius}px` }),
+                            }}
+                          />
+                        )}
+                        {isBottomChild && (
+                          <div
+                            className="span-connector-bottom"
+                            style={{
+                              backgroundColor: span.color || 'var(--secondary-text)',
+                              paddingTop: connectorHeight,
+                              transform: connectorTransform,
+                              width: `${connectorThicknessBase}px`,
+                              ...(thinRadius != null && { borderBottomLeftRadius: `${thinRadius}px` }),
+                            }}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                {/* Extension connectors - align mixed-size extension chains by center */}
+                {finalSpans.map((span) => {
+                  const placement = spanChildPlacement[span.id];
+                  if (!placement || placement.mode !== 'extend') return null;
+                  const parentSpan = finalSpanById.get(placement.parentId);
+                  if (!parentSpan) return null;
+                  if (span.width <= 0 || parentSpan.width <= 0) return null;
+
+                  const spanH = span.spanHeight ?? 20;
+                  const parentH = parentSpan.spanHeight ?? 20;
+                  const childTop = spanRenderTopById.get(span.id) ?? span.top;
+                  const parentTop = spanRenderTopById.get(parentSpan.id) ?? parentSpan.top;
+                  const childCenter = childTop + spanH / 2;
+                  const parentCenter = parentTop + parentH / 2;
+                  const centerDelta = childCenter - parentCenter;
+                  if (Math.abs(centerDelta) < 0.75) return null;
+
+                  const connectorTop = Math.min(childCenter, parentCenter);
+                  const connectorHeight = Math.abs(centerDelta);
+                  const connectorWidth =
+                    file?.thinConnectors === true
+                      ? 3
+                      : Math.max(3, Math.min(7, Math.round(Math.min(spanH, parentH) * 0.28)));
+                  const connectorLeft = span.left - Math.floor(connectorWidth / 2);
+                  const connectorColor = span.color || parentSpan.color || 'var(--secondary-text)';
+                  const proximityPenalty = Math.min(2000, Math.abs(Math.round(centerDelta)));
+                  const connectorZIndex = 5000 - proximityPenalty * 2 - connectorWidth * 10;
+
+                  return (
+                    <div
+                      key={`extension-connector-${span.id}`}
+                      style={{
+                        position: 'absolute',
+                        left: `${connectorLeft}px`,
+                        top: `${connectorTop}px`,
+                        width: `${connectorWidth}px`,
+                        height: `${connectorHeight}px`,
+                        borderRadius: `${Math.ceil(connectorWidth / 2)}px`,
+                        backgroundColor: connectorColor,
+                        pointerEvents: 'none',
+                        zIndex: connectorZIndex,
+                      }}
+                    />
+                  );
+                })}
+                {/* Merge connectors - at the END of child spans, flipped horizontally */}
+                {!file?.hideSpanConnectors &&
+                  finalSpans.map((span) => {
+                    const mergePlacement = spanMergePlacement[span.id];
+                    if (!mergePlacement) return null;
+
+                    const mergeSpanH = span.spanHeight ?? 20;
+                    const mergeParent = finalSpanById.get(mergePlacement.parentId);
+                    if (!mergeParent) return null;
+                    if (span.width <= 0 || mergeParent.width <= 0) return null;
+                    const thinConnectorMode = file?.thinConnectors === true;
+
+                    // Use actual rendered positions for direction detection (works across groups)
+                    const childTop = spanRenderTopById.get(span.id) ?? span.top;
+                    const parentTop = spanRenderTopById.get(mergeParent.id) ?? mergeParent.top;
+                    const deltaTop = parentTop - childTop;
+
+                    // Skip if same position (no vertical distance to span)
+                    if (Math.abs(deltaTop) < 0.5) return null;
+
+                    const isAboveParent = deltaTop > 0; // child is above (lower top value)
+                    const isBelowParent = deltaTop < 0;
+                    const laneDifference = Math.abs(span.lane - mergeParent.lane);
+
+                    let mergeConnectorHeight = undefined;
+                    let mergeConnectorOffset = undefined;
+                    const proximityPenalty = Math.min(2000, Math.abs(Math.round(deltaTop)));
+                    const parentH = mergeParent.spanHeight ?? 20;
+                    // Thin connector mode: treat as connecting to a thin span
+                    const mergeThinH = Math.round(mergeSpanH / 2);
+                    const mergeTrimPx =
+                      thinConnectorMode && span.spanSize !== 'thin' ? (mergeSpanH - mergeThinH) / 2 : 0;
+                    // Extend connector into parent's neck area when parent is also in thin mode
+                    const mergeParentTrimPx =
+                      thinConnectorMode && mergeParent.spanSize !== 'thin'
+                        ? (parentH - Math.round(parentH / 2)) / 2
+                        : 0;
+
+                    if (laneDifference <= 1) {
+                      if (deltaTop >= 0) {
+                        mergeConnectorHeight = `${Math.max(0, deltaTop + 1 - mergeTrimPx + mergeParentTrimPx)}px`;
+                        if (mergeTrimPx > 0) mergeConnectorOffset = `${mergeTrimPx}px`;
+                      } else {
+                        const transformY = deltaTop + parentH - 1 - mergeParentTrimPx;
+                        mergeConnectorHeight = `${Math.max(0, -deltaTop + mergeSpanH - parentH + 1 - mergeTrimPx + mergeParentTrimPx)}px`;
+                        mergeConnectorOffset = `${transformY}px`;
+                      }
+                    } else {
+                      if (deltaTop >= 0) {
+                        const extraTrim = Math.round(mergeSpanH / 2) + 2;
+                        mergeConnectorHeight = `${Math.max(0, deltaTop + mergeSpanH - extraTrim - mergeTrimPx + mergeParentTrimPx)}px`;
+                        mergeConnectorOffset = mergeTrimPx > 0 ? `${mergeTrimPx}px` : '0px';
+                      } else {
+                        const parentTrim = Math.round(parentH / 2) + 2;
+                        mergeConnectorHeight = `${Math.max(0, -deltaTop + mergeSpanH - parentTrim - mergeTrimPx + mergeParentTrimPx)}px`;
+                        mergeConnectorOffset = `${deltaTop + parentTrim - mergeParentTrimPx}px`;
+                      }
+                    }
+
+                    const mergeConnectorWidth = thinConnectorMode ? 11 : Math.max(11, mergeSpanH + 1);
+                    const mergeAnchorAdjust = Math.max(0, Math.round((21 - mergeConnectorWidth) / 2));
+                    const thinMergeNudgeX = thinConnectorMode || span.spanSize === 'thin' ? 5 : 0;
+                    const connectorLeft = span.left + span.width - mergeAnchorAdjust + thinMergeNudgeX;
+                    const mergeConnectorZIndex = 5000 - proximityPenalty * 2 - mergeConnectorWidth * 10;
+                    const mergeThinRadius = thinConnectorMode ? Math.round(mergeConnectorWidth * 0.45) : undefined;
+
+                    return (
+                      <div
+                        key={`merge-connector-${span.id}`}
+                        style={{
+                          position: 'absolute',
+                          left: `${connectorLeft}px`,
+                          top: `${childTop}px`,
+                          zIndex: mergeConnectorZIndex,
+                          pointerEvents: 'none',
+                        }}
+                      >
+                        {isAboveParent && (
+                          <div
+                            className="span-connector-merge-top"
+                            style={{
+                              backgroundColor: span.color || 'var(--secondary-text)',
+                              paddingTop: mergeConnectorHeight,
+                              width: `${mergeConnectorWidth}px`,
+                              transform: mergeConnectorOffset ? `translateY(${mergeConnectorOffset})` : undefined,
+                              ...(mergeThinRadius != null && { borderTopRightRadius: `${mergeThinRadius}px` }),
+                            }}
+                          />
+                        )}
+                        {isBelowParent && (
+                          <div
+                            className="span-connector-merge-bottom"
+                            style={{
+                              backgroundColor: span.color || 'var(--secondary-text)',
+                              paddingTop: mergeConnectorHeight,
+                              width: `${mergeConnectorWidth}px`,
+                              transform: mergeConnectorOffset ? `translateY(${mergeConnectorOffset})` : undefined,
+                              ...(mergeThinRadius != null && { borderBottomRightRadius: `${mergeThinRadius}px` }),
+                            }}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
               </div>
-            );
-          })}
-          {/* Extension connectors - align mixed-size extension chains by center */}
-          {finalSpans.map((span) => {
-            const placement = spanChildPlacement[span.id];
-            if (!placement || placement.mode !== "extend") return null;
-            const parentSpan = finalSpanById.get(placement.parentId);
-            if (!parentSpan) return null;
-            if (span.width <= 0 || parentSpan.width <= 0) return null;
 
-            const spanH = span.spanHeight ?? 20;
-            const parentH = parentSpan.spanHeight ?? 20;
-            const childTop = spanRenderTopById.get(span.id) ?? span.top;
-            const parentTop = spanRenderTopById.get(parentSpan.id) ?? parentSpan.top;
-            const childCenter = childTop + spanH / 2;
-            const parentCenter = parentTop + parentH / 2;
-            const centerDelta = childCenter - parentCenter;
-            if (Math.abs(centerDelta) < 0.75) return null;
-
-            const connectorTop = Math.min(childCenter, parentCenter);
-            const connectorHeight = Math.abs(centerDelta);
-            const connectorWidth = file?.thinConnectors === true
-              ? 3
-              : Math.max(3, Math.min(7, Math.round(Math.min(spanH, parentH) * 0.28)));
-            const connectorLeft = span.left - Math.floor(connectorWidth / 2);
-            const connectorColor = span.color || parentSpan.color || "var(--secondary-text)";
-            const proximityPenalty = Math.min(2000, Math.abs(Math.round(centerDelta)));
-            const connectorZIndex = 5000 - proximityPenalty * 2 - connectorWidth * 10;
-
-            return (
-              <div
-                key={`extension-connector-${span.id}`}
-                style={{
-                  position: "absolute",
-                  left: `${connectorLeft}px`,
-                  top: `${connectorTop}px`,
-                  width: `${connectorWidth}px`,
-                  height: `${connectorHeight}px`,
-                  borderRadius: `${Math.ceil(connectorWidth / 2)}px`,
-                  backgroundColor: connectorColor,
-                  pointerEvents: "none",
-                  zIndex: connectorZIndex,
-                }}
-              />
-            );
-          })}
-          {/* Merge connectors - at the END of child spans, flipped horizontally */}
-          {!file?.hideSpanConnectors && finalSpans.map((span) => {
-            const mergePlacement = spanMergePlacement[span.id];
-            if (!mergePlacement) return null;
-
-            const mergeSpanH = span.spanHeight ?? 20;
-            const mergeParent = finalSpanById.get(mergePlacement.parentId);
-            if (!mergeParent) return null;
-            if (span.width <= 0 || mergeParent.width <= 0) return null;
-            const thinConnectorMode = file?.thinConnectors === true;
-
-            // Use actual rendered positions for direction detection (works across groups)
-            const childTop = spanRenderTopById.get(span.id) ?? span.top;
-            const parentTop = spanRenderTopById.get(mergeParent.id) ?? mergeParent.top;
-            const deltaTop = parentTop - childTop;
-
-            // Skip if same position (no vertical distance to span)
-            if (Math.abs(deltaTop) < 0.5) return null;
-
-            const isAboveParent = deltaTop > 0; // child is above (lower top value)
-            const isBelowParent = deltaTop < 0;
-            const laneDifference = Math.abs(span.lane - mergeParent.lane);
-
-            let mergeConnectorHeight = undefined;
-            let mergeConnectorOffset = undefined;
-            const proximityPenalty = Math.min(2000, Math.abs(Math.round(deltaTop)));
-            const parentH = mergeParent.spanHeight ?? 20;
-            // Thin connector mode: treat as connecting to a thin span
-            const mergeThinH = Math.round(mergeSpanH / 2);
-            const mergeTrimPx = (thinConnectorMode && span.spanSize !== "thin")
-              ? (mergeSpanH - mergeThinH) / 2 : 0;
-            // Extend connector into parent's neck area when parent is also in thin mode
-            const mergeParentTrimPx = (thinConnectorMode && mergeParent.spanSize !== "thin")
-              ? (parentH - Math.round(parentH / 2)) / 2 : 0;
-
-            if (laneDifference <= 1) {
-              if (deltaTop >= 0) {
-                mergeConnectorHeight = `${Math.max(0, deltaTop + 1 - mergeTrimPx + mergeParentTrimPx)}px`;
-                if (mergeTrimPx > 0) mergeConnectorOffset = `${mergeTrimPx}px`;
-              } else {
-                const transformY = deltaTop + parentH - 1 - mergeParentTrimPx;
-                mergeConnectorHeight = `${Math.max(0, -deltaTop + mergeSpanH - parentH + 1 - mergeTrimPx + mergeParentTrimPx)}px`;
-                mergeConnectorOffset = `${transformY}px`;
-              }
-            } else {
-              if (deltaTop >= 0) {
-                const extraTrim = Math.round(mergeSpanH / 2) + 2;
-                mergeConnectorHeight = `${Math.max(0, deltaTop + mergeSpanH - extraTrim - mergeTrimPx + mergeParentTrimPx)}px`;
-                mergeConnectorOffset = mergeTrimPx > 0 ? `${mergeTrimPx}px` : "0px";
-              } else {
-                const parentTrim = Math.round(parentH / 2) + 2;
-                mergeConnectorHeight = `${Math.max(0, -deltaTop + mergeSpanH - parentTrim - mergeTrimPx + mergeParentTrimPx)}px`;
-                mergeConnectorOffset = `${deltaTop + parentTrim - mergeParentTrimPx}px`;
-              }
-            }
-
-            const mergeConnectorWidth = thinConnectorMode ? 11 : Math.max(11, mergeSpanH + 1);
-            const mergeAnchorAdjust = Math.max(0, Math.round((21 - mergeConnectorWidth) / 2));
-            const thinMergeNudgeX = thinConnectorMode || span.spanSize === "thin" ? 5 : 0;
-            const connectorLeft = span.left + span.width - mergeAnchorAdjust + thinMergeNudgeX;
-            const mergeConnectorZIndex = 5000 - proximityPenalty * 2 - mergeConnectorWidth * 10;
-            const mergeThinRadius = thinConnectorMode ? Math.round(mergeConnectorWidth * 0.45) : undefined;
-
-            return (
-              <div
-                key={`merge-connector-${span.id}`}
-                style={{
-                  position: 'absolute',
-                  left: `${connectorLeft}px`,
-                  top: `${childTop}px`,
-                  zIndex: mergeConnectorZIndex,
-                  pointerEvents: 'none',
-                }}
-              >
-                {isAboveParent && (
-                  <div
-                    className="span-connector-merge-top"
-                    style={{
-                      backgroundColor: span.color || "var(--secondary-text)",
-                      paddingTop: mergeConnectorHeight,
-                      width: `${mergeConnectorWidth}px`,
-                      transform: mergeConnectorOffset
-                        ? `translateY(${mergeConnectorOffset})`
-                        : undefined,
-                      ...(mergeThinRadius != null && { borderTopRightRadius: `${mergeThinRadius}px` }),
-                    }}
-                  />
-                )}
-                {isBelowParent && (
-                  <div
-                    className="span-connector-merge-bottom"
-                    style={{
-                      backgroundColor: span.color || "var(--secondary-text)",
-                      paddingTop: mergeConnectorHeight,
-                      width: `${mergeConnectorWidth}px`,
-                      transform: mergeConnectorOffset
-                        ? `translateY(${mergeConnectorOffset})`
-                        : undefined,
-                      ...(mergeThinRadius != null && { borderBottomRightRadius: `${mergeThinRadius}px` }),
-                    }}
-                  />
-                )}
+              <div className="group-bands-layer">
+                {!file?.disableGroups &&
+                  groupLayouts
+                    .filter((group) => group.visible)
+                    .map((group) => {
+                      const box = groupBandBoxes.find((item) => item.groupId === group.id);
+                      if (!box || group.hideBand) return null;
+                      const bandBackground = withAlpha(group.bgColor || resolvedActiveBg, 0.34);
+                      const bandBorderColor = withAlpha(group.bgColor || resolvedActiveBg, 0.86);
+                      const bandBorder = `var(--timeline-line-thickness) solid ${bandBorderColor}`;
+                      const bandLabelTextColor = getReadableTextColor(
+                        normalizeColor(group.bgColor || resolvedActiveBg),
+                      );
+                      return (
+                        <div
+                          key={`group-bg-${group.id}`}
+                          className="group-bg-band"
+                          style={{
+                            top: `${box.top}px`,
+                            height: `${box.height}px`,
+                            backgroundColor: bandBackground,
+                            border: bandBorder,
+                          }}
+                        >
+                          {group.title && (
+                            <span
+                              className="group-band-label"
+                              style={{ backgroundColor: bandBorderColor, color: bandLabelTextColor }}
+                            >
+                              {group.title}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
               </div>
-            );
-          })}
-        </div>
 
-        <div className="group-bands-layer">
-          {!file?.disableGroups && groupLayouts
-            .filter((group) => group.visible)
-            .map((group) => {
-              const box = groupBandBoxes.find((item) => item.groupId === group.id);
-              if (!box || group.hideBand) return null;
-              const bandBackground = withAlpha(group.bgColor || resolvedActiveBg, 0.34);
-              const bandBorderColor = withAlpha(group.bgColor || resolvedActiveBg, 0.86);
-              const bandBorder = `var(--timeline-line-thickness) solid ${bandBorderColor}`;
-              const bandLabelTextColor = getReadableTextColor(normalizeColor(group.bgColor || resolvedActiveBg));
-              return (
-                <div
-                  key={`group-bg-${group.id}`}
-                  className="group-bg-band"
-                  style={{
-                    top: `${box.top}px`,
-                    height: `${box.height}px`,
-                    backgroundColor: bandBackground,
-                    border: bandBorder,
-                  }}
-                >
-                  {group.title && (
-                    <span
-                      className="group-band-label"
-                      style={{ backgroundColor: bandBorderColor, color: bandLabelTextColor }}
-                    >
-                      {group.title}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-        </div>
+              {groupLayouts
+                .filter((group) => group.visible)
+                .map((group) => {
+                  const groupSpans = group.finalSpans;
+                  const groupEvents = group.finalEvents;
+                  return (
+                    <div key={`group-layer-${group.id}`} className="group-layer" style={{ zIndex: 100 + group.order }}>
+                      <div className="spans-layer">
+                        {groupSpans.map((span) => {
+                          if (span.width <= 0) return null;
+                          const isSelected = selectedId === span.id;
+                          const spanTextColor = getReadableTextColor(span.color || 'var(--secondary-text)');
+                          const mergePlacement = spanMergePlacement[span.id];
+                          const placement = spanChildPlacement[span.id];
+                          const isExtension = placement?.mode === 'extend';
+                          const extensionParent = isExtension ? finalSpanById.get(placement.parentId) : null;
+                          const spanH = span.spanHeight ?? 20;
+                          const parentH = extensionParent ? (extensionParent.spanHeight ?? 20) : 20;
+                          const extensionChildLarger =
+                            isExtension && !!extensionParent && spanH > parentH + 0.1 && span.spanSize !== 'thin';
+                          const extensionParentLarger = extensionParentRoundedSet.has(span.id);
+                          const hideSpanDetails = span.hideDetails === true;
+                          const hideSpanName = hideSpanDetails || span.hideName === true;
+                          const hideSpanYears = hideSpanDetails || span.hideYears === true;
+                          const childInset = placement ? (isExtension ? 1 : 2) : 0;
+                          const isBranchChild = !!placement && placement.mode !== 'extend';
+                          const thinConnectorChild =
+                            file?.thinConnectors === true && isBranchChild && span.spanSize !== 'thin';
+                          const thinConnectorMergeOut =
+                            file?.thinConnectors === true && !!mergePlacement && span.spanSize !== 'thin';
+                          const neckLeft = thinConnectorChild ? 10 : 0;
+                          const neckRight = thinConnectorMergeOut ? 10 : 0;
+                          const mergeInset = mergePlacement ? 2 : 0;
 
-        {groupLayouts
-          .filter((group) => group.visible)
-          .map((group) => {
-            const groupSpans = group.finalSpans;
-            const groupEvents = group.finalEvents;
-            return (
-              <div
-                key={`group-layer-${group.id}`}
-                className="group-layer"
-                style={{ zIndex: 100 + group.order }}
-              >
+                          return (
+                            <div
+                              key={span.id}
+                              data-id={span.id}
+                              className={`span-item ${isSelected ? 'is-selected' : ''}${span.spanSize === 'thin' ? ' span-thin' : ''}${span.spanSize === 'thick' ? ' span-thick' : ''}${isExtension ? ' span-extension' : ''}${extensionChildLarger ? ' span-extension-child-larger' : ''}${extensionParentLarger ? ' span-extension-parent-larger' : ''}${thinConnectorChild ? ' span-thin-connector-child' : ''}${thinConnectorMergeOut ? ' span-thin-connector-merge-out' : ''}${span.sourceLink ? ' has-source-link' : ''}`}
+                              style={
+                                {
+                                  '--span-fill': span.color || 'var(--secondary-text)',
+                                  left: `${span.left - childInset + neckLeft}px`,
+                                  width: `${span.width + childInset + mergeInset - neckLeft - neckRight}px`,
+                                  top: `${spanRenderTopById.get(span.id) ?? span.top}px`,
+                                  height: `${span.spanHeight ?? 20}px`,
+                                  background: span.color || 'var(--secondary-text)',
+                                } as CSSProperties
+                              }
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSelect(span.id);
+                              }}
+                            >
+                              <>
+                                {!hideSpanName && (
+                                  <span className="span-title" style={{ color: spanTextColor }}>
+                                    {span.icon &&
+                                      ICON_MAP[span.icon] &&
+                                      (() => {
+                                        const I = ICON_MAP[span.icon];
+                                        return <I size={10} className="span-title-icon" />;
+                                      })()}
+                                    {span.title}
+                                  </span>
+                                )}
+                                {span.sourceLink && !hideSpanName && (
+                                  <a
+                                    className="span-source-link"
+                                    href={span.sourceLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    title="Open source"
+                                    style={{ color: spanTextColor }}
+                                  >
+                                    <ExternalLink size={9} strokeWidth={3} />
+                                  </a>
+                                )}
+                                {!hideSpanYears && (
+                                  <span className="span-years" style={{ color: spanTextColor, opacity: 0.7 }}>
+                                    {displayDateLabel(span.startLabel) ??
+                                      formatYear(
+                                        span.start,
+                                        file.negID,
+                                        file.posID,
+                                        file?.useCalendar === true,
+                                        file.hideDecimals,
+                                      )}{' '}
+                                    -{' '}
+                                    {displayDateLabel(span.endLabel) ??
+                                      formatYear(
+                                        span.end,
+                                        file.negID,
+                                        file.posID,
+                                        file?.useCalendar === true,
+                                        file.hideDecimals,
+                                      )}
+                                  </span>
+                                )}
+                              </>
+                              {(() => {
+                                const visiblePinnedTags = (Array.isArray(span.tags) ? span.tags : []).filter((tag) =>
+                                  pinnedTags.includes(tag),
+                                );
+                                return (
+                                  <>
+                                    {visiblePinnedTags.length > 0 && (
+                                      <span className="pinned-tags" style={{ color: spanTextColor }}>
+                                        {visiblePinnedTags.map((tag) => (
+                                          <span
+                                            key={tag}
+                                            className="pinned-tag"
+                                            style={
+                                              tagColors[tag]
+                                                ? {
+                                                    background: tagColors[tag],
+                                                    color: getReadableTextColor(tagColors[tag]),
+                                                  }
+                                                : undefined
+                                            }
+                                          >
+                                            {tag}
+                                          </span>
+                                        ))}
+                                      </span>
+                                    )}
+                                  </>
+                                );
+                              })()}
+                              {!hideSpanDetails && span.description && (
+                                <span className="span-description" style={{ color: spanTextColor, opacity: 0.7 }}>
+                                  {span.description}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <div className="events-layer">
+                        {groupEvents.map((event) => {
+                          if (
+                            (file.start != null && event.date < file.start) ||
+                            (file.end != null && event.date > file.end)
+                          )
+                            return null;
+                          const parentId = event.parents?.[0];
+                          const parentSpan = parentId ? finalSpanById.get(parentId) : null;
+                          const parentColor = parentSpan?.color;
+                          const groupColor = groupLayoutById.get(event.groupId)?.bgColor;
+                          const isSelected = selectedId === event.id;
+                          const eventBorderStyle = event.eventBorderStyle || 'solid';
+                          const groupBlendBase = groupColor || resolvedActiveBg;
+                          const mixedGroupColor = blendColors(groupBlendBase, resolvedElementBg, 0.6);
+                          const borderColor =
+                            event.color ||
+                            parentColor ||
+                            (file?.eventLinesToGroupBottom === true ? mixedGroupColor : 'var(--secondary-text)');
+                          const borderValue =
+                            eventBorderStyle === 'none' ? 'none' : `2px ${eventBorderStyle} ${borderColor}`;
+                          const effectiveParentColor = event.color || parentColor;
+                          const eventBg =
+                            file?.spanColorEvents && effectiveParentColor
+                              ? blendColors(effectiveParentColor, resolvedSecondaryBg, 0.2)
+                              : undefined;
+                          return (
+                            <div
+                              key={event.id}
+                              data-id={event.id}
+                              className={`event ${isSelected ? 'is-selected' : ''}${event._isMultiLine ? ' multi-lane' : ''}${event.hideYears === true && !(Array.isArray(event.tags) ? event.tags : []).some((t) => pinnedTags.includes(t)) ? ' event-no-year' : ''}${event.sourceLink ? ' has-source-link' : ''}${event.thumbnail && event.thumbnailStyle !== 'banner' && event.thumbnailStyle !== 'square-fill' && event.thumbnailStyle !== 'circle-fill' ? ' has-thumbnail' : ''}${event.thumbnail && event.thumbnailStyle === 'banner' ? ' has-thumbnail-banner' : ''}${event.thumbnail && event.thumbnailStyle === 'square-fill' ? ' has-thumbnail-square' : ''}${event.thumbnail && event.thumbnailStyle === 'circle-fill' ? ' has-thumbnail-circle' : ''}`}
+                              style={{
+                                left: `${event._x}px`,
+                                top: `${event.top}px`,
+                                position: 'absolute',
+                                border: borderValue,
+                                height: event._isMultiLine ? 'auto' : undefined,
+                                ...(eventBg && { backgroundColor: eventBg }),
+                                ...(event._squareSize && {
+                                  width: `${event._squareSize}px`,
+                                  height: `${event._squareSize}px`,
+                                  padding: 0,
+                                }),
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSelect(event.id);
+                              }}
+                            >
+                              {event.thumbnail &&
+                              (event.thumbnailStyle === 'square-fill' || event.thumbnailStyle === 'circle-fill') ? (
+                                <img
+                                  className={
+                                    event.thumbnailStyle === 'circle-fill'
+                                      ? 'event-thumbnail-circle'
+                                      : 'event-thumbnail-square'
+                                  }
+                                  src={event.thumbnail}
+                                  alt=""
+                                  style={{ objectFit: event.thumbnailFit || 'cover' }}
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                  }}
+                                />
+                              ) : (
+                                <>
+                                  {event.thumbnail && event.thumbnailStyle !== 'banner' && (
+                                    <div
+                                      className="event-thumbnail-tile"
+                                      style={{
+                                        backgroundImage: `url("${event.thumbnail}")`,
+                                        backgroundSize: event.thumbnailFit || 'cover',
+                                      }}
+                                    />
+                                  )}
+                                  {event.thumbnail && event.thumbnailStyle === 'banner' && (
+                                    <img
+                                      className="event-thumbnail-banner"
+                                      src={event.thumbnail}
+                                      alt=""
+                                      style={{ objectFit: event.thumbnailFit || 'cover' }}
+                                    />
+                                  )}
+                                  <div
+                                    className={
+                                      event.thumbnail && event.thumbnailStyle !== 'banner' ? 'event-text-content' : ''
+                                    }
+                                  >
+                                    <div className="event-title">
+                                      {event.icon &&
+                                        ICON_MAP[event.icon] &&
+                                        (() => {
+                                          const I = ICON_MAP[event.icon];
+                                          return <I size={evFontSize} className="event-title-icon" />;
+                                        })()}
+                                      {event.title}
+                                    </div>
+                                    {event.sourceLink && (
+                                      <a
+                                        className="event-source-link"
+                                        href={event.sourceLink}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onClick={(e) => e.stopPropagation()}
+                                        title="Open source"
+                                      >
+                                        <ExternalLink size={11} strokeWidth={2.7} />
+                                      </a>
+                                    )}
+                                    {(event.hideYears !== true ||
+                                      (Array.isArray(event.tags) ? event.tags : []).some((t) =>
+                                        pinnedTags.includes(t),
+                                      )) && (
+                                      <div className="event-date">
+                                        {event.hideYears !== true && (
+                                          <span className="event-year">
+                                            {displayDateLabel(event.dateLabel) ??
+                                              formatYear(
+                                                event.date,
+                                                file.negID,
+                                                file.posID,
+                                                file?.useCalendar === true,
+                                                file.hideDecimals,
+                                              )}
+                                          </span>
+                                        )}
+                                        {(() => {
+                                          const visiblePinnedTags = (
+                                            Array.isArray(event.tags) ? event.tags : []
+                                          ).filter((tag) => pinnedTags.includes(tag));
+                                          if (visiblePinnedTags.length === 0) return null;
+                                          if (file?.fixedEventHeight) {
+                                            return (
+                                              <OverflowTags
+                                                key={visiblePinnedTags.join(',')}
+                                                tags={visiblePinnedTags}
+                                                tagColors={tagColors}
+                                                getReadableTextColor={getReadableTextColor}
+                                              />
+                                            );
+                                          }
+                                          return (
+                                            <span className="pinned-tags">
+                                              {visiblePinnedTags.map((tag) => (
+                                                <span
+                                                  key={tag}
+                                                  className="pinned-tag"
+                                                  style={
+                                                    tagColors[tag]
+                                                      ? {
+                                                          background: tagColors[tag],
+                                                          color: getReadableTextColor(tagColors[tag]),
+                                                        }
+                                                      : undefined
+                                                  }
+                                                >
+                                                  {tag}
+                                                </span>
+                                              ))}
+                                            </span>
+                                          );
+                                        })()}
+                                      </div>
+                                    )}
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+
+              {renderLegacyLayers && (
                 <div className="spans-layer">
-                  {groupSpans.map((span) => {
+                  {finalSpans.map((span) => {
                     if (span.width <= 0) return null;
                     const isSelected = selectedId === span.id;
-                    const spanTextColor = getReadableTextColor(span.color || "var(--secondary-text)");
+                    const spanTextColor = getReadableTextColor(span.color || 'var(--secondary-text)');
+
                     const mergePlacement = spanMergePlacement[span.id];
                     const placement = spanChildPlacement[span.id];
-                    const isExtension = placement?.mode === "extend";
+                    const isExtension = placement?.mode === 'extend';
                     const extensionParent = isExtension ? finalSpanById.get(placement.parentId) : null;
                     const spanH = span.spanHeight ?? 20;
                     const parentH = extensionParent ? (extensionParent.spanHeight ?? 20) : 20;
                     const extensionChildLarger =
-                      isExtension &&
-                      !!extensionParent &&
-                      spanH > parentH + 0.1 &&
-                      span.spanSize !== "thin";
+                      isExtension && !!extensionParent && spanH > parentH + 0.1 && span.spanSize !== 'thin';
                     const extensionParentLarger = extensionParentRoundedSet.has(span.id);
                     const hideSpanDetails = span.hideDetails === true;
                     const hideSpanName = hideSpanDetails || span.hideName === true;
                     const hideSpanYears = hideSpanDetails || span.hideYears === true;
                     const childInset = placement ? (isExtension ? 1 : 2) : 0;
-                    const isBranchChild = !!placement && placement.mode !== "extend";
+                    const isBranchChild = !!placement && placement.mode !== 'extend';
                     const thinConnectorChild =
-                      file?.thinConnectors === true &&
-                      isBranchChild &&
-                      span.spanSize !== "thin";
+                      file?.thinConnectors === true && isBranchChild && span.spanSize !== 'thin';
                     const thinConnectorMergeOut =
-                      file?.thinConnectors === true &&
-                      !!mergePlacement &&
-                      span.spanSize !== "thin";
+                      file?.thinConnectors === true && !!mergePlacement && span.spanSize !== 'thin';
                     const neckLeft = thinConnectorChild ? 10 : 0;
                     const neckRight = thinConnectorMergeOut ? 10 : 0;
                     const mergeInset = mergePlacement ? 2 : 0;
@@ -3804,15 +4277,17 @@ const TimelineView = forwardRef(function TimelineView({
                       <div
                         key={span.id}
                         data-id={span.id}
-                        className={`span-item ${isSelected ? "is-selected" : ""}${span.spanSize === "thin" ? " span-thin" : ""}${span.spanSize === "thick" ? " span-thick" : ""}${isExtension ? " span-extension" : ""}${extensionChildLarger ? " span-extension-child-larger" : ""}${extensionParentLarger ? " span-extension-parent-larger" : ""}${thinConnectorChild ? " span-thin-connector-child" : ""}${thinConnectorMergeOut ? " span-thin-connector-merge-out" : ""}${span.sourceLink ? " has-source-link" : ""}`}
-                        style={{
-                          "--span-fill": span.color || "var(--secondary-text)",
-                          left: `${span.left - childInset + neckLeft}px`,
-                          width: `${span.width + childInset + mergeInset - neckLeft - neckRight}px`,
-                          top: `${spanRenderTopById.get(span.id) ?? span.top}px`,
-                          height: `${span.spanHeight ?? 20}px`,
-                          background: span.color || "var(--secondary-text)",
-                        } as CSSProperties}
+                        className={`span-item ${isSelected ? 'is-selected' : ''}${span.spanSize === 'thin' ? ' span-thin' : ''}${span.spanSize === 'thick' ? ' span-thick' : ''}${isExtension ? ' span-extension' : ''}${extensionChildLarger ? ' span-extension-child-larger' : ''}${extensionParentLarger ? ' span-extension-parent-larger' : ''}${thinConnectorChild ? ' span-thin-connector-child' : ''}${thinConnectorMergeOut ? ' span-thin-connector-merge-out' : ''}`}
+                        style={
+                          {
+                            '--span-fill': span.color || 'var(--secondary-text)',
+                            left: `${span.left - childInset + neckLeft}px`,
+                            width: `${span.width + childInset + mergeInset - neckLeft - neckRight}px`,
+                            top: `${spanRenderTopById.get(span.id) ?? span.top}px`,
+                            height: `${span.spanHeight ?? 20}px`,
+                            background: span.color || 'var(--secondary-text)',
+                          } as CSSProperties
+                        }
                         onClick={(e) => {
                           e.stopPropagation();
                           handleSelect(span.id);
@@ -3820,32 +4295,66 @@ const TimelineView = forwardRef(function TimelineView({
                       >
                         <>
                           {!hideSpanName && (
-                            <span className="span-title" style={{ color: spanTextColor }}>{span.icon && ICON_MAP[span.icon] && (() => { const I = ICON_MAP[span.icon]; return <I size={10} className="span-title-icon" />; })()}{span.title}</span>
-                          )}
-                          {span.sourceLink && !hideSpanName && (
-                            <a className="span-source-link" href={span.sourceLink} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} title="Open source" style={{ color: spanTextColor }}><ExternalLink size={9} strokeWidth={3} /></a>
+                            <span className="span-title" style={{ color: spanTextColor }}>
+                              {span.title}
+                            </span>
                           )}
                           {!hideSpanYears && (
                             <span className="span-years" style={{ color: spanTextColor, opacity: 0.7 }}>
-                              {displayDateLabel(span.startLabel) ?? formatYear(span.start, file.negID, file.posID, file?.useCalendar === true, file.hideDecimals)} - {displayDateLabel(span.endLabel) ?? formatYear(span.end, file.negID, file.posID, file?.useCalendar === true, file.hideDecimals)}
+                              {displayDateLabel(span.startLabel) ??
+                                formatYear(
+                                  span.start,
+                                  file.negID,
+                                  file.posID,
+                                  file?.useCalendar === true,
+                                  file.hideDecimals,
+                                )}{' '}
+                              -{' '}
+                              {displayDateLabel(span.endLabel) ??
+                                formatYear(
+                                  span.end,
+                                  file.negID,
+                                  file.posID,
+                                  file?.useCalendar === true,
+                                  file.hideDecimals,
+                                )}
                             </span>
+                          )}
+                          {span.sourceLink && !hideSpanYears && (
+                            <a
+                              className="span-source-link"
+                              href={span.sourceLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              title="Open source"
+                              style={{ color: spanTextColor, opacity: 0.85 }}
+                            >
+                              <ExternalLink size={9} strokeWidth={2.5} />
+                            </a>
                           )}
                         </>
                         {(() => {
-                          const visiblePinnedTags = (Array.isArray(span.tags) ? span.tags : [])
-                            .filter((tag) => pinnedTags.includes(tag));
+                          const visiblePinnedTags = (Array.isArray(span.tags) ? span.tags : []).filter((tag) =>
+                            pinnedTags.includes(tag),
+                          );
+                          if (visiblePinnedTags.length === 0) return null;
                           return (
-                            <>
-                              {visiblePinnedTags.length > 0 && (
-                                <span className="pinned-tags" style={{ color: spanTextColor }}>
-                                  {visiblePinnedTags.map((tag) => (
-                                    <span key={tag} className="pinned-tag" style={tagColors[tag] ? { background: tagColors[tag], color: getReadableTextColor(tagColors[tag]) } : undefined}>
-                                      {tag}
-                                    </span>
-                                  ))}
+                            <span className="pinned-tags" style={{ color: spanTextColor }}>
+                              {visiblePinnedTags.map((tag) => (
+                                <span
+                                  key={tag}
+                                  className="pinned-tag"
+                                  style={
+                                    tagColors[tag]
+                                      ? { background: tagColors[tag], color: getReadableTextColor(tagColors[tag]) }
+                                      : undefined
+                                  }
+                                >
+                                  {tag}
                                 </span>
-                              )}
-                            </>
+                              ))}
+                            </span>
                           );
                         })()}
                         {!hideSpanDetails && span.description && (
@@ -3857,750 +4366,626 @@ const TimelineView = forwardRef(function TimelineView({
                     );
                   })}
                 </div>
+              )}
 
+              {/* Event lines layer - behind spans and events */}
+              <div className="event-lines-layer">
+                {finalEvents.map((event) => {
+                  if ((file.start != null && event.date < file.start) || (file.end != null && event.date > file.end))
+                    return null;
+                  const eventLineStyle = event.eventLineStyle || 'solid';
+                  if (eventLineStyle === 'none') return null;
+
+                  const parentId = event.parents?.[0];
+                  const parentSpan = parentId ? finalSpanById.get(parentId) : null;
+
+                  if (parentSpan && parentSpan.groupId !== event.groupId) return null;
+
+                  const groupLayout = groupLayoutById.get(event.groupId);
+                  const isBelowLine = groupLayout?.belowLine === true;
+
+                  const fallbackTargetY =
+                    file?.eventLinesToGroupBottom === true
+                      ? (groupBandBottomById.get(event.groupId) ?? BASE_LINE_Y)
+                      : BASE_LINE_Y;
+                  let targetY;
+                  if (isBelowLine) {
+                    targetY = parentSpan
+                      ? (spanRenderTopById.get(parentSpan.id) ?? parentSpan.top) + (parentSpan.spanHeight ?? 20)
+                      : BASE_LINE_Y;
+                  } else {
+                    targetY = parentSpan ? (spanRenderTopById.get(parentSpan.id) ?? parentSpan.top) : fallbackTargetY;
+                  }
+
+                  const effectiveBoxHeight = event._boxHeight || 29;
+                  const eventBottom = event.top + effectiveBoxHeight;
+
+                  const parentColor = parentSpan?.color;
+                  const groupColor = groupLayout?.bgColor;
+                  const groupBlendBase = groupColor || resolvedActiveBg;
+                  const mixedGroupColor = blendColors(groupBlendBase, resolvedElementBg, 0.6);
+                  const lineColor =
+                    event.color ||
+                    parentColor ||
+                    (file?.eventLinesToGroupBottom === true ? mixedGroupColor : resolvedElementBg);
+                  const isDashed = eventLineStyle === 'dashed';
+                  const isDotted = eventLineStyle === 'dotted';
+                  const groupConnectedUnparented = file?.eventLinesToGroupBottom === true && !parentSpan;
+
+                  if (isBelowLine) {
+                    const lineHeight = Math.max(0, event.top - targetY);
+                    const dotYOffset = groupConnectedUnparented ? -2 : 0;
+                    return (
+                      <div
+                        key={`event-line-${event.id}`}
+                        className="event-line-container"
+                        style={{
+                          position: 'absolute',
+                          left: `${event._x}px`,
+                          top: `${targetY}px`,
+                          pointerEvents: 'none',
+                          zIndex: Math.round(event.top),
+                        }}
+                      >
+                        <div
+                          className="event-line"
+                          style={{
+                            position: 'absolute',
+                            left: '50%',
+                            top: '0',
+                            transform: 'translateX(-50%)',
+                            width: isDashed || isDotted ? '0' : '2px',
+                            height: `${lineHeight}px`,
+                            background: isDashed || isDotted ? 'transparent' : lineColor,
+                            borderLeft: isDashed
+                              ? `2px dashed ${lineColor}`
+                              : isDotted
+                                ? `2px dotted ${lineColor}`
+                                : 'none',
+                          }}
+                        />
+                        <div
+                          className="event-dot"
+                          style={{
+                            position: 'absolute',
+                            left: '50%',
+                            top: `${dotYOffset}px`,
+                            transform: 'translate(-50%, -50%)',
+                            width: '8px',
+                            height: '8px',
+                            background: lineColor,
+                          }}
+                        />
+                      </div>
+                    );
+                  }
+
+                  const lineHeight = Math.abs(eventBottom - targetY);
+                  const dotYOffset = groupConnectedUnparented ? 2 : 0;
+                  return (
+                    <div
+                      key={`event-line-${event.id}`}
+                      className="event-line-container"
+                      style={{
+                        position: 'absolute',
+                        left: `${event._x}px`,
+                        top: `${eventBottom}px`,
+                        pointerEvents: 'none',
+                        zIndex: Math.round(event.top),
+                      }}
+                    >
+                      <div
+                        className="event-line"
+                        style={{
+                          position: 'absolute',
+                          left: '50%',
+                          top: '0',
+                          transform: 'translateX(-50%)',
+                          width: isDashed || isDotted ? '0' : '2px',
+                          height: `${lineHeight}px`,
+                          background: isDashed || isDotted ? 'transparent' : lineColor,
+                          borderLeft: isDashed
+                            ? `2px dashed ${lineColor}`
+                            : isDotted
+                              ? `2px dotted ${lineColor}`
+                              : 'none',
+                        }}
+                      />
+                      <div
+                        className="event-dot"
+                        style={{
+                          position: 'absolute',
+                          left: '50%',
+                          top: `${lineHeight + dotYOffset}px`,
+                          transform: 'translate(-50%, -50%)',
+                          width: '8px',
+                          height: '8px',
+                          background: lineColor,
+                        }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+
+              {renderLegacyLayers && (
                 <div className="events-layer">
-                  {groupEvents.map((event) => {
-                    if ((file.start != null && event.date < file.start) || (file.end != null && event.date > file.end)) return null;
+                  {finalEvents.map((event) => {
+                    if ((file.start != null && event.date < file.start) || (file.end != null && event.date > file.end))
+                      return null;
                     const parentId = event.parents?.[0];
                     const parentSpan = parentId ? finalSpanById.get(parentId) : null;
+
                     const parentColor = parentSpan?.color;
                     const groupColor = groupLayoutById.get(event.groupId)?.bgColor;
                     const isSelected = selectedId === event.id;
-                    const eventBorderStyle = event.eventBorderStyle || "solid";
+                    const eventBorderStyle = event.eventBorderStyle || 'solid';
                     const groupBlendBase = groupColor || resolvedActiveBg;
                     const mixedGroupColor = blendColors(groupBlendBase, resolvedElementBg, 0.6);
-                    const borderColor = event.color || parentColor || (
-                      file?.eventLinesToGroupBottom === true
-                        ? mixedGroupColor
-                        : "var(--secondary-text)"
-                    );
-                    const borderValue =
-                      eventBorderStyle === "none"
-                        ? "none"
-                        : `2px ${eventBorderStyle} ${borderColor}`;
-                    const effectiveParentColor = event.color || parentColor;
-                    const eventBg = file?.spanColorEvents && effectiveParentColor
-                      ? blendColors(effectiveParentColor, resolvedSecondaryBg, 0.2)
-                      : undefined;
+                    const borderColor =
+                      event.color ||
+                      parentColor ||
+                      (file?.eventLinesToGroupBottom === true ? mixedGroupColor : resolvedElementBg);
+                    const borderValue = eventBorderStyle === 'none' ? 'none' : `2px ${eventBorderStyle} ${borderColor}`;
                     return (
                       <div
                         key={event.id}
                         data-id={event.id}
-                        className={`event ${isSelected ? "is-selected" : ""}${event._isMultiLine ? " multi-lane" : ""}${event.hideYears === true && !(Array.isArray(event.tags) ? event.tags : []).some((t) => pinnedTags.includes(t)) ? " event-no-year" : ""}${event.sourceLink ? " has-source-link" : ""}${event.thumbnail && event.thumbnailStyle !== "banner" && event.thumbnailStyle !== "square-fill" && event.thumbnailStyle !== "circle-fill" ? " has-thumbnail" : ""}${event.thumbnail && event.thumbnailStyle === "banner" ? " has-thumbnail-banner" : ""}${event.thumbnail && event.thumbnailStyle === "square-fill" ? " has-thumbnail-square" : ""}${event.thumbnail && event.thumbnailStyle === "circle-fill" ? " has-thumbnail-circle" : ""}`}
+                        className={`event ${isSelected ? 'is-selected' : ''}${event._isMultiLine ? ' multi-lane' : ''}${event.hideYears === true && !(Array.isArray(event.tags) ? event.tags : []).some((t) => pinnedTags.includes(t)) ? ' event-no-year' : ''}${event.thumbnail && event.thumbnailStyle !== 'banner' && event.thumbnailStyle !== 'square-fill' && event.thumbnailStyle !== 'circle-fill' ? ' has-thumbnail' : ''}${event.thumbnail && event.thumbnailStyle === 'banner' ? ' has-thumbnail-banner' : ''}${event.thumbnail && event.thumbnailStyle === 'square-fill' ? ' has-thumbnail-square' : ''}${event.thumbnail && event.thumbnailStyle === 'circle-fill' ? ' has-thumbnail-circle' : ''}`}
                         style={{
                           left: `${event._x}px`,
                           top: `${event.top}px`,
-                          position: "absolute",
+                          position: 'absolute',
                           border: borderValue,
-                          height: event._isMultiLine ? "auto" : undefined,
-                          ...(eventBg && { backgroundColor: eventBg }),
-                          ...(event._squareSize && { width: `${event._squareSize}px`, height: `${event._squareSize}px`, padding: 0 }),
+                          height: event._isMultiLine ? 'auto' : undefined,
+                          ...(event._squareSize && {
+                            width: `${event._squareSize}px`,
+                            height: `${event._squareSize}px`,
+                            padding: 0,
+                          }),
                         }}
                         onClick={(e) => {
                           e.stopPropagation();
                           handleSelect(event.id);
                         }}
                       >
-                        {event.thumbnail && (event.thumbnailStyle === "square-fill" || event.thumbnailStyle === "circle-fill") ? (
-                          <img className={event.thumbnailStyle === "circle-fill" ? "event-thumbnail-circle" : "event-thumbnail-square"} src={event.thumbnail} alt="" style={{ objectFit: event.thumbnailFit || "cover" }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-                        ) : (<>
-                        {event.thumbnail && event.thumbnailStyle !== "banner" && <div className="event-thumbnail-tile" style={{ backgroundImage: `url("${event.thumbnail}")`, backgroundSize: event.thumbnailFit || "cover" }} />}
-                        {event.thumbnail && event.thumbnailStyle === "banner" && <img className="event-thumbnail-banner" src={event.thumbnail} alt="" style={{ objectFit: event.thumbnailFit || "cover" }} />}
-                        <div className={event.thumbnail && event.thumbnailStyle !== "banner" ? "event-text-content" : ""}>
-                        <div className="event-title">{event.icon && ICON_MAP[event.icon] && (() => { const I = ICON_MAP[event.icon]; return <I size={evFontSize} className="event-title-icon" />; })()}{event.title}</div>
-                        {event.sourceLink && (
-                          <a
-                            className="event-source-link"
-                            href={event.sourceLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            title="Open source"
-                          ><ExternalLink size={11} strokeWidth={2.7} /></a>
+                        {event.thumbnail && event.thumbnailStyle === 'square-fill' ? (
+                          <img
+                            className="event-thumbnail-square"
+                            src={event.thumbnail}
+                            alt=""
+                            style={{ objectFit: event.thumbnailFit || 'cover' }}
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                        ) : (
+                          <>
+                            {event.thumbnail && event.thumbnailStyle !== 'banner' && (
+                              <div
+                                className="event-thumbnail-tile"
+                                style={{
+                                  backgroundImage: `url("${event.thumbnail}")`,
+                                  backgroundSize: event.thumbnailFit || 'cover',
+                                }}
+                              />
+                            )}
+                            {event.thumbnail && event.thumbnailStyle === 'banner' && (
+                              <img
+                                className="event-thumbnail-banner"
+                                src={event.thumbnail}
+                                alt=""
+                                style={{ objectFit: event.thumbnailFit || 'cover' }}
+                              />
+                            )}
+                            <div
+                              className={
+                                event.thumbnail && event.thumbnailStyle !== 'banner' ? 'event-text-content' : ''
+                              }
+                            >
+                              <div className="event-title">
+                                {event.icon &&
+                                  ICON_MAP[event.icon] &&
+                                  (() => {
+                                    const I = ICON_MAP[event.icon];
+                                    return <I size={evFontSize} className="event-title-icon" />;
+                                  })()}
+                                {event.title}
+                              </div>
+                              {(event.hideYears !== true ||
+                                (Array.isArray(event.tags) ? event.tags : []).some((t) => pinnedTags.includes(t))) && (
+                                <div className="event-date">
+                                  {event.hideYears !== true && (
+                                    <span className="event-year">
+                                      {displayDateLabel(event.dateLabel) ??
+                                        formatYear(
+                                          event.date,
+                                          file.negID,
+                                          file.posID,
+                                          file?.useCalendar === true,
+                                          file.hideDecimals,
+                                        )}
+                                    </span>
+                                  )}
+                                  {(() => {
+                                    const visiblePinnedTags = (Array.isArray(event.tags) ? event.tags : []).filter(
+                                      (tag) => pinnedTags.includes(tag),
+                                    );
+                                    if (visiblePinnedTags.length === 0) return null;
+                                    if (file?.fixedEventHeight) {
+                                      return (
+                                        <OverflowTags
+                                          key={visiblePinnedTags.join(',')}
+                                          tags={visiblePinnedTags}
+                                          tagColors={tagColors}
+                                          getReadableTextColor={getReadableTextColor}
+                                        />
+                                      );
+                                    }
+                                    return (
+                                      <span className="pinned-tags">
+                                        {visiblePinnedTags.map((tag) => (
+                                          <span key={tag} className="pinned-tag">
+                                            {tag}
+                                          </span>
+                                        ))}
+                                      </span>
+                                    );
+                                  })()}
+                                </div>
+                              )}
+                            </div>
+                          </>
                         )}
-                        {(event.hideYears !== true || (Array.isArray(event.tags) ? event.tags : []).some((t) => pinnedTags.includes(t))) && <div className="event-date">
-                          {event.hideYears !== true && <span className="event-year">{displayDateLabel(event.dateLabel) ?? formatYear(event.date, file.negID, file.posID, file?.useCalendar === true, file.hideDecimals)}</span>}
-                          {(() => {
-                            const visiblePinnedTags = (Array.isArray(event.tags) ? event.tags : [])
-                              .filter((tag) => pinnedTags.includes(tag));
-                            if (visiblePinnedTags.length === 0) return null;
-                            if (file?.fixedEventHeight) {
-                              return (
-                                <OverflowTags
-                                  key={visiblePinnedTags.join(',')}
-                                  tags={visiblePinnedTags}
-                                  tagColors={tagColors}
-                                  getReadableTextColor={getReadableTextColor}
-                                />
-                              );
-                            }
-                            return (
-                              <span className="pinned-tags">
-                                {visiblePinnedTags.map((tag) => (
-                                  <span key={tag} className="pinned-tag" style={tagColors[tag] ? { background: tagColors[tag], color: getReadableTextColor(tagColors[tag]) } : undefined}>
-                                    {tag}
-                                  </span>
-                                ))}
-                              </span>
-                            );
-                          })()}
-                        </div>}
-                        </div>
-                        </>)}
                       </div>
                     );
                   })}
                 </div>
-              </div>
-            );
-          })}
+              )}
 
-        {renderLegacyLayers && <div className="spans-layer">
-          {finalSpans.map((span) => {
-            if (span.width <= 0) return null;
-            const isSelected = selectedId === span.id;
-            const spanTextColor = getReadableTextColor(span.color || "var(--secondary-text)");
-
-            const mergePlacement = spanMergePlacement[span.id];
-            const placement = spanChildPlacement[span.id];
-            const isExtension = placement?.mode === "extend";
-            const extensionParent = isExtension ? finalSpanById.get(placement.parentId) : null;
-            const spanH = span.spanHeight ?? 20;
-            const parentH = extensionParent ? (extensionParent.spanHeight ?? 20) : 20;
-            const extensionChildLarger =
-              isExtension &&
-              !!extensionParent &&
-              spanH > parentH + 0.1 &&
-              span.spanSize !== "thin";
-            const extensionParentLarger = extensionParentRoundedSet.has(span.id);
-            const hideSpanDetails = span.hideDetails === true;
-            const hideSpanName = hideSpanDetails || span.hideName === true;
-            const hideSpanYears = hideSpanDetails || span.hideYears === true;
-            const childInset = placement ? (isExtension ? 1 : 2) : 0;
-            const isBranchChild = !!placement && placement.mode !== "extend";
-            const thinConnectorChild =
-              file?.thinConnectors === true &&
-              isBranchChild &&
-              span.spanSize !== "thin";
-            const thinConnectorMergeOut =
-              file?.thinConnectors === true &&
-              !!mergePlacement &&
-              span.spanSize !== "thin";
-            const neckLeft = thinConnectorChild ? 10 : 0;
-            const neckRight = thinConnectorMergeOut ? 10 : 0;
-            const mergeInset = mergePlacement ? 2 : 0;
-
-            return (
-              <div
-                key={span.id}
-                data-id={span.id}
-                className={`span-item ${isSelected ? "is-selected" : ""}${span.spanSize === "thin" ? " span-thin" : ""}${span.spanSize === "thick" ? " span-thick" : ""}${isExtension ? " span-extension" : ""}${extensionChildLarger ? " span-extension-child-larger" : ""}${extensionParentLarger ? " span-extension-parent-larger" : ""}${thinConnectorChild ? " span-thin-connector-child" : ""}${thinConnectorMergeOut ? " span-thin-connector-merge-out" : ""}`}
-                style={{
-                  "--span-fill": span.color || "var(--secondary-text)",
-                  left: `${span.left - childInset + neckLeft}px`,
-                  width: `${span.width + childInset + mergeInset - neckLeft - neckRight}px`,
-                  top: `${spanRenderTopById.get(span.id) ?? span.top}px`,
-                  height: `${span.spanHeight ?? 20}px`,
-                  background: span.color || "var(--secondary-text)",
-                } as CSSProperties}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleSelect(span.id);
-                }}
-              >
-                <>
-                  {!hideSpanName && (
-                    <span className="span-title" style={{ color: spanTextColor }}>{span.title}</span>
-                  )}
-                  {!hideSpanYears && (
-                    <span className="span-years" style={{ color: spanTextColor, opacity: 0.7 }}>
-                      {displayDateLabel(span.startLabel) ?? formatYear(span.start, file.negID, file.posID, file?.useCalendar === true, file.hideDecimals)} - {displayDateLabel(span.endLabel) ?? formatYear(span.end, file.negID, file.posID, file?.useCalendar === true, file.hideDecimals)}
-                    </span>
-                  )}
-                  {span.sourceLink && !hideSpanYears && (
-                    <a className="span-source-link" href={span.sourceLink} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} title="Open source" style={{ color: spanTextColor, opacity: 0.85 }}><ExternalLink size={9} strokeWidth={2.5} /></a>
-                  )}
-                </>
-                {(() => {
-                  const visiblePinnedTags = (Array.isArray(span.tags) ? span.tags : [])
-                    .filter((tag) => pinnedTags.includes(tag));
-                  if (visiblePinnedTags.length === 0) return null;
+              {(() => {
+                const MIN_LABEL_GAP = Math.max(4, 8 / tickDensityMult);
+                const CHAR_WIDTH = 7.5;
+                let lastLabelRight = -Infinity;
+                let lastTickPx = -Infinity;
+                return ticks.map((tick) => {
+                  const px = yearToPx(tick.value);
+                  if (px < lastTickPx + tickGapForYear(tick.value)) return null;
+                  lastTickPx = px;
+                  const label =
+                    tick.label ??
+                    formatYear(tick.value, file.negID, file.posID, file?.useCalendar === true, file.hideDecimals);
+                  const halfWidth = (label.length * CHAR_WIDTH) / 2;
+                  const labelLeft = px - halfWidth;
+                  const showLabel = labelLeft >= lastLabelRight + MIN_LABEL_GAP;
+                  if (showLabel) {
+                    lastLabelRight = px + halfWidth;
+                  }
+                  const roundedPx = Math.round(px);
                   return (
-                    <span className="pinned-tags" style={{ color: spanTextColor }}>
-                      {visiblePinnedTags.map((tag) => (
-                        <span key={tag} className="pinned-tag" style={tagColors[tag] ? { background: tagColors[tag], color: getReadableTextColor(tagColors[tag]) } : undefined}>
-                          {tag}
-                        </span>
-                      ))}
-                    </span>
+                    <Fragment key={tick.value}>
+                      {file.showGrid && <div className="grid-line" style={{ left: `${roundedPx}px` }} />}
+                      <div
+                        className="tick"
+                        style={{
+                          left: `${roundedPx}px`,
+                          top: `${BASE_LINE_Y - 5}px`,
+                        }}
+                      >
+                        <div className="tick-line" />
+                        {showLabel && <div className="tick-label">{label}</div>}
+                      </div>
+                    </Fragment>
                   );
-                })()}
-                {!hideSpanDetails && span.description && (
-                  <span className="span-description" style={{ color: spanTextColor, opacity: 0.7 }}>
-                    {span.description}
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>}
-
-        {/* Event lines layer - behind spans and events */}
-        <div className="event-lines-layer">
-          {finalEvents.map((event) => {
-            if ((file.start != null && event.date < file.start) || (file.end != null && event.date > file.end)) return null;
-            const eventLineStyle = event.eventLineStyle || "solid";
-            if (eventLineStyle === "none") return null;
-
-            const parentId = event.parents?.[0];
-            const parentSpan = parentId
-              ? finalSpanById.get(parentId)
-              : null;
-
-            if (parentSpan && parentSpan.groupId !== event.groupId) return null;
-
-            const groupLayout = groupLayoutById.get(event.groupId);
-            const isBelowLine = groupLayout?.belowLine === true;
-
-            const fallbackTargetY =
-              file?.eventLinesToGroupBottom === true
-                ? (groupBandBottomById.get(event.groupId) ?? BASE_LINE_Y)
-                : BASE_LINE_Y;
-            let targetY;
-            if (isBelowLine) {
-              targetY = parentSpan
-                ? (spanRenderTopById.get(parentSpan.id) ?? parentSpan.top) + (parentSpan.spanHeight ?? 20)
-                : BASE_LINE_Y;
-            } else {
-              targetY = parentSpan
-                ? (spanRenderTopById.get(parentSpan.id) ?? parentSpan.top)
-                : fallbackTargetY;
-            }
-
-            const effectiveBoxHeight = event._boxHeight || 29;
-            const eventBottom = event.top + effectiveBoxHeight;
-
-            const parentColor = parentSpan?.color;
-            const groupColor = groupLayout?.bgColor;
-            const groupBlendBase = groupColor || resolvedActiveBg;
-            const mixedGroupColor = blendColors(groupBlendBase, resolvedElementBg, 0.6);
-            const lineColor = event.color || parentColor || (
-              file?.eventLinesToGroupBottom === true
-                ? mixedGroupColor
-                : resolvedElementBg
-            );
-            const isDashed = eventLineStyle === "dashed";
-            const isDotted = eventLineStyle === "dotted";
-            const groupConnectedUnparented =
-              file?.eventLinesToGroupBottom === true && !parentSpan;
-
-            if (isBelowLine) {
-              const lineHeight = Math.max(0, event.top - targetY);
-              const dotYOffset = groupConnectedUnparented ? -2 : 0;
-              return (
-                <div
-                  key={`event-line-${event.id}`}
-                  className="event-line-container"
-                  style={{
-                    position: 'absolute',
-                    left: `${event._x}px`,
-                    top: `${targetY}px`,
-                    pointerEvents: 'none',
-                    zIndex: Math.round(event.top),
-                  }}
-                >
-                  <div
-                    className="event-line"
-                    style={{
-                      position: 'absolute',
-                      left: '50%',
-                      top: '0',
-                      transform: 'translateX(-50%)',
-                      width: isDashed || isDotted ? '0' : '2px',
-                      height: `${lineHeight}px`,
-                      background: isDashed || isDotted ? 'transparent' : lineColor,
-                      borderLeft: isDashed
-                        ? `2px dashed ${lineColor}`
-                        : isDotted
-                          ? `2px dotted ${lineColor}`
-                          : 'none',
-                    }}
-                  />
-                  <div
-                    className="event-dot"
-                    style={{
-                      position: 'absolute',
-                      left: '50%',
-                      top: `${dotYOffset}px`,
-                      transform: 'translate(-50%, -50%)',
-                      width: '8px',
-                      height: '8px',
-                      background: lineColor,
-                    }}
-                  />
-                </div>
-              );
-            }
-
-            const lineHeight = Math.abs(eventBottom - targetY);
-            const dotYOffset = groupConnectedUnparented ? 2 : 0;
-            return (
-              <div
-                key={`event-line-${event.id}`}
-                className="event-line-container"
-                style={{
-                  position: 'absolute',
-                  left: `${event._x}px`,
-                  top: `${eventBottom}px`,
-                  pointerEvents: 'none',
-                  zIndex: Math.round(event.top),
-                }}
-              >
-                <div
-                  className="event-line"
-                  style={{
-                    position: 'absolute',
-                    left: '50%',
-                    top: '0',
-                    transform: 'translateX(-50%)',
-                    width: isDashed || isDotted ? '0' : '2px',
-                    height: `${lineHeight}px`,
-                    background: isDashed || isDotted ? 'transparent' : lineColor,
-                    borderLeft: isDashed
-                      ? `2px dashed ${lineColor}`
-                      : isDotted
-                        ? `2px dotted ${lineColor}`
-                        : 'none',
-                  }}
-                />
-                <div
-                  className="event-dot"
-                  style={{
-                    position: 'absolute',
-                    left: '50%',
-                    top: `${lineHeight + dotYOffset}px`,
-                    transform: 'translate(-50%, -50%)',
-                    width: '8px',
-                    height: '8px',
-                    background: lineColor,
-                  }}
-                />
-              </div>
-            );
-          })}
-        </div>
-
-        {renderLegacyLayers && <div className="events-layer">
-          {finalEvents.map((event) => {
-            if ((file.start != null && event.date < file.start) || (file.end != null && event.date > file.end)) return null;
-            const parentId = event.parents?.[0];
-            const parentSpan = parentId
-              ? finalSpanById.get(parentId)
-              : null;
-
-            const parentColor = parentSpan?.color;
-            const groupColor = groupLayoutById.get(event.groupId)?.bgColor;
-            const isSelected = selectedId === event.id;
-            const eventBorderStyle = event.eventBorderStyle || "solid";
-            const groupBlendBase = groupColor || resolvedActiveBg;
-            const mixedGroupColor = blendColors(groupBlendBase, resolvedElementBg, 0.6);
-            const borderColor = event.color || parentColor || (
-              file?.eventLinesToGroupBottom === true
-                ? mixedGroupColor
-                : resolvedElementBg
-            );
-            const borderValue =
-              eventBorderStyle === "none"
-                ? "none"
-                : `2px ${eventBorderStyle} ${borderColor}`;
-            return (
-              <div
-                key={event.id}
-                data-id={event.id}
-                className={`event ${isSelected ? "is-selected" : ""}${event._isMultiLine ? " multi-lane" : ""}${event.hideYears === true && !(Array.isArray(event.tags) ? event.tags : []).some((t) => pinnedTags.includes(t)) ? " event-no-year" : ""}${event.thumbnail && event.thumbnailStyle !== "banner" && event.thumbnailStyle !== "square-fill" && event.thumbnailStyle !== "circle-fill" ? " has-thumbnail" : ""}${event.thumbnail && event.thumbnailStyle === "banner" ? " has-thumbnail-banner" : ""}${event.thumbnail && event.thumbnailStyle === "square-fill" ? " has-thumbnail-square" : ""}${event.thumbnail && event.thumbnailStyle === "circle-fill" ? " has-thumbnail-circle" : ""}`}
-                style={{
-                  left: `${event._x}px`,
-                  top: `${event.top}px`,
-                  position: "absolute",
-                  border: borderValue,
-                  height: event._isMultiLine ? "auto" : undefined,
-                  ...(event._squareSize && { width: `${event._squareSize}px`, height: `${event._squareSize}px`, padding: 0 }),
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleSelect(event.id);
-                }}
-              >
-                {event.thumbnail && event.thumbnailStyle === "square-fill" ? (
-                  <img className="event-thumbnail-square" src={event.thumbnail} alt="" style={{ objectFit: event.thumbnailFit || "cover" }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-                ) : (<>
-                {event.thumbnail && event.thumbnailStyle !== "banner" && <div className="event-thumbnail-tile" style={{ backgroundImage: `url("${event.thumbnail}")`, backgroundSize: event.thumbnailFit || "cover" }} />}
-                {event.thumbnail && event.thumbnailStyle === "banner" && <img className="event-thumbnail-banner" src={event.thumbnail} alt="" style={{ objectFit: event.thumbnailFit || "cover" }} />}
-                <div className={event.thumbnail && event.thumbnailStyle !== "banner" ? "event-text-content" : ""}>
-                <div className="event-title">{event.icon && ICON_MAP[event.icon] && (() => { const I = ICON_MAP[event.icon]; return <I size={evFontSize} className="event-title-icon" />; })()}{event.title}</div>
-                {(event.hideYears !== true || (Array.isArray(event.tags) ? event.tags : []).some((t) => pinnedTags.includes(t))) && <div className="event-date">
-                  {event.hideYears !== true && <span className="event-year">{displayDateLabel(event.dateLabel) ?? formatYear(event.date, file.negID, file.posID, file?.useCalendar === true, file.hideDecimals)}</span>}
-                  {(() => {
-                    const visiblePinnedTags = (Array.isArray(event.tags) ? event.tags : [])
-                      .filter((tag) => pinnedTags.includes(tag));
-                    if (visiblePinnedTags.length === 0) return null;
-                    if (file?.fixedEventHeight) {
-                      return (
-                        <OverflowTags
-                          key={visiblePinnedTags.join(',')}
-                          tags={visiblePinnedTags}
-                          tagColors={tagColors}
-                          getReadableTextColor={getReadableTextColor}
-                        />
-                      );
-                    }
-                    return (
-                      <span className="pinned-tags">
-                        {visiblePinnedTags.map((tag) => (
-                          <span key={tag} className="pinned-tag">
-                            {tag}
-                          </span>
-                        ))}
-                      </span>
-                    );
-                  })()}
-                </div>}
-                </div>
-                </>)}
-              </div>
-            );
-          })}
-        </div>}
-
-        {(() => {
-          const MIN_LABEL_GAP = Math.max(4, 8 / tickDensityMult);
-          const CHAR_WIDTH = 7.5;
-          let lastLabelRight = -Infinity;
-          let lastTickPx = -Infinity;
-          return ticks.map((tick) => {
-            const px = yearToPx(tick.value);
-            if (px < lastTickPx + tickGapForYear(tick.value)) return null;
-            lastTickPx = px;
-            const label = tick.label ?? formatYear(tick.value, file.negID, file.posID, file?.useCalendar === true, file.hideDecimals);
-            const halfWidth = (label.length * CHAR_WIDTH) / 2;
-            const labelLeft = px - halfWidth;
-            const showLabel = labelLeft >= lastLabelRight + MIN_LABEL_GAP;
-            if (showLabel) {
-              lastLabelRight = px + halfWidth;
-            }
-            const roundedPx = Math.round(px);
-            return (
-              <Fragment key={tick.value}>
-                {file.showGrid && (
-                  <div
-                    className="grid-line"
-                    style={{ left: `${roundedPx}px` }}
-                  />
-                )}
-                <div
-                  className="tick"
-                  style={{
-                    left: `${roundedPx}px`,
-                    top: `${BASE_LINE_Y - 5}px`,
-                  }}
-                >
-                  <div className="tick-line" />
-                  {showLabel && <div className="tick-label">{label}</div>}
-                </div>
-              </Fragment>
-            );
-          });
-        })()}
-          </div>
-        </>
-      )}
-
-      {contextMenu && contextMenu.element && (
-        <div
-          className="timeline-context-menu"
-          style={{
-            position: 'fixed',
-            left: `${contextMenu.x}px`,
-            top: `${contextMenu.y}px`,
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            className="context-menu-item"
-            onClick={() => handleMenuAction(() => onEditElement?.(contextMenu.element.id))}
-          >
-            <Edit2 size={16} />
-            <span>Edit {contextMenu.element.type.charAt(0).toUpperCase() + contextMenu.element.type.slice(1)}</span>
-          </button>
-          <button
-            className="context-menu-item"
-            onClick={() => handleMenuAction(() => onDuplicateElement?.(contextMenu.element.id))}
-          >
-            <CopyPlus size={16} />
-            <span>Duplicate {contextMenu.element.type.charAt(0).toUpperCase() + contextMenu.element.type.slice(1)}</span>
-          </button>
-          <div className="context-menu-separator" />
-          <button
-            className="context-menu-item context-menu-item-danger"
-            onClick={() => handleMenuAction(() => onDelete?.(contextMenu.element.id))}
-          >
-            <Trash2 size={16} />
-            <span>Delete {contextMenu.element.type.charAt(0).toUpperCase() + contextMenu.element.type.slice(1)}</span>
-          </button>
-        </div>
-      )}
-
-      {contextMenu && !contextMenu.element && (
-        <div
-          className="timeline-context-menu"
-          style={{
-            position: 'fixed',
-            left: `${contextMenu.x}px`,
-            top: `${contextMenu.y}px`,
-          }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            className="context-menu-item"
-            onClick={() => handleMenuAction(() => onAddEvent(contextMenu.groupId, contextMenu.clickYear, { lat: contextMenu.lat, lng: contextMenu.lng }))}
-          >
-            <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 16, height: 16 }}>
-              <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: "currentColor" }} />
-            </span>
-            <span>Add Event</span>
-          </button>
-          <button
-            className="context-menu-item"
-            onClick={() => handleMenuAction(() => onAddSpan(contextMenu.groupId, contextMenu.clickYear, { lat: contextMenu.lat, lng: contextMenu.lng }))}
-          >
-            <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 16, height: 16 }}>
-              <span style={{ display: "inline-block", width: 12, height: 2, borderRadius: 1, background: "currentColor" }} />
-            </span>
-            <span>Add Span</span>
-          </button>
-          <button
-            className="context-menu-item"
-            onClick={() => handleMenuAction(() => onAddEra(contextMenu.clickYear, { lat: contextMenu.lat, lng: contextMenu.lng }))}
-          >
-            <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 16, height: 16 }}>
-              <span style={{ display: "inline-block", width: 10, height: 10, border: "2px solid currentColor", borderRadius: 2 }} />
-            </span>
-            <span>Add Era</span>
-          </button>
-
-          <div className="context-menu-separator" />
-
-          <button
-            className="context-menu-item"
-            onClick={() => handleMenuAction(handleDownloadJSON)}
-          >
-            <FileJson size={16} />
-            <span>Download .json</span>
-          </button>
-          {!showMap && (
-            <>
-              <button
-                className="context-menu-item"
-                onClick={() => handleMenuAction(() => onExportPng?.())}
-              >
-                <Image size={16} />
-                <span>Download .png</span>
-              </button>
-              <button
-                className="context-menu-item"
-                onClick={() => handleMenuAction(() => onExportVideo?.())}
-              >
-                <Video size={16} />
-                <span>Export Video</span>
-              </button>
-            </>
-          )}
-
-          <div className="context-menu-separator" />
-
-          <button
-            className="context-menu-item"
-            onClick={() => handleMenuAction(() => onOpenSettings?.())}
-          >
-            <Settings size={16} />
-            <span>Settings</span>
-          </button>
-        </div>
-      )}
-
-      {showMap && (
-        <Suspense fallback={<div className="timeline-map-placeholder" />}>
-          <MapView
-            ref={mapViewRef}
-            elements={mapElements}
-            onSelect={onSelect}
-            onOpenContextMenu={handleMapContextMenu}
-            onAltWheelPan={stablePanTimelineFromWheel}
-            onCtrlWheelZoom={stableZoomTimelineFromWheel}
-            viewportYear={deferredMapViewportYear}
-            selectedId={selectedId}
-            fileConfig={file}
-          />
-        </Suspense>
-      )}
-
-      <div className="timeline-canvas-bar" style={{ right: `${zoomButtonOffset}px` }}>
-        <button
-          type="button"
-          className="timeline-canvas-button"
-          onClick={handleZoomIn}
-          aria-label="Zoom in"
-          data-tooltip="Zoom in (+)"
-        >
-          <Plus size={16} />
-        </button>
-        <button
-          type="button"
-          className="timeline-canvas-button"
-          onClick={handleZoomOut}
-          aria-label="Zoom out"
-          data-tooltip="Zoom out (-)"
-        >
-          <Minus size={16} />
-        </button>
-        <div className="timeline-canvas-divider" />
-        {timelineData?.file?.useMaps && (
-          <button
-            type="button"
-            className="timeline-canvas-button"
-            aria-label={showMap ? "Timeline View" : "Map View"}
-            data-tooltip={showMap ? "Timeline View" : "Map View"}
-            onClick={() => setShowMap((v) => !v)}
-          >
-            {showMap ? <GanttChartSquare size={16} /> : <MapIcon size={16} />}
-          </button>
+                });
+              })()}
+            </div>
+          </>
         )}
-        {onSetViewMode && (
-          <button
-            type="button"
-            className="timeline-canvas-button"
-            onClick={() => onSetViewMode("spreadsheet")}
-            aria-label="Spreadsheet view"
-            data-tooltip="Spreadsheet view"
-          >
-            <Table2 size={16} />
-          </button>
-        )}
-        <button
-          type="button"
-          className={`timeline-canvas-button${hasAnyFilter ? ' timeline-canvas-button-active' : ''}`}
-          onClick={handleToggleFilterMenu}
-          aria-label="Filter"
-          data-tooltip="Filter"
-          ref={filterButtonRef}
-        >
-          <ListFilter size={16} />
-        </button>
-        {!readOnly && (
-          <button
-            type="button"
-            className="timeline-canvas-button"
-            onClick={onOpenSettings}
-            aria-label="Timeline settings"
-            data-tooltip="Settings"
-          >
-            <Settings size={16} />
-          </button>
-        )}
-      </div>
 
-      {filterMenu && (
-        <div
-          ref={filterMenuRef}
-          className="timeline-context-menu sidebar-filter-menu"
-          style={{
-            position: 'fixed',
-            left: `${filterMenu.x}px`,
-            top: `${filterMenu.y}px`,
-            opacity: filterMenu.ready ? 1 : 0,
-            pointerEvents: filterMenu.ready ? "auto" : "none",
-          }}
-        >
-          {renderFilterMenuContent(false)}
-        </div>
-      )}
-
-      {filterModalOpen && createPortal(
-        <div
-          className="fm-modal-backdrop"
-          onMouseDown={(e) => { if (e.target === e.currentTarget) setFilterModalOpen(false); }}
-          onWheelCapture={(e) => e.stopPropagation()}
-        >
-          <div className="fm-modal">
-            {renderFilterMenuContent(true)}
-          </div>
-        </div>,
-        document.body
-      )}
-
-      <div
-        className="timeline-slider-container"
-        style={{ left: `calc(50% + ${sliderOffset / 2}px)` }}
-      >
-        <button
-          className="slider-play-button"
-          onClick={handlePlayPause}
-          aria-label={isPlaying ? "Pause" : "Play"}
-          data-tooltip={btnTip(isPlaying ? "Pause" : "Play", keybinds.play)}
-        >
-          {isPlaying ? (
-            <Pause size={16} strokeWidth={2} />
-          ) : (
-            <Play size={16} strokeWidth={2} />
-          )}
-        </button>
-        <div className="slider-track">
-          <input
-            ref={sliderElementRef}
-            type="range"
-            min="0"
-            max="100"
-            step="0.1"
-            defaultValue={0}
-            onChange={handleSliderChange}
-            onTouchStart={handleSliderTouch}
-            onTouchMove={handleSliderTouch}
-            className="timeline-slider"
-          />
+        {contextMenu && contextMenu.element && (
           <div
-            ref={viewportIndicatorRef}
-            className="slider-viewport-indicator"
+            className="timeline-context-menu"
             style={{
-              left: (() => {
-                if (!containerRef.current) return '50%';
-                const scale = scaleRef.current;
-                const viewportWidth = containerRef.current.clientWidth;
-                const scaledTimelineWidth = timelineWidth * scale;
-                const extra = Math.max(0, viewportWidth / 2 - TIMELINE_PADDING * scale);
-                const totalScrollable = scaledTimelineWidth + extra * 2;
-                const viewportWidthPercent = Math.min(100, (viewportWidth / totalScrollable) * 100);
-                const halfWidth = viewportWidthPercent / 2;
-                // Map sliderValue (0-100) to the safe range (halfWidth to 100-halfWidth)
-                const safeRange = 100 - viewportWidthPercent;
-                const mappedPosition = halfWidth + (sliderValue / 100) * safeRange;
-                return `${mappedPosition}%`;
-              })(),
-              width: (() => {
-                if (!containerRef.current) return '10%';
-                const scale = scaleRef.current;
-                const viewportWidth = containerRef.current.clientWidth;
-                const scaledTimelineWidth = timelineWidth * scale;
-                const extra = Math.max(0, viewportWidth / 2 - TIMELINE_PADDING * scale);
-                const totalScrollable = scaledTimelineWidth + extra * 2;
-                const widthPercent = Math.min(100, (viewportWidth / totalScrollable) * 100);
-                return `${widthPercent}%`;
-              })()
+              position: 'fixed',
+              left: `${contextMenu.x}px`,
+              top: `${contextMenu.y}px`,
             }}
-          />
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="context-menu-item"
+              onClick={() => handleMenuAction(() => onEditElement?.(contextMenu.element.id))}
+            >
+              <Edit2 size={16} />
+              <span>Edit {contextMenu.element.type.charAt(0).toUpperCase() + contextMenu.element.type.slice(1)}</span>
+            </button>
+            <button
+              className="context-menu-item"
+              onClick={() => handleMenuAction(() => onDuplicateElement?.(contextMenu.element.id))}
+            >
+              <CopyPlus size={16} />
+              <span>
+                Duplicate {contextMenu.element.type.charAt(0).toUpperCase() + contextMenu.element.type.slice(1)}
+              </span>
+            </button>
+            <div className="context-menu-separator" />
+            <button
+              className="context-menu-item context-menu-item-danger"
+              onClick={() => handleMenuAction(() => onDelete?.(contextMenu.element.id))}
+            >
+              <Trash2 size={16} />
+              <span>Delete {contextMenu.element.type.charAt(0).toUpperCase() + contextMenu.element.type.slice(1)}</span>
+            </button>
+          </div>
+        )}
+
+        {contextMenu && !contextMenu.element && (
+          <div
+            className="timeline-context-menu"
+            style={{
+              position: 'fixed',
+              left: `${contextMenu.x}px`,
+              top: `${contextMenu.y}px`,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="context-menu-item"
+              onClick={() =>
+                handleMenuAction(() =>
+                  onAddEvent(contextMenu.groupId, contextMenu.clickYear, {
+                    lat: contextMenu.lat,
+                    lng: contextMenu.lng,
+                  }),
+                )
+              }
+            >
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16 }}>
+                <span
+                  style={{
+                    display: 'inline-block',
+                    width: 7,
+                    height: 7,
+                    borderRadius: '50%',
+                    background: 'currentColor',
+                  }}
+                />
+              </span>
+              <span>Add Event</span>
+            </button>
+            <button
+              className="context-menu-item"
+              onClick={() =>
+                handleMenuAction(() =>
+                  onAddSpan(contextMenu.groupId, contextMenu.clickYear, { lat: contextMenu.lat, lng: contextMenu.lng }),
+                )
+              }
+            >
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16 }}>
+                <span
+                  style={{ display: 'inline-block', width: 12, height: 2, borderRadius: 1, background: 'currentColor' }}
+                />
+              </span>
+              <span>Add Span</span>
+            </button>
+            <button
+              className="context-menu-item"
+              onClick={() =>
+                handleMenuAction(() => onAddEra(contextMenu.clickYear, { lat: contextMenu.lat, lng: contextMenu.lng }))
+              }
+            >
+              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 16, height: 16 }}>
+                <span
+                  style={{
+                    display: 'inline-block',
+                    width: 10,
+                    height: 10,
+                    border: '2px solid currentColor',
+                    borderRadius: 2,
+                  }}
+                />
+              </span>
+              <span>Add Era</span>
+            </button>
+
+            <div className="context-menu-separator" />
+
+            <button className="context-menu-item" onClick={() => handleMenuAction(handleDownloadJSON)}>
+              <FileJson size={16} />
+              <span>Download .json</span>
+            </button>
+            {!showMap && (
+              <>
+                <button className="context-menu-item" onClick={() => handleMenuAction(() => onExportPng?.())}>
+                  <Image size={16} />
+                  <span>Download .png</span>
+                </button>
+                <button className="context-menu-item" onClick={() => handleMenuAction(() => onExportVideo?.())}>
+                  <Video size={16} />
+                  <span>Export Video</span>
+                </button>
+              </>
+            )}
+
+            <div className="context-menu-separator" />
+
+            <button className="context-menu-item" onClick={() => handleMenuAction(() => onOpenSettings?.())}>
+              <Settings size={16} />
+              <span>Settings</span>
+            </button>
+          </div>
+        )}
+
+        {showMap && (
+          <Suspense fallback={<div className="timeline-map-placeholder" />}>
+            <MapView
+              ref={mapViewRef}
+              elements={mapElements}
+              onSelect={onSelect}
+              onOpenContextMenu={handleMapContextMenu}
+              onAltWheelPan={stablePanTimelineFromWheel}
+              onCtrlWheelZoom={stableZoomTimelineFromWheel}
+              viewportYear={deferredMapViewportYear}
+              selectedId={selectedId}
+              fileConfig={file}
+            />
+          </Suspense>
+        )}
+
+        <div className="timeline-canvas-bar" style={{ right: `${zoomButtonOffset}px` }}>
+          <button
+            type="button"
+            className="timeline-canvas-button"
+            onClick={handleZoomIn}
+            aria-label="Zoom in"
+            data-tooltip="Zoom in (+)"
+          >
+            <Plus size={16} />
+          </button>
+          <button
+            type="button"
+            className="timeline-canvas-button"
+            onClick={handleZoomOut}
+            aria-label="Zoom out"
+            data-tooltip="Zoom out (-)"
+          >
+            <Minus size={16} />
+          </button>
+          <div className="timeline-canvas-divider" />
+          {timelineData?.file?.useMaps && (
+            <button
+              type="button"
+              className="timeline-canvas-button"
+              aria-label={showMap ? 'Timeline View' : 'Map View'}
+              data-tooltip={showMap ? 'Timeline View' : 'Map View'}
+              onClick={() => setShowMap((v) => !v)}
+            >
+              {showMap ? <GanttChartSquare size={16} /> : <MapIcon size={16} />}
+            </button>
+          )}
+          {onSetViewMode && (
+            <button
+              type="button"
+              className="timeline-canvas-button"
+              onClick={() => onSetViewMode('spreadsheet')}
+              aria-label="Spreadsheet view"
+              data-tooltip="Spreadsheet view"
+            >
+              <Table2 size={16} />
+            </button>
+          )}
+          <button
+            type="button"
+            className={`timeline-canvas-button${hasAnyFilter ? ' timeline-canvas-button-active' : ''}`}
+            onClick={handleToggleFilterMenu}
+            aria-label="Filter"
+            data-tooltip="Filter"
+            ref={filterButtonRef}
+          >
+            <ListFilter size={16} />
+          </button>
+          {!readOnly && (
+            <button
+              type="button"
+              className="timeline-canvas-button"
+              onClick={onOpenSettings}
+              aria-label="Timeline settings"
+              data-tooltip="Settings"
+            >
+              <Settings size={16} />
+            </button>
+          )}
         </div>
-        <div ref={yearLabelRef} className="slider-year">{sliderYearLabel}</div>
+
+        {filterMenu && (
+          <div
+            ref={filterMenuRef}
+            className="timeline-context-menu sidebar-filter-menu"
+            style={{
+              position: 'fixed',
+              left: `${filterMenu.x}px`,
+              top: `${filterMenu.y}px`,
+              opacity: filterMenu.ready ? 1 : 0,
+              pointerEvents: filterMenu.ready ? 'auto' : 'none',
+            }}
+          >
+            {renderFilterMenuContent(false)}
+          </div>
+        )}
+
+        {filterModalOpen &&
+          createPortal(
+            <div
+              className="fm-modal-backdrop"
+              onMouseDown={(e) => {
+                if (e.target === e.currentTarget) setFilterModalOpen(false);
+              }}
+              onWheelCapture={(e) => e.stopPropagation()}
+            >
+              <div className="fm-modal">{renderFilterMenuContent(true)}</div>
+            </div>,
+            document.body,
+          )}
+
+        <div className="timeline-slider-container" style={{ left: `calc(50% + ${sliderOffset / 2}px)` }}>
+          <button
+            className="slider-play-button"
+            onClick={handlePlayPause}
+            aria-label={isPlaying ? 'Pause' : 'Play'}
+            data-tooltip={btnTip(isPlaying ? 'Pause' : 'Play', keybinds.play)}
+          >
+            {isPlaying ? <Pause size={16} strokeWidth={2} /> : <Play size={16} strokeWidth={2} />}
+          </button>
+          <div className="slider-track">
+            <input
+              ref={sliderElementRef}
+              type="range"
+              min="0"
+              max="100"
+              step="0.1"
+              defaultValue={0}
+              onChange={handleSliderChange}
+              onTouchStart={handleSliderTouch}
+              onTouchMove={handleSliderTouch}
+              className="timeline-slider"
+            />
+            <div
+              ref={viewportIndicatorRef}
+              className="slider-viewport-indicator"
+              style={{
+                left: (() => {
+                  if (!containerRef.current) return '50%';
+                  const scale = scaleRef.current;
+                  const viewportWidth = containerRef.current.clientWidth;
+                  const scaledTimelineWidth = timelineWidth * scale;
+                  const extra = Math.max(0, viewportWidth / 2 - TIMELINE_PADDING * scale);
+                  const totalScrollable = scaledTimelineWidth + extra * 2;
+                  const viewportWidthPercent = Math.min(100, (viewportWidth / totalScrollable) * 100);
+                  const halfWidth = viewportWidthPercent / 2;
+                  // Map sliderValue (0-100) to the safe range (halfWidth to 100-halfWidth)
+                  const safeRange = 100 - viewportWidthPercent;
+                  const mappedPosition = halfWidth + (sliderValue / 100) * safeRange;
+                  return `${mappedPosition}%`;
+                })(),
+                width: (() => {
+                  if (!containerRef.current) return '10%';
+                  const scale = scaleRef.current;
+                  const viewportWidth = containerRef.current.clientWidth;
+                  const scaledTimelineWidth = timelineWidth * scale;
+                  const extra = Math.max(0, viewportWidth / 2 - TIMELINE_PADDING * scale);
+                  const totalScrollable = scaledTimelineWidth + extra * 2;
+                  const widthPercent = Math.min(100, (viewportWidth / totalScrollable) * 100);
+                  return `${widthPercent}%`;
+                })(),
+              }}
+            />
+          </div>
+          <div ref={yearLabelRef} className="slider-year">
+            {sliderYearLabel}
+          </div>
+        </div>
       </div>
-    </div>
     </>
   );
 });

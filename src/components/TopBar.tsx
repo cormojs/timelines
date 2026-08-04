@@ -1,4 +1,4 @@
-import { Minus, Square, X, PanelLeft, PanelRight, Lock, LockOpen } from "lucide-react";
+import { Minus, Square, X, PanelLeft, PanelRight, Lock, LockOpen } from 'lucide-react';
 
 type TopBarProps = {
   title?: string;
@@ -12,7 +12,7 @@ type TopBarProps = {
 };
 
 export default function TopBar({
-  title = "Timelines",
+  title = 'Timelines',
   version,
   isLeftCollapsed,
   onToggleLeft,
@@ -69,7 +69,7 @@ export default function TopBar({
           <button
             className="title-bar-button title-bar-panel-toggle"
             onClick={onToggleLeft}
-            title={isLeftCollapsed ? "Show sidebar" : "Hide sidebar"}
+            title={isLeftCollapsed ? 'Show sidebar' : 'Hide sidebar'}
           >
             <PanelLeft size={14} />
           </button>
@@ -78,16 +78,16 @@ export default function TopBar({
           <button
             className="title-bar-button title-bar-panel-toggle"
             onClick={onToggleRight}
-            title={isRightCollapsed ? "Show panel" : "Hide panel"}
+            title={isRightCollapsed ? 'Show panel' : 'Hide panel'}
           >
             <PanelRight size={14} />
           </button>
         )}
         {onCycleRightLock && (
           <button
-            className={`title-bar-button title-bar-panel-toggle${rightLockState ? " title-bar-button-locked" : ""}`}
+            className={`title-bar-button title-bar-panel-toggle${rightLockState ? ' title-bar-button-locked' : ''}`}
             onClick={onCycleRightLock}
-            title={rightLockState ? "Unlock panel" : "Lock panel"}
+            title={rightLockState ? 'Unlock panel' : 'Lock panel'}
           >
             {rightLockState ? <Lock size={13} /> : <LockOpen size={13} />}
           </button>

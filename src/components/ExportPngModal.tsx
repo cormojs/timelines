@@ -1,7 +1,7 @@
-import { ArrowLeft } from "lucide-react";
-import { useState, useEffect, useRef, useCallback } from "react";
-import { formatYear } from "../utils/timelineUtils";
-import "../styles/07-modals-menus.css";
+import { ArrowLeft } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { formatYear } from '../utils/timelineUtils';
+import '../styles/07-modals-menus.css';
 
 const RESOLUTION_OPTIONS = [
   { value: 'current', label: 'Timeline', width: null, height: null },
@@ -18,8 +18,14 @@ type PreviewOptions = {
   customBg?: string;
 };
 
-export default function ExportPngModal({ isOpen, onClose, onExport, timelineData, timelineViewRef }: Record<string, DynamicValue>) {
-  const [filename, setFilename] = useState("");
+export default function ExportPngModal({
+  isOpen,
+  onClose,
+  onExport,
+  timelineData,
+  timelineViewRef,
+}: Record<string, DynamicValue>) {
+  const [filename, setFilename] = useState('');
   const [previewData, setPreviewData] = useState(null);
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
   const [validationErrors, setValidationErrors] = useState([]);
@@ -51,32 +57,35 @@ export default function ExportPngModal({ isOpen, onClose, onExport, timelineData
   );
   const maxStartPercent = 100 - effectiveRangeSpanPercent;
 
-  const clampPreviewOffset = useCallback((nextOffset, scaleValue = previewScale) => {
-    const container = previewContainerRef.current;
-    const containerWidth = container?.clientWidth;
-    if (!container || !containerWidth) return nextOffset;
+  const clampPreviewOffset = useCallback(
+    (nextOffset, scaleValue = previewScale) => {
+      const container = previewContainerRef.current;
+      const containerWidth = container?.clientWidth;
+      if (!container || !containerWidth) return nextOffset;
 
-    const scaleSafe = Math.min(10, Math.max(0.3, scaleValue));
-    const span = Math.min(100, Math.max(minRangePercent, rangeSpanPercent / scaleSafe));
-    const center = rangeCenterPercent;
-    const baseStart = Math.min(Math.max(0, center - span / 2), 100 - span);
-    const maxStart = 100 - span;
-    const percentPerPx = span / containerWidth;
-    const minPanPercent = -baseStart;
-    const maxPanPercent = maxStart - baseStart;
-    const minOffsetX = -maxPanPercent / percentPerPx;
-    const maxOffsetX = -minPanPercent / percentPerPx;
+      const scaleSafe = Math.min(10, Math.max(0.3, scaleValue));
+      const span = Math.min(100, Math.max(minRangePercent, rangeSpanPercent / scaleSafe));
+      const center = rangeCenterPercent;
+      const baseStart = Math.min(Math.max(0, center - span / 2), 100 - span);
+      const maxStart = 100 - span;
+      const percentPerPx = span / containerWidth;
+      const minPanPercent = -baseStart;
+      const maxPanPercent = maxStart - baseStart;
+      const minOffsetX = -maxPanPercent / percentPerPx;
+      const maxOffsetX = -minPanPercent / percentPerPx;
 
-    return {
-      x: Math.min(maxOffsetX, Math.max(minOffsetX, nextOffset.x)),
-      y: 0,
-    };
-  }, [previewScale, minRangePercent, rangeSpanPercent, rangeCenterPercent]);
+      return {
+        x: Math.min(maxOffsetX, Math.max(minOffsetX, nextOffset.x)),
+        y: 0,
+      };
+    },
+    [previewScale, minRangePercent, rangeSpanPercent, rangeCenterPercent],
+  );
 
   useEffect(() => {
     if (isOpen && timelineData?.file) {
       const file = timelineData.file;
-      setFilename(file.id || file.title || "timeline");
+      setFilename(file.id || file.title || 'timeline');
       setValidationErrors([]);
       setPreviewData(null);
       setPreviewScale(1);
@@ -87,13 +96,13 @@ export default function ExportPngModal({ isOpen, onClose, onExport, timelineData
       setShowTitle(false);
       setTitlePosition('bottom-right');
       setTitleStyle('title-logo');
-      setTitleText(file.title || "");
+      setTitleText(file.title || '');
       setExportRange({ startPercent: 0, endPercent: 100 });
     }
   }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (resolution === "current" && showTitle) {
+    if (resolution === 'current' && showTitle) {
       setShowTitle(false);
     }
   }, [resolution, showTitle]);
@@ -131,21 +140,26 @@ export default function ExportPngModal({ isOpen, onClose, onExport, timelineData
     };
   }, [isOpen, bgOption, timelineViewRef]);
 
-  const handleWheel = useCallback((e) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.12 : 0.12;
-    setPreviewScale((current) => {
-      const nextScale = Math.min(10, Math.max(0.3, Number((current + delta).toFixed(2))));
-      setPreviewOffset((currentOffset) => clampPreviewOffset(currentOffset, nextScale));
-      return nextScale;
-    });
-  }, [clampPreviewOffset]);
+  const handleWheel = useCallback(
+    (e) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -0.12 : 0.12;
+      setPreviewScale((current) => {
+        const nextScale = Math.min(10, Math.max(0.3, Number((current + delta).toFixed(2))));
+        setPreviewOffset((currentOffset) => clampPreviewOffset(currentOffset, nextScale));
+        return nextScale;
+      });
+    },
+    [clampPreviewOffset],
+  );
 
   useEffect(() => {
     if (!isOpen) return;
-    const handleKeyDown = (e) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
   useEffect(() => {
@@ -171,11 +185,11 @@ export default function ExportPngModal({ isOpen, onClose, onExport, timelineData
       setIsDraggingPreview(false);
     };
 
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
     return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
     };
   }, [isDraggingPreview, clampPreviewOffset]);
 
@@ -213,10 +227,10 @@ export default function ExportPngModal({ isOpen, onClose, onExport, timelineData
     if (resolution === 'custom') {
       const parsedW = parseInt(customWidth, 10);
       const parsedH = parseInt(customHeight, 10);
-      targetWidth = (parsedW > 0) ? Math.min(parsedW, 16384) : null;
-      targetHeight = (parsedH > 0) ? Math.min(parsedH, 16384) : null;
+      targetWidth = parsedW > 0 ? Math.min(parsedW, 16384) : null;
+      targetHeight = parsedH > 0 ? Math.min(parsedH, 16384) : null;
     } else {
-      const selectedRes = RESOLUTION_OPTIONS.find(r => r.value === resolution) || RESOLUTION_OPTIONS[0];
+      const selectedRes = RESOLUTION_OPTIONS.find((r) => r.value === resolution) || RESOLUTION_OPTIONS[0];
       targetWidth = selectedRes.width;
       targetHeight = selectedRes.height;
     }
@@ -238,7 +252,7 @@ export default function ExportPngModal({ isOpen, onClose, onExport, timelineData
 
     onExport({
       ...exportBgOpts,
-      filename: (filename || "").trim() || (timelineData?.file?.id || timelineData?.file?.title || "timeline"),
+      filename: (filename || '').trim() || timelineData?.file?.id || timelineData?.file?.title || 'timeline',
       targetWidth,
       targetHeight,
       exportStartYear: startYear,
@@ -257,7 +271,7 @@ export default function ExportPngModal({ isOpen, onClose, onExport, timelineData
     onClose();
   };
 
-  const selectedRes = RESOLUTION_OPTIONS.find(r => r.value === resolution) || RESOLUTION_OPTIONS[0];
+  const selectedRes = RESOLUTION_OPTIONS.find((r) => r.value === resolution) || RESOLUTION_OPTIONS[0];
   const rangeRatio = rangeSpanPercent / 100;
   const rangeWidthPx = previewData?.elementWidth ? previewData.elementWidth * rangeRatio : null;
 
@@ -284,7 +298,7 @@ export default function ExportPngModal({ isOpen, onClose, onExport, timelineData
     const sourceWidth = rangeWidthPx || previewData.elementWidth;
     return {
       width: Math.round(sourceWidth * 2),
-      height: previewData.elementHeight * 2
+      height: previewData.elementHeight * 2,
     };
   };
 
@@ -312,12 +326,11 @@ export default function ExportPngModal({ isOpen, onClose, onExport, timelineData
   };
 
   const outputAspectRatio = getOutputAspectRatio();
-  const previewBgColor = bgOption === 'secondary' ? 'var(--surface)'
-    : bgOption === 'tertiary' ? 'var(--inset-bg)'
-    : undefined;
+  const previewBgColor =
+    bgOption === 'secondary' ? 'var(--surface)' : bgOption === 'tertiary' ? 'var(--inset-bg)' : undefined;
   const file = timelineData?.file;
   const displayYear = (value) => {
-    if (!Number.isFinite(value)) return "--";
+    if (!Number.isFinite(value)) return '--';
     return formatYear(value, file?.negID, file?.posID, file?.useCalendar === true, file?.hideDecimals);
   };
   const selectedStartYear = previewData?.percentToYear
@@ -332,14 +345,11 @@ export default function ExportPngModal({ isOpen, onClose, onExport, timelineData
 
   const containerWidth = previewContainerRef.current?.clientWidth || 1;
   const panPercent = -(previewOffset.x * effectiveRangeSpanPercent) / containerWidth;
-  const effectiveStartPercent = Math.min(
-    Math.max(0, baseStartPercent + panPercent),
-    maxStartPercent,
-  );
+  const effectiveStartPercent = Math.min(Math.max(0, baseStartPercent + panPercent), maxStartPercent);
   const previewImageStyle = {
     width: `${100 / (effectiveRangeSpanPercent / 100)}%`,
-    maxWidth: "none",
-    maxHeight: "none",
+    maxWidth: 'none',
+    maxHeight: 'none',
     marginLeft: `-${(effectiveStartPercent / effectiveRangeSpanPercent) * 100}%`,
   };
 
@@ -365,11 +375,7 @@ export default function ExportPngModal({ isOpen, onClose, onExport, timelineData
     <div className="settings-backdrop" onMouseDown={handleBackdropMouseDown} onMouseUp={handleBackdropMouseUp}>
       <div className="settings-modal export-png-modal">
         <div className="settings-header">
-          <button
-            className="settings-back-button"
-            onClick={handleCancel}
-            aria-label="Close"
-          >
+          <button className="settings-back-button" onClick={handleCancel} aria-label="Close">
             <ArrowLeft size={20} strokeWidth={2} />
           </button>
           <h2 className="settings-title">EXPORT PNG</h2>
@@ -399,13 +405,15 @@ export default function ExportPngModal({ isOpen, onClose, onExport, timelineData
                 onMouseDown={handlePreviewMouseDown}
                 style={{
                   transform: `translate(${previewOffset.x}px, 0)`,
-                  transformOrigin: "center",
+                  transformOrigin: 'center',
                   justifyContent: 'flex-start',
-                  ...(outputAspectRatio ? {
-                    aspectRatio: outputAspectRatio,
-                    backgroundColor: previewBgColor,
-                    width: '100%',
-                  } : {}),
+                  ...(outputAspectRatio
+                    ? {
+                        aspectRatio: outputAspectRatio,
+                        backgroundColor: previewBgColor,
+                        width: '100%',
+                      }
+                    : {}),
                 }}
               >
                 <img
@@ -415,13 +423,16 @@ export default function ExportPngModal({ isOpen, onClose, onExport, timelineData
                   style={previewImageStyle}
                   draggable={false}
                 />
-                <div className="export-preview-bounds" style={{
-                  border: '1px dashed var(--ui-muted)',
-                  position: 'absolute',
-                  inset: 0,
-                  pointerEvents: 'none',
-                  boxSizing: 'border-box',
-                }} />
+                <div
+                  className="export-preview-bounds"
+                  style={{
+                    border: '1px dashed var(--ui-muted)',
+                    position: 'absolute',
+                    inset: 0,
+                    pointerEvents: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                />
                 {showTitle && resolution !== 'current' && (
                   <div className={`export-preview-title export-preview-title-${titlePosition}`}>
                     {titleStyle !== 'logo-only' && (titleText || '')}
@@ -458,13 +469,11 @@ export default function ExportPngModal({ isOpen, onClose, onExport, timelineData
               </div>
             </div>
             <div className="settings-row-right">
-              <select
-                className="settings-select"
-                value={resolution}
-                onChange={(e) => setResolution(e.target.value)}
-              >
+              <select className="settings-select" value={resolution} onChange={(e) => setResolution(e.target.value)}>
                 {RESOLUTION_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
                 ))}
               </select>
               {resolution === 'custom' && (
@@ -548,11 +557,7 @@ export default function ExportPngModal({ isOpen, onClose, onExport, timelineData
               <div className="settings-row-description">Choose the background color for the export.</div>
             </div>
             <div className="settings-row-right">
-              <select
-                className="settings-select"
-                value={bgOption}
-                onChange={(e) => setBgOption(e.target.value)}
-              >
+              <select className="settings-select" value={bgOption} onChange={(e) => setBgOption(e.target.value)}>
                 <option value="default">Default</option>
                 <option value="secondary">Secondary</option>
                 <option value="tertiary">Tertiary</option>
@@ -565,9 +570,9 @@ export default function ExportPngModal({ isOpen, onClose, onExport, timelineData
             <div className="settings-row-left">
               <div className="settings-row-label">Title Watermark</div>
               <div className="settings-row-description">
-                {resolution === "current"
-                  ? "Available for fixed export resolutions."
-                  : "Overlay the timeline title on the export."}
+                {resolution === 'current'
+                  ? 'Available for fixed export resolutions.'
+                  : 'Overlay the timeline title on the export.'}
               </div>
             </div>
             <div className="settings-row-right">
@@ -576,14 +581,14 @@ export default function ExportPngModal({ isOpen, onClose, onExport, timelineData
                   type="checkbox"
                   checked={showTitle}
                   onChange={(e) => setShowTitle(e.target.checked)}
-                  disabled={resolution === "current"}
+                  disabled={resolution === 'current'}
                 />
                 <span className="settings-toggle-slider"></span>
               </label>
             </div>
           </div>
 
-          {showTitle && resolution !== "current" && (
+          {showTitle && resolution !== 'current' && (
             <div className="settings-row">
               <div className="settings-row-left">
                 <div className="settings-row-label">Title Text</div>
@@ -597,24 +602,20 @@ export default function ExportPngModal({ isOpen, onClose, onExport, timelineData
                   onChange={(e) => setTitleText(e.target.value)}
                   placeholder="Enter export title"
                   maxLength={120}
-                  disabled={titleStyle === "logo-only"}
+                  disabled={titleStyle === 'logo-only'}
                 />
               </div>
             </div>
           )}
 
-          {showTitle && resolution !== "current" && (
+          {showTitle && resolution !== 'current' && (
             <div className="settings-row">
               <div className="settings-row-left">
                 <div className="settings-row-label">Title Style</div>
                 <div className="settings-row-description">Choose what appears in the watermark.</div>
               </div>
               <div className="settings-row-right">
-                <select
-                  className="settings-select"
-                  value={titleStyle}
-                  onChange={(e) => setTitleStyle(e.target.value)}
-                >
+                <select className="settings-select" value={titleStyle} onChange={(e) => setTitleStyle(e.target.value)}>
                   <option value="title-logo">Title and Logo</option>
                   <option value="title-only">Title Only</option>
                   <option value="logo-only">Logo Only</option>
@@ -623,7 +624,7 @@ export default function ExportPngModal({ isOpen, onClose, onExport, timelineData
             </div>
           )}
 
-          {showTitle && resolution !== "current" && (
+          {showTitle && resolution !== 'current' && (
             <div className="settings-row">
               <div className="settings-row-left">
                 <div className="settings-row-label">Title Position</div>
@@ -645,7 +646,6 @@ export default function ExportPngModal({ isOpen, onClose, onExport, timelineData
               </div>
             </div>
           )}
-
         </div>
 
         <div className="settings-footer">

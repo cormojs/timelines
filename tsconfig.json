@@ -12,12 +12,6 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": [
-    "src/**/*.ts",
-    "src/**/*.tsx",
-    "electron/**/*.ts",
-    "test/**/*.cts",
-    "*.ts"
-  ],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "electron/**/*.ts", "test/**/*.cts", "*.ts"],
   "exclude": ["dist", "dist-viewer", "release", "node_modules"]
 }

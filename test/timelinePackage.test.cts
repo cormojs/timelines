@@ -19,7 +19,15 @@ test('deterministic builds are byte-identical across runs', async () => {
   const { json, files } = fixture();
   const a = buildPackage(json, files, { deterministic: true });
   await new Promise((resolve) => setTimeout(resolve, 30));
-  const b = buildPackage(json, { 'notes/one.md': files['notes/one.md'], 'assets/zzz.bin': files['assets/zzz.bin'], 'assets/img.png': files['assets/img.png'] }, { deterministic: true });
+  const b = buildPackage(
+    json,
+    {
+      'notes/one.md': files['notes/one.md'],
+      'assets/zzz.bin': files['assets/zzz.bin'],
+      'assets/img.png': files['assets/img.png'],
+    },
+    { deterministic: true },
+  );
   assert.equal(Buffer.compare(Buffer.from(a), Buffer.from(b)), 0);
 });
 
@@ -47,5 +55,8 @@ test('ESM viewer twin packageReader.ts reads stored entries', async () => {
   const pkg = mod.readPackage(zip);
   assert.equal(pkg.timelineJson, json);
   assert.equal(pkg.notes['one.md'], '# One\n\nhello');
-  assert.equal(strFromU8(pkg.assets['zzz.bin'] instanceof Uint8Array ? pkg.assets['zzz.bin'] : new Uint8Array()), '\t\t\t');
+  assert.equal(
+    strFromU8(pkg.assets['zzz.bin'] instanceof Uint8Array ? pkg.assets['zzz.bin'] : new Uint8Array()),
+    '\t\t\t',
+  );
 });

@@ -1,6 +1,6 @@
 // Persistent IndexedDB cache for sanitized wiki HTML; every call is best-effort and fails silently.
-const DB_NAME = "timelines-wiki-cache";
-const STORE_NAME = "articles";
+const DB_NAME = 'timelines-wiki-cache';
+const STORE_NAME = 'articles';
 const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
 const MAX_ENTRY_BYTES = 2 * 1024 * 1024;
 
@@ -17,19 +17,19 @@ let dbPromise: Promise<IDBDatabase> | null = null;
 function openDb(): Promise<IDBDatabase> {
   if (dbPromise) return dbPromise;
   dbPromise = new Promise((resolve, reject) => {
-    if (typeof indexedDB === "undefined") {
-      reject(new Error("IndexedDB unavailable"));
+    if (typeof indexedDB === 'undefined') {
+      reject(new Error('IndexedDB unavailable'));
       return;
     }
     const request = indexedDB.open(DB_NAME, 1);
     request.onupgradeneeded = () => {
       if (!request.result.objectStoreNames.contains(STORE_NAME)) {
-        request.result.createObjectStore(STORE_NAME, { keyPath: "key" });
+        request.result.createObjectStore(STORE_NAME, { keyPath: 'key' });
       }
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
-    request.onblocked = () => reject(new Error("IndexedDB blocked"));
+    request.onblocked = () => reject(new Error('IndexedDB blocked'));
   });
   return dbPromise;
 }
@@ -42,13 +42,18 @@ function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
 }
 
 function isWikiCacheEntry(value: unknown): value is WikiCacheEntry {
-  return typeof value === "object" && value !== null
-    && "key" in value && typeof value.key === "string"
-    && "html" in value && typeof value.html === "string";
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'key' in value &&
+    typeof value.key === 'string' &&
+    'html' in value &&
+    typeof value.html === 'string'
+  );
 }
 
 async function prune(db: IDBDatabase) {
-  const store = db.transaction(STORE_NAME, "readwrite").objectStore(STORE_NAME);
+  const store = db.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME);
   const rawEntries = await requestToPromise(store.getAll());
   const entries = Array.isArray(rawEntries) ? rawEntries.filter(isWikiCacheEntry) : [];
   let total = entries.reduce((sum, e) => sum + (e.bytes || 0), 0);
@@ -64,7 +69,7 @@ async function prune(db: IDBDatabase) {
 export async function getWikiCacheEntry(key: string): Promise<WikiCacheEntry | null> {
   try {
     const db = await openDb();
-    const store = db.transaction(STORE_NAME, "readwrite").objectStore(STORE_NAME);
+    const store = db.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME);
     const entry = await requestToPromise(store.get(key));
     if (!isWikiCacheEntry(entry)) return null;
     store.put({ ...entry, lastUsedAt: Date.now() });
@@ -80,7 +85,7 @@ export async function setWikiCacheEntry(key: string, html: string) {
     if (bytes > MAX_ENTRY_BYTES) return;
     const db = await openDb();
     const now = Date.now();
-    const store = db.transaction(STORE_NAME, "readwrite").objectStore(STORE_NAME);
+    const store = db.transaction(STORE_NAME, 'readwrite').objectStore(STORE_NAME);
     await requestToPromise(store.put({ key, html, fetchedAt: now, lastUsedAt: now, bytes }));
     await prune(db);
   } catch {

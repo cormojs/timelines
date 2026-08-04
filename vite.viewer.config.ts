@@ -1,6 +1,6 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import { fileURLToPath } from 'node:url'
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import { fileURLToPath } from 'node:url';
 
 // Separate output so the viewer never enters the Electron installer
 // (electron-builder only packages dist/** and electron/**)
@@ -18,4 +18,4 @@ export default defineConfig({
     strictPort: true,
     open: '/viewer.html',
   },
-})
+});

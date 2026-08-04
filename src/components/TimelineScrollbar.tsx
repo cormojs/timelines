@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Play, Pause } from "lucide-react";
-import { parseTimelineInput, snapToMonthGrid, snapToDayGrid } from "../utils/dateUtils";
-import { formatYear } from "../utils/timelineUtils";
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Play, Pause } from 'lucide-react';
+import { parseTimelineInput, snapToMonthGrid, snapToDayGrid } from '../utils/dateUtils';
+import { formatYear } from '../utils/timelineUtils';
 
 /**
  * Standalone scrollbar component.
@@ -19,7 +19,7 @@ export default function TimelineScrollbar({
   isRightPanelOpen = false,
 }) {
   const [sliderValue, setSliderValue] = useState(0);
-  const [sliderYearLabel, setSliderYearLabel] = useState("");
+  const [sliderYearLabel, setSliderYearLabel] = useState('');
   const [isPlaying, setIsPlaying] = useState(false);
 
   const animationFrameRef = useRef(null);
@@ -27,7 +27,7 @@ export default function TimelineScrollbar({
   const sliderValueRef = useRef(0);
   const sliderElementRef = useRef(null);
   const yearLabelRef = useRef(null);
-  const lastSliderLabelRef = useRef("");
+  const lastSliderLabelRef = useRef('');
 
   // Compute year range from timeline data
   const { compressedMin, compressedMax, decompressYear, file } = useMemo(() => {
@@ -36,8 +36,11 @@ export default function TimelineScrollbar({
     const useCalendar = file.useCalendar === true;
 
     const hasDayPrecision = (label) => {
-      if (!label || typeof label !== "string") return false;
-      const parts = label.split("/").map((p) => p.trim()).filter(Boolean);
+      if (!label || typeof label !== 'string') return false;
+      const parts = label
+        .split('/')
+        .map((p) => p.trim())
+        .filter(Boolean);
       return parts.length === 3;
     };
 
@@ -52,26 +55,20 @@ export default function TimelineScrollbar({
     };
 
     const resolveDate = (value, label) => {
-      if (!label || typeof label !== "string") return adjustDate(value, label);
+      if (!label || typeof label !== 'string') return adjustDate(value, label);
       const parsed = parseTimelineInput(label);
       if (Number.isFinite(parsed.value)) return adjustDate(parsed.value, label);
       return adjustDate(value, label);
     };
 
-    const events = elements.filter((e) => e.type === "event");
-    const spans = elements.filter((e) => e.type === "span");
-    const eras = elements.filter((e) => e.type === "era");
+    const events = elements.filter((e) => e.type === 'event');
+    const spans = elements.filter((e) => e.type === 'span');
+    const eras = elements.filter((e) => e.type === 'era');
 
     const allYears = [
       ...events.map((e) => resolveDate(e.date, e.dateLabel)),
-      ...spans.flatMap((s) => [
-        resolveDate(s.start, s.startLabel),
-        resolveDate(s.end, s.endLabel),
-      ]),
-      ...eras.flatMap((e) => [
-        resolveDate(e.start, e.startLabel),
-        resolveDate(e.end, e.endLabel),
-      ]),
+      ...spans.flatMap((s) => [resolveDate(s.start, s.startLabel), resolveDate(s.end, s.endLabel)]),
+      ...eras.flatMap((e) => [resolveDate(e.start, e.startLabel), resolveDate(e.end, e.endLabel)]),
     ];
 
     const rawMin = allYears.length > 0 ? Math.min(...allYears) : 0;
@@ -81,8 +78,8 @@ export default function TimelineScrollbar({
 
     // Parse and normalize scale sections (with legacy breaks fallback)
     const parseScaleValue = (value) => {
-      if (typeof value === "number") return value;
-      if (typeof value === "string") {
+      if (typeof value === 'number') return value;
+      if (typeof value === 'string') {
         const parsed = parseTimelineInput(value);
         return Number.isFinite(parsed.value) ? parsed.value : null;
       }
@@ -90,11 +87,12 @@ export default function TimelineScrollbar({
     };
 
     const normalizeScaleSections = (sections, legacyBreaks, min, max) => {
-      let raw = Array.isArray(sections) && sections.length > 0
-        ? sections
-        : Array.isArray(legacyBreaks) && legacyBreaks.length > 0
-          ? legacyBreaks.map((b) => ({ ...b, scale: 0 }))
-          : [];
+      let raw =
+        Array.isArray(sections) && sections.length > 0
+          ? sections
+          : Array.isArray(legacyBreaks) && legacyBreaks.length > 0
+            ? legacyBreaks.map((b) => ({ ...b, scale: 0 }))
+            : [];
       if (raw.length === 0) return [];
 
       const cleaned = raw
@@ -126,9 +124,7 @@ export default function TimelineScrollbar({
       return merged;
     };
 
-    const normalizedScaleSections = normalizeScaleSections(
-      file.scaleSections, file.breaks, minYear, maxYear
-    );
+    const normalizedScaleSections = normalizeScaleSections(file.scaleSections, file.breaks, minYear, maxYear);
 
     const compressYear = (year) => {
       let adjustment = 0;
@@ -244,7 +240,13 @@ export default function TimelineScrollbar({
       const rawYear = capturedDecompress(clamped);
       const showCalendar = capturedFile.useCalendar === true;
       const snappedYear = showCalendar ? snapToDayGrid(rawYear) : Math.round(rawYear);
-      const nextLabel = formatYear(snappedYear, capturedFile.negID, capturedFile.posID, showCalendar, capturedFile.hideDecimals);
+      const nextLabel = formatYear(
+        snappedYear,
+        capturedFile.negID,
+        capturedFile.posID,
+        showCalendar,
+        capturedFile.hideDecimals,
+      );
 
       if (yearLabelRef.current && nextLabel !== lastSliderLabelRef.current) {
         lastSliderLabelRef.current = nextLabel;
@@ -285,7 +287,7 @@ export default function TimelineScrollbar({
       // Sync React state with current DOM values when pausing
       setSliderValue(sliderValueRef.current);
       if (yearLabelRef.current) {
-        setSliderYearLabel(yearLabelRef.current.textContent || "");
+        setSliderYearLabel(yearLabelRef.current.textContent || '');
       }
     }
     setIsPlaying(!isPlaying);
@@ -297,21 +299,14 @@ export default function TimelineScrollbar({
   const sliderOffset = leftOffset - rightOffset;
 
   return (
-    <div
-      className="timeline-slider-container"
-      style={{ left: `calc(50% + ${sliderOffset / 2}px)` }}
-    >
+    <div className="timeline-slider-container" style={{ left: `calc(50% + ${sliderOffset / 2}px)` }}>
       <button
         className="slider-play-button"
         onClick={handlePlayPause}
-        aria-label={isPlaying ? "Pause" : "Play"}
-        title={isPlaying ? "Pause" : "Play"}
+        aria-label={isPlaying ? 'Pause' : 'Play'}
+        title={isPlaying ? 'Pause' : 'Play'}
       >
-        {isPlaying ? (
-          <Pause size={16} strokeWidth={2} />
-        ) : (
-          <Play size={16} strokeWidth={2} />
-        )}
+        {isPlaying ? <Pause size={16} strokeWidth={2} /> : <Play size={16} strokeWidth={2} />}
       </button>
       <div className="slider-track">
         <input

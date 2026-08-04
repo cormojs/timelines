@@ -7,15 +7,16 @@ import * as git from 'isomorphic-git';
 import httpNode from 'isomorphic-git/http/node';
 import { readPackage } from './timelinePackage';
 
-const safeName = (value) => String(value || '')
-  .trim()
-  .replace(/[^\w.-]+/g, '-')
-  .replace(/-+/g, '-')
-  .replace(/^-+|-+$/g, '')
-  .toLowerCase();
+const safeName = (value) =>
+  String(value || '')
+    .trim()
+    .replace(/[^\w.-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase();
 
-const bufEq = (a, b) => Boolean(a) && Boolean(b) && a.length === b.length
-  && Buffer.compare(Buffer.from(a), Buffer.from(b)) === 0;
+const bufEq = (a, b) =>
+  Boolean(a) && Boolean(b) && a.length === b.length && Buffer.compare(Buffer.from(a), Buffer.from(b)) === 0;
 
 // Conflict copies are named {stem}-conflict-{yyyymmdd}-{machine}.timeline
 const isConflictCopyPath = (rel) => /-conflict-\d{8}-[\w.-]*\.timeline$/i.test(String(rel || ''));
@@ -71,7 +72,10 @@ function parseGitHubRemote(input) {
     }
     pathText = url.pathname.replace(/^\/+/, '');
   }
-  const parts = pathText.replace(/\.git$/i, '').split('/').filter(Boolean);
+  const parts = pathText
+    .replace(/\.git$/i, '')
+    .split('/')
+    .filter(Boolean);
   if (parts.length < 2) return null;
   const [owner, repo] = parts;
   return {
@@ -104,15 +108,13 @@ function summarizePackageDiff(oldBuf, newBuf) {
     return null;
   }
   type SummaryElement = { id: string | number; title?: string };
-  const isSummaryElement = (value: unknown): value is SummaryElement => (
-    typeof value === 'object' && value !== null
-    && 'id' in value && (typeof value.id === 'string' || typeof value.id === 'number')
-  );
-  const byId = (data: { elements?: unknown }): Map<string | number, SummaryElement> => new Map(
-    (Array.isArray(data.elements) ? data.elements : [])
-      .filter(isSummaryElement)
-      .map((el) => [el.id, el])
-  );
+  const isSummaryElement = (value: unknown): value is SummaryElement =>
+    typeof value === 'object' &&
+    value !== null &&
+    'id' in value &&
+    (typeof value.id === 'string' || typeof value.id === 'number');
+  const byId = (data: { elements?: unknown }): Map<string | number, SummaryElement> =>
+    new Map((Array.isArray(data.elements) ? data.elements : []).filter(isSummaryElement).map((el) => [el.id, el]));
   const oldEls = byId(oldData);
   const newEls = byId(newData);
   let added = 0;
@@ -151,15 +153,20 @@ function summarizePackageDiff(oldBuf, newBuf) {
 
 const isNetworkError = (err) => {
   const code = err?.code || err?.cause?.code;
-  if (['ENOTFOUND', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN', 'EPIPE', 'UND_ERR_CONNECT_TIMEOUT'].includes(code)) return true;
+  if (
+    ['ENOTFOUND', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN', 'EPIPE', 'UND_ERR_CONNECT_TIMEOUT'].includes(
+      code,
+    )
+  )
+    return true;
   return /network|fetch failed|socket hang up/i.test(err?.message || '');
 };
 
-const isAuthError = (err) => err?.code === 'HttpError'
-  && (err?.data?.statusCode === 401 || err?.data?.statusCode === 403);
+const isAuthError = (err) =>
+  err?.code === 'HttpError' && (err?.data?.statusCode === 401 || err?.data?.statusCode === 403);
 
-const isEmptyRemoteError = (err) => err?.code === 'NotFoundError'
-  || /could not find|no refs|empty/i.test(err?.message || '');
+const isEmptyRemoteError = (err) =>
+  err?.code === 'NotFoundError' || /could not find|no refs|empty/i.test(err?.message || '');
 
 function getChangeTarget(change: unknown): string | undefined {
   if (typeof change !== 'object' || change === null || !('to' in change)) return undefined;
@@ -178,14 +185,15 @@ class GitSyncEngine {
     this.removeLocalTimeline = opts.removeLocalTimeline;
     this.http = opts.http || httpNode;
     this.fetch = opts.fetch || ((...args: Parameters<typeof fetch>) => globalThis.fetch(...args));
-    this.onAuth = opts.onAuth || (() => (
-      this.credentials?.token
-        ? {
-          username: this.credentials.username || 'x-access-token',
-          password: this.credentials.token,
-        }
-        : {}
-    ));
+    this.onAuth =
+      opts.onAuth ||
+      (() =>
+        this.credentials?.token
+          ? {
+              username: this.credentials.username || 'x-access-token',
+              password: this.credentials.token,
+            }
+          : {});
     this.author = opts.author || { name: 'Timelines', email: 'timelines@localhost' };
     this.machineLabel = safeName(opts.machineLabel || os.hostname()) || 'machine';
     this.onStatus = opts.onStatus || null;
@@ -225,9 +233,7 @@ class GitSyncEngine {
     }
     this._applyIdentity(this.credentials);
     if (this.state?.machineLabel) this.machineLabel = this.state.machineLabel;
-    this.statusState = this.state
-      ? (this.credentials?.token ? 'idle' : 'auth-expired')
-      : 'disconnected';
+    this.statusState = this.state ? (this.credentials?.token ? 'idle' : 'auth-expired') : 'disconnected';
     return this;
   }
 
@@ -247,11 +253,11 @@ class GitSyncEngine {
       error: this.lastError ? String(this.lastError.message || this.lastError) : null,
       repo: this.state
         ? {
-          url: this.state.url,
-          branch: this.state.branch,
-          owner: github?.owner || null,
-          repo: github?.repo || null,
-        }
+            url: this.state.url,
+            branch: this.state.branch,
+            owner: github?.owner || null,
+            repo: github?.repo || null,
+          }
         : null,
       machineLabel: this.machineLabel,
       excludedPaths: [...(this.state?.excludedPaths || [])],
@@ -268,7 +274,9 @@ class GitSyncEngine {
     this.statusState = statusState;
     this.lastError = err;
     if (this.onStatus) {
-      try { this.onStatus(this.getStatus()); } catch {}
+      try {
+        this.onStatus(this.getStatus());
+      } catch {}
     }
   }
 
@@ -321,9 +329,9 @@ class GitSyncEngine {
 
   _isExcluded(relId) {
     const rel = stripExt(String(relId || ''));
-    return (this.state?.excludedPaths || []).some((entry) => (
-      entry.endsWith('/') ? rel.startsWith(entry) : rel === entry
-    ));
+    return (this.state?.excludedPaths || []).some((entry) =>
+      entry.endsWith('/') ? rel.startsWith(entry) : rel === entry,
+    );
   }
 
   syncNow(opts = {}) {
@@ -411,7 +419,9 @@ class GitSyncEngine {
         const abs = path.join(dir, entry.name);
         if (entry.isDirectory()) total += await walk(abs);
         else {
-          try { total += (await fsp.stat(abs)).size; } catch {}
+          try {
+            total += (await fsp.stat(abs)).size;
+          } catch {}
         }
       }
       return total;
@@ -478,7 +488,9 @@ class GitSyncEngine {
       pending,
       viewerUrl: github ? viewerDeepLink(github.owner, github.repo, branch, rel) : null,
       exactViewerUrl: github && remoteOid ? viewerDeepLink(github.owner, github.repo, remoteOid, rel) : null,
-      githubBlobUrl: github ? `${github.htmlUrl}/blob/${encodeURIComponent(branch)}/${rel.split('/').map(encodeURIComponent).join('/')}` : null,
+      githubBlobUrl: github
+        ? `${github.htmlUrl}/blob/${encodeURIComponent(branch)}/${rel.split('/').map(encodeURIComponent).join('/')}`
+        : null,
     };
   }
 
@@ -788,9 +800,10 @@ class GitSyncEngine {
     const timelineChanges = summaries.filter((s) => s.path.endsWith('.timeline'));
     if (timelineChanges.length === 0 && summaries.length === 0) return null;
     const n = timelineChanges.length;
-    const subject = n > 0
-      ? `Update ${n} timeline${n === 1 ? '' : 's'} (${this.machineLabel})`
-      : `Update sync metadata (${this.machineLabel})`;
+    const subject =
+      n > 0
+        ? `Update ${n} timeline${n === 1 ? '' : 's'} (${this.machineLabel})`
+        : `Update sync metadata (${this.machineLabel})`;
     const body = summaries
       .map((s) => `${stripExt(s.path)}: ${s.summary || 'updated'}`)
       .sort()
@@ -942,10 +955,9 @@ class GitSyncEngine {
     const changes = await this._diffCommits(this.state.lastSyncedCommit, head);
     const changedIds = [];
     const errors = [];
-    const incoming = changes.filter((c) => c.to
-      && c.path.endsWith('.timeline')
-      && !this._isExcluded(c.path)
-      && !exportedPaths.has(c.path));
+    const incoming = changes.filter(
+      (c) => c.to && c.path.endsWith('.timeline') && !this._isExcluded(c.path) && !exportedPaths.has(c.path),
+    );
     // Originals before conflict copies so copy imports see their uid taken
     incoming.sort((a, b) => Number(isConflictCopyPath(a.path)) - Number(isConflictCopyPath(b.path)));
 
@@ -1004,15 +1016,15 @@ class GitSyncEngine {
     this.state.lastSyncedCommit = head;
     this.importErrors = errors;
     if (changedIds.length > 0 && this.onApplied) {
-      try { this.onApplied(changedIds); } catch {}
+      try {
+        this.onApplied(changedIds);
+      } catch {}
     }
   }
 
   // All file-level changes between two commits (null from = everything in to)
   async _diffCommits(fromOid, toOid) {
-    const trees = fromOid
-      ? [git.TREE({ ref: fromOid }), git.TREE({ ref: toOid })]
-      : [git.TREE({ ref: toOid })];
+    const trees = fromOid ? [git.TREE({ ref: fromOid }), git.TREE({ ref: toOid })] : [git.TREE({ ref: toOid })];
     const entries = await git.walk({
       ...this._g,
       trees,
@@ -1080,7 +1092,7 @@ class GitSyncEngine {
     for (const entry of entries) {
       if (entry.name === '.git') continue;
       const rel = subdir ? `${subdir}/${entry.name}` : entry.name;
-      if (entry.isDirectory()) results.push(...await this._listRepoFiles(rel, timelineOnly));
+      if (entry.isDirectory()) results.push(...(await this._listRepoFiles(rel, timelineOnly)));
       else if (entry.isFile() && (!timelineOnly || entry.name.endsWith('.timeline'))) results.push(rel);
     }
     return results;
@@ -1114,9 +1126,10 @@ class GitSyncEngine {
     const excluded = this.state?.excludedPaths || [];
     const ignorePath = path.join(this.repoDir, '.gitignore');
     const ignoreLine = (p) => (p.endsWith('/') ? `/${p}` : `/${p}.timeline`);
-    const content = excluded.length > 0
-      ? `# Excluded from sync for this repo (managed by Timelines)\n${excluded.map((p) => `${ignoreLine(p)}\n`).join('')}`
-      : '';
+    const content =
+      excluded.length > 0
+        ? `# Excluded from sync for this repo (managed by Timelines)\n${excluded.map((p) => `${ignoreLine(p)}\n`).join('')}`
+        : '';
     const current = fs.existsSync(ignorePath) ? await fsp.readFile(ignorePath, 'utf8') : null;
     if (content && content !== current) await fsp.writeFile(ignorePath, content, 'utf8');
     else if (!content && current !== null) await fsp.rm(ignorePath, { force: true });
@@ -1154,9 +1167,8 @@ class GitSyncEngine {
         if (log?.[0]) date = new Date(log[0].commit.committer.timestamp * 1000).toISOString().slice(0, 10);
       } catch {}
       const encoded = pkg.rel.split('/').map(encodeURIComponent).join('/');
-      const link = owner && repo
-        ? `[Open](https://www.timelines.studio/viewer/gh/${owner}/${repo}/${branch}/${encoded})`
-        : '';
+      const link =
+        owner && repo ? `[Open](https://www.timelines.studio/viewer/gh/${owner}/${repo}/${branch}/${encoded})` : '';
       rows.push(`| ${pkg.title.replace(/\\/g, '\\\\').replace(/\|/g, '\\|')} | ${link} | ${date} |`);
     }
     const lines = [
@@ -1182,10 +1194,4 @@ function createEngine(opts) {
   return new GitSyncEngine(opts);
 }
 
-export {
-  createEngine,
-  GitSyncEngine,
-  summarizePackageDiff,
-  isConflictCopyPath,
-  isGeneratedReadme,
-};
+export { createEngine, GitSyncEngine, summarizePackageDiff, isConflictCopyPath, isGeneratedReadme };

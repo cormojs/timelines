@@ -1,9 +1,9 @@
-import type { ElectronApi } from '../../electron/preload.ts'
+import type { ElectronApi } from '../../electron/preload.ts';
 
-export {}
+export {};
 
 declare global {
   interface Window {
-    electron: ElectronApi
+    electron: ElectronApi;
   }
 }

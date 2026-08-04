@@ -1,9 +1,9 @@
-import js from '@eslint/js'
-import globals from 'globals'
-import reactHooks from 'eslint-plugin-react-hooks'
-import reactRefresh from 'eslint-plugin-react-refresh'
-import { defineConfig, globalIgnores } from 'eslint/config'
-import tseslint from 'typescript-eslint'
+import js from '@eslint/js';
+import globals from 'globals';
+import reactHooks from 'eslint-plugin-react-hooks';
+import reactRefresh from 'eslint-plugin-react-refresh';
+import { defineConfig, globalIgnores } from 'eslint/config';
+import tseslint from 'typescript-eslint';
 
 export default defineConfig([
   globalIgnores(['dist', 'dist-viewer', 'out', 'release']),
@@ -28,10 +28,13 @@ export default defineConfig([
     },
     rules: {
       'no-unused-vars': 'off',
-      '@typescript-eslint/no-unused-vars': ['error', {
-        varsIgnorePattern: '^[A-Z_]',
-        argsIgnorePattern: '^_',
-      }],
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          varsIgnorePattern: '^[A-Z_]',
+          argsIgnorePattern: '^_',
+        },
+      ],
       '@typescript-eslint/ban-ts-comment': 'off',
       '@typescript-eslint/no-require-imports': 'off',
       '@typescript-eslint/no-unsafe-type-assertion': 'error',
@@ -43,22 +46,25 @@ export default defineConfig([
   {
     files: ['src/viewer/**/*.{ts,tsx}'],
     rules: {
-      'no-restricted-imports': ['error', {
-        patterns: [
-          {
-            group: ['**/HomePage', '**/HomePage.tsx'],
-            message: 'HomePage is desktop-shell UI; the web viewer must not import it.',
-          },
-          {
-            group: ['**/electronApi', '**/electronApi.ts'],
-            message: 'electronApi is the Electron bridge; the web viewer must not import it.',
-          },
-          {
-            group: ['**/electron/*', '*electron*'],
-            message: 'Electron main/preload modules must not be imported by the web viewer.',
-          },
-        ],
-      }],
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/HomePage', '**/HomePage.tsx'],
+              message: 'HomePage is desktop-shell UI; the web viewer must not import it.',
+            },
+            {
+              group: ['**/electronApi', '**/electronApi.ts'],
+              message: 'electronApi is the Electron bridge; the web viewer must not import it.',
+            },
+            {
+              group: ['**/electron/*', '*electron*'],
+              message: 'Electron main/preload modules must not be imported by the web viewer.',
+            },
+          ],
+        },
+      ],
     },
   },
   {
@@ -67,4 +73,4 @@ export default defineConfig([
       '@typescript-eslint/no-unused-vars': 'off',
     },
   },
-])
+]);

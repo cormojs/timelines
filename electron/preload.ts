@@ -1,12 +1,14 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 
 const electronApi = {
-  saveTimeline: (data, filename, options) => ipcRenderer.invoke('save-timeline', { data, filename, create: options?.create === true }),
+  saveTimeline: (data, filename, options) =>
+    ipcRenderer.invoke('save-timeline', { data, filename, create: options?.create === true }),
   saveTimelineThumbnail: (payload) => ipcRenderer.invoke('save-timeline-thumbnail', payload),
   listTimelines: () => ipcRenderer.invoke('list-timelines'),
   loadTimeline: (filename) => ipcRenderer.invoke('load-timeline', filename),
   exportTimeline: (data, suggestedName) => ipcRenderer.invoke('export-timeline', { data, suggestedName }),
-  exportTimelinePackage: (data, suggestedName) => ipcRenderer.invoke('export-timeline-package', { data, suggestedName }),
+  exportTimelinePackage: (data, suggestedName) =>
+    ipcRenderer.invoke('export-timeline-package', { data, suggestedName }),
   importTimeline: (payload) => ipcRenderer.invoke('import-timeline', payload),
   deleteTimeline: (payload) => ipcRenderer.invoke('delete-timeline', payload),
   createNote: (payload) => ipcRenderer.invoke('create-note', payload),
@@ -65,12 +67,16 @@ const electronApi = {
   onGitSyncState: (callback) => {
     const listener = (_event, data) => callback(data);
     ipcRenderer.on('git-sync-state-changed', listener);
-    return () => { ipcRenderer.removeListener('git-sync-state-changed', listener); };
+    return () => {
+      ipcRenderer.removeListener('git-sync-state-changed', listener);
+    };
   },
   onGitSyncApplied: (callback) => {
     const listener = (_event, data) => callback(data);
     ipcRenderer.on('git-sync-applied', listener);
-    return () => { ipcRenderer.removeListener('git-sync-applied', listener); };
+    return () => {
+      ipcRenderer.removeListener('git-sync-applied', listener);
+    };
   },
   // Window controls
   minimizeWindow: () => ipcRenderer.send('minimize-window'),

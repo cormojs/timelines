@@ -178,7 +178,6 @@ export async function deleteNote({ timelineId, filename }) {
   }
 }
 
-
 export async function renameTimeline({ oldId, newId }) {
   if (!isElectron()) {
     console.warn('Not running in Electron');
@@ -195,12 +194,20 @@ export async function renameTimeline({ oldId, newId }) {
 
 export async function chooseAssetsDir() {
   if (!isElectron()) return { success: false };
-  try { return await window.electron.chooseAssetsDir(); } catch (e) { return { success: false, error: e.message }; }
+  try {
+    return await window.electron.chooseAssetsDir();
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
 }
 
 export async function openAssetsFolder() {
   if (!isElectron()) return { success: false };
-  try { return await window.electron.openAssetsFolder(); } catch (e) { return { success: false, error: e.message }; }
+  try {
+    return await window.electron.openAssetsFolder();
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
 }
 
 export async function getAssetsBaseDir() {
@@ -305,7 +312,6 @@ export async function chooseNotesDir() {
     return { success: false, error: error.message };
   }
 }
-
 
 export async function openTimelinesFolder() {
   if (!isElectron()) return { success: false, error: 'Not in Electron environment' };

@@ -1,9 +1,13 @@
 const NOOP = () => {};
 const POLL_INTERVAL_MS = 100;
 
-const normalizeFamily = (value) => String(value || "").trim().replace(/^["']|["']$/g, "").toLowerCase();
+const normalizeFamily = (value) =>
+  String(value || '')
+    .trim()
+    .replace(/^["']|["']$/g, '')
+    .toLowerCase();
 
-const firstFamily = (stack) => normalizeFamily(String(stack || "").split(",")[0]);
+const firstFamily = (stack) => normalizeFamily(String(stack || '').split(',')[0]);
 
 // fonts.check() reports unknown families as available. Unicode-range siblings may stay unloaded.
 export function isFontReady(fonts, fontStack) {
@@ -11,7 +15,7 @@ export function isFontReady(fonts, fontStack) {
   if (!fonts || !family) return true;
   try {
     for (const face of fonts) {
-      if (normalizeFamily(face.family) === family && face.status === "loaded") return true;
+      if (normalizeFamily(face.family) === family && face.status === 'loaded') return true;
     }
   } catch {
     return true;

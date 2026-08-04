@@ -1,19 +1,29 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { renderNoteMarkdown } from "../utils/noteUtils";
-import { createNote, addExistingNote, readNote, writeNote, deleteNote, getNotesBaseDir, getAssetsBaseDir, pickAndImportImage, importImageFromPath } from "../utils/electronApi";
-import { isSafeNoteRef } from "../utils/validation";
-import { getStorageId } from "../utils/idUtils";
-import { resolvePackageAssetSrc } from "../utils/viewerPackageStore";
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { renderNoteMarkdown } from '../utils/noteUtils';
+import {
+  createNote,
+  addExistingNote,
+  readNote,
+  writeNote,
+  deleteNote,
+  getNotesBaseDir,
+  getAssetsBaseDir,
+  pickAndImportImage,
+  importImageFromPath,
+} from '../utils/electronApi';
+import { isSafeNoteRef } from '../utils/validation';
+import { getStorageId } from '../utils/idUtils';
+import { resolvePackageAssetSrc } from '../utils/viewerPackageStore';
 
 export function useNoteManagement({ selectedElement, timelineData, formData, setFormData, onUpdate }) {
   const timelineId = getStorageId(timelineData?.file);
-  const [noteInitialContent, setNoteInitialContent] = useState("");
+  const [noteInitialContent, setNoteInitialContent] = useState('');
   const [isNoteLoading, setIsNoteLoading] = useState(false);
   const [noteExists, setNoteExists] = useState(false);
   const [isNoteAddOpen, setIsNoteAddOpen] = useState(false);
-  const [notesBaseUrl, setNotesBaseUrl] = useState("");
-  const [notesBasePath, setNotesBasePath] = useState("");
-  const [assetsBasePath, setAssetsBasePath] = useState("");
+  const [notesBaseUrl, setNotesBaseUrl] = useState('');
+  const [notesBasePath, setNotesBasePath] = useState('');
+  const [assetsBasePath, setAssetsBasePath] = useState('');
   const noteEditorRef = useRef(null);
   const noteRenderRef = useRef(null);
 
@@ -24,20 +34,22 @@ export function useNoteManagement({ selectedElement, timelineData, formData, set
     Promise.all([getNotesBaseDir(), getAssetsBaseDir()]).then(([notesResult, assetsResult]) => {
       if (!isMounted) return;
       if (notesResult?.success && notesResult.fileUrl) {
-        const normalized = notesResult.fileUrl.endsWith("/") ? notesResult.fileUrl : `${notesResult.fileUrl}/`;
+        const normalized = notesResult.fileUrl.endsWith('/') ? notesResult.fileUrl : `${notesResult.fileUrl}/`;
         setNotesBaseUrl(normalized);
       }
       if (notesResult?.success && notesResult.path) setNotesBasePath(notesResult.path);
       if (assetsResult?.success && assetsResult.path) setAssetsBasePath(assetsResult.path);
     });
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useEffect(() => {
     let isMounted = true;
     const loadNote = async () => {
       if (!selectedElement?.noteFile) {
-        setNoteInitialContent("");
+        setNoteInitialContent('');
         setNoteExists(false);
         setIsNoteAddOpen(false);
         return;
@@ -49,43 +61,53 @@ export function useNoteManagement({ selectedElement, timelineData, formData, set
       if (!isMounted) return;
       setIsNoteLoading(false);
       if (result?.success) {
-        setNoteInitialContent(result.content ?? "");
+        setNoteInitialContent(result.content ?? '');
         setNoteExists(true);
       } else {
-        if (result?.error === "NOT_FOUND") {
+        if (result?.error === 'NOT_FOUND') {
           const next = { ...selectedElement };
           delete next.noteFile;
           setFormData(next);
           onUpdate?.(next);
         }
-        setNoteInitialContent("");
+        setNoteInitialContent('');
         setNoteExists(false);
       }
     };
     loadNote();
-    return () => { isMounted = false; };
+    return () => {
+      isMounted = false;
+    };
   }, [selectedElement?.id, selectedElement?.noteFile, timelineData?.file?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Hide broken images and videos in rendered note
   useEffect(() => {
     if (!noteRenderRef.current) return;
-    const imgs = noteRenderRef.current.querySelectorAll("img");
+    const imgs = noteRenderRef.current.querySelectorAll('img');
     imgs.forEach((img) => {
       if (img.complete && img.naturalWidth === 0) {
-        img.style.display = "none";
+        img.style.display = 'none';
       } else {
-        img.addEventListener("error", function () {
-          this.style.display = "none";
-          this.style.minHeight = "0";
-        }, { once: true });
+        img.addEventListener(
+          'error',
+          function () {
+            this.style.display = 'none';
+            this.style.minHeight = '0';
+          },
+          { once: true },
+        );
       }
     });
-    const videos = noteRenderRef.current.querySelectorAll("video");
+    const videos = noteRenderRef.current.querySelectorAll('video');
     videos.forEach((video) => {
-      video.addEventListener("error", function () {
-        this.style.display = "none";
-        this.style.minHeight = "0";
-      }, { once: true });
+      video.addEventListener(
+        'error',
+        function () {
+          this.style.display = 'none';
+          this.style.minHeight = '0';
+        },
+        { once: true },
+      );
     });
   }, [noteInitialContent]);
 
@@ -94,51 +116,66 @@ export function useNoteManagement({ selectedElement, timelineData, formData, set
     return noteInitialContent.trim().split(/\s+/).filter(Boolean).length;
   }, [noteInitialContent]);
 
-  const noteFileBaseUrl = notesBaseUrl && timelineId
-    ? `${notesBaseUrl}${timelineId}/`
-    : notesBaseUrl;
+  const noteFileBaseUrl = notesBaseUrl && timelineId ? `${notesBaseUrl}${timelineId}/` : notesBaseUrl;
 
-  const assetsTimelineDir = assetsBasePath && timelineId
-    ? `${assetsBasePath.replace(/[/\\]$/, "")}/${timelineId}/`
-    : "";
+  const assetsTimelineDir =
+    assetsBasePath && timelineId ? `${assetsBasePath.replace(/[/\\]$/, '')}/${timelineId}/` : '';
 
   const renderedNoteHtml = useMemo(
     // resolvePackageAssetSrc serves images bundled in a packaged .timeline (web viewer); it is a no-op on desktop
-    () => renderNoteMarkdown(noteInitialContent, isNoteLoading, noteFileBaseUrl, notesBasePath, assetsBasePath, assetsTimelineDir, resolvePackageAssetSrc),
-    [noteInitialContent, isNoteLoading, noteFileBaseUrl, notesBasePath, assetsBasePath, assetsTimelineDir]
+    () =>
+      renderNoteMarkdown(
+        noteInitialContent,
+        isNoteLoading,
+        noteFileBaseUrl,
+        notesBasePath,
+        assetsBasePath,
+        assetsTimelineDir,
+        resolvePackageAssetSrc,
+      ),
+    [noteInitialContent, isNoteLoading, noteFileBaseUrl, notesBasePath, assetsBasePath, assetsTimelineDir],
   );
 
-  const noteViewCallbackRef = useCallback((node) => {
-    noteRenderRef.current = node;
-    if (node) node.innerHTML = renderedNoteHtml;
-  }, [renderedNoteHtml]);
+  const noteViewCallbackRef = useCallback(
+    (node) => {
+      noteRenderRef.current = node;
+      if (node) node.innerHTML = renderedNoteHtml;
+    },
+    [renderedNoteHtml],
+  );
 
-  const handleNoteSave = useCallback(async (content) => {
-    if (!formData?.noteFile || !isSafeNoteRef(formData.noteFile)) return;
-    const timelineId = getStorageId(timelineData?.file);
-    if (!timelineId) return;
-    await writeNote({ timelineId, filename: formData.noteFile, content });
-    setNoteInitialContent(content);
-  }, [formData?.noteFile, timelineData?.file?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const handleNoteSave = useCallback(
+    async (content) => {
+      if (!formData?.noteFile || !isSafeNoteRef(formData.noteFile)) return;
+      const timelineId = getStorageId(timelineData?.file);
+      if (!timelineId) return;
+      await writeNote({ timelineId, filename: formData.noteFile, content });
+      setNoteInitialContent(content);
+    },
+    [formData?.noteFile, timelineData?.file?.id],
+  ); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleTaskToggle = useCallback((idx) => {
-    let count = 0;
-    const newContent = noteInitialContent.replace(
-      /^(\s*[-*+] \[)([ x])(\])/gm,
-      (match, pre, state, post) => {
-        if (count++ === idx) return `${pre}${state === " " ? "x" : " "}${post}`;
+  const handleTaskToggle = useCallback(
+    (idx) => {
+      let count = 0;
+      const newContent = noteInitialContent.replace(/^(\s*[-*+] \[)([ x])(\])/gm, (match, pre, state, post) => {
+        if (count++ === idx) return `${pre}${state === ' ' ? 'x' : ' '}${post}`;
         return match;
-      }
-    );
-    setNoteInitialContent(newContent);
-    handleNoteSave(newContent);
-  }, [noteInitialContent, handleNoteSave]);
+      });
+      setNoteInitialContent(newContent);
+      handleNoteSave(newContent);
+    },
+    [noteInitialContent, handleNoteSave],
+  );
 
   const handleAddNote = useCallback(async () => {
     const timelineId = getStorageId(timelineData?.file);
     if (!timelineId) return;
     const result = await createNote({ timelineId, title: formData.title, elementId: formData.id });
-    if (!result?.success) { console.error("Failed to create note:", result?.error); return; }
+    if (!result?.success) {
+      console.error('Failed to create note:', result?.error);
+      return;
+    }
     const next = { ...formData, noteFile: result.filename || `${formData.id}.md` };
     setFormData(next);
     onUpdate?.(next);
@@ -150,32 +187,37 @@ export function useNoteManagement({ selectedElement, timelineData, formData, set
     if (!timelineId) return;
     const result = await addExistingNote({ timelineId });
     if (!result?.success) {
-      if (result?.error === "OUTSIDE_NOTES_DIR") {
-        window.alert("That note is outside your Notes Folder. Choose a note inside the Notes Folder or change the Notes Folder in App Settings.");
+      if (result?.error === 'OUTSIDE_NOTES_DIR') {
+        window.alert(
+          'That note is outside your Notes Folder. Choose a note inside the Notes Folder or change the Notes Folder in App Settings.',
+        );
       } else if (!result?.cancelled) {
-        console.error("Failed to add existing note:", result?.error);
+        console.error('Failed to add existing note:', result?.error);
       }
       return;
     }
     const next = { ...formData, noteFile: result.filename };
     setFormData(next);
     onUpdate?.(next);
-    setNoteInitialContent(result?.content ?? "");
+    setNoteInitialContent(result?.content ?? '');
     setNoteExists(true);
   }, [formData, timelineData?.file?.id, onUpdate, setFormData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDeleteNote = useCallback(async () => {
     if (!formData?.noteFile || !isSafeNoteRef(formData.noteFile)) return;
-    const confirmed = window.confirm("Delete this note? This cannot be undone.");
+    const confirmed = window.confirm('Delete this note? This cannot be undone.');
     if (!confirmed) return;
     const timelineId = getStorageId(timelineData?.file);
     if (!timelineId) return;
     const result = await deleteNote({ timelineId, filename: formData.noteFile });
-    if (!result?.success) { console.error("Failed to delete note:", result?.error); return; }
+    if (!result?.success) {
+      console.error('Failed to delete note:', result?.error);
+      return;
+    }
     const next = { ...formData };
     delete next.noteFile;
     setFormData(next);
-    setNoteInitialContent("");
+    setNoteInitialContent('');
     onUpdate?.(next);
   }, [formData, timelineData?.file?.id, onUpdate, setFormData]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -184,7 +226,7 @@ export function useNoteManagement({ selectedElement, timelineData, formData, set
     const next = { ...formData };
     delete next.noteFile;
     setFormData(next);
-    setNoteInitialContent("");
+    setNoteInitialContent('');
     setNoteExists(false);
     onUpdate?.(next);
   }, [formData, onUpdate, setFormData]);
@@ -205,12 +247,15 @@ export function useNoteManagement({ selectedElement, timelineData, formData, set
     return result.assetUrl;
   }, [timelineId]);
 
-  const handleDropThumbnail = useCallback(async (filePath) => {
-    if (!timelineId || !filePath) return null;
-    const result = await importImageFromPath({ timelineId, filePath });
-    if (!result?.success) return null;
-    return result.assetUrl;
-  }, [timelineId]);
+  const handleDropThumbnail = useCallback(
+    async (filePath) => {
+      if (!timelineId || !filePath) return null;
+      const result = await importImageFromPath({ timelineId, filePath });
+      if (!result?.success) return null;
+      return result.assetUrl;
+    },
+    [timelineId],
+  );
 
   return {
     noteInitialContent,

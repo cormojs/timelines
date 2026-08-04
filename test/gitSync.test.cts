@@ -32,8 +32,8 @@ function makeLibrary() {
       return [...timelines.values()].find((t) => t.relativeId === relId);
     },
     ops: {
-      listTimelines: async () => [...timelines.values()]
-        .map(({ uid, relativeId, neverSync }) => ({ uid, relativeId, neverSync })),
+      listTimelines: async () =>
+        [...timelines.values()].map(({ uid, relativeId, neverSync }) => ({ uid, relativeId, neverSync })),
       buildPackageForTimeline: async ({ uid }) => {
         const t = timelines.get(uid);
         const data = { file: { uid: t.uid, title: t.title }, elements: t.elements };
@@ -42,11 +42,14 @@ function makeLibrary() {
         for (const [k, v] of Object.entries(t.notes)) files[`notes/${k}`] = strToU8(v);
         return buildPackage(JSON.stringify(data, null, 2), files, { deterministic: true });
       },
-      importPackage: async (buf: Uint8Array, opts: {
-        preferredRelId?: string;
-        resolution?: string;
-        titleSuffix?: string;
-      } = {}) => {
+      importPackage: async (
+        buf: Uint8Array,
+        opts: {
+          preferredRelId?: string;
+          resolution?: string;
+          titleSuffix?: string;
+        } = {},
+      ) => {
         const pkg = readPackage(buf);
         const data = JSON.parse(pkg.timelineJson);
         let uid = data.file.uid;
@@ -92,8 +95,8 @@ async function makeCtx(t) {
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   t.after(() => new Promise((resolve) => server.close(resolve)));
   const url = `http://127.0.0.1:${server.address().port}/remote.git`;
-  const remoteFiles = () => runGit(['--git-dir', remoteDir, 'ls-tree', '-r', '--name-only', 'main'], root)
-    .trim().split('\n').filter(Boolean);
+  const remoteFiles = () =>
+    runGit(['--git-dir', remoteDir, 'ls-tree', '-r', '--name-only', 'main'], root).trim().split('\n').filter(Boolean);
   const lastMessage = () => runGit(['--git-dir', remoteDir, 'log', '-1', '--format=%B', 'main'], root);
   const mergeCount = () => runGit(['--git-dir', remoteDir, 'rev-list', '--merges', '--count', 'main'], root).trim();
   return { root, remoteDir, url, server, remoteFiles, lastMessage, mergeCount };
@@ -112,13 +115,26 @@ function makeEngine(ctx, name, lib, extra = {}) {
 }
 
 test('summarizePackageDiff reports element, note, and asset changes', () => {
-  const mk = (elements, notes) => buildPackage(
-    JSON.stringify({ file: { uid: 'x', title: 'World' }, elements }, null, 2),
-    Object.fromEntries(Object.entries(notes).map(([k, v]) => [`notes/${k}`, strToU8(v)])),
-    { deterministic: true }
+  const mk = (elements, notes) =>
+    buildPackage(
+      JSON.stringify({ file: { uid: 'x', title: 'World' }, elements }, null, 2),
+      Object.fromEntries(Object.entries(notes).map(([k, v]) => [`notes/${k}`, strToU8(v)])),
+      { deterministic: true },
+    );
+  const oldBuf = mk(
+    [
+      { id: 1, title: 'Battle' },
+      { id: 2, title: 'Gone' },
+    ],
+    { 'a.md': 'old' },
   );
-  const oldBuf = mk([{ id: 1, title: 'Battle' }, { id: 2, title: 'Gone' }], { 'a.md': 'old' });
-  const newBuf = mk([{ id: 1, title: 'Battle of X' }, { id: 3, title: 'New' }], { 'a.md': 'new' });
+  const newBuf = mk(
+    [
+      { id: 1, title: 'Battle of X' },
+      { id: 3, title: 'New' },
+    ],
+    { 'a.md': 'new' },
+  );
   const summary = summarizePackageDiff(oldBuf, newBuf);
   assert.match(summary, /\+1 element/);
   assert.match(summary, /-1 element/);
@@ -130,7 +146,13 @@ test('summarizePackageDiff reports element, note, and asset changes', () => {
 test('connect exports the library to an empty remote', async (t) => {
   const ctx = await makeCtx(t);
   const libA = makeLibrary();
-  libA.add({ uid: 'alpha', relativeId: 'alpha', title: 'Alpha', elements: [{ id: 1, title: 'One' }], notes: { 'alpha.md': '# Alpha' } });
+  libA.add({
+    uid: 'alpha',
+    relativeId: 'alpha',
+    title: 'Alpha',
+    elements: [{ id: 1, title: 'One' }],
+    notes: { 'alpha.md': '# Alpha' },
+  });
   libA.add({ uid: 'beta', relativeId: 'folder/beta', title: 'Beta' });
   const A = makeEngine(ctx, 'machine-a', libA);
   await A.init();
@@ -153,7 +175,13 @@ test('connect exports the library to an empty remote', async (t) => {
 test('second machine connect imports the remote library', async (t) => {
   const ctx = await makeCtx(t);
   const libA = makeLibrary();
-  libA.add({ uid: 'alpha', relativeId: 'alpha', title: 'Alpha', elements: [{ id: 1, title: 'One' }], notes: { 'alpha.md': '# Alpha' } });
+  libA.add({
+    uid: 'alpha',
+    relativeId: 'alpha',
+    title: 'Alpha',
+    elements: [{ id: 1, title: 'One' }],
+    notes: { 'alpha.md': '# Alpha' },
+  });
   const A = makeEngine(ctx, 'machine-a', libA);
   await A.init();
   await A.connect({ url: ctx.url, branch: 'main' });

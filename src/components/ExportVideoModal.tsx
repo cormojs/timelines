@@ -1,8 +1,8 @@
-import { ArrowLeft } from "lucide-react";
-import { useState, useEffect, useRef, type CSSProperties } from "react";
-import { Muxer, ArrayBufferTarget } from "mp4-muxer";
-import { formatYear } from "../utils/timelineUtils";
-import "../styles/07-modals-menus.css";
+import { ArrowLeft } from 'lucide-react';
+import { useState, useEffect, useRef, type CSSProperties } from 'react';
+import { Muxer, ArrayBufferTarget } from 'mp4-muxer';
+import { formatYear } from '../utils/timelineUtils';
+import '../styles/07-modals-menus.css';
 
 const RESOLUTION_OPTIONS = [
   { value: 'hd', label: '1080p (1920 × 1080)', width: 1920, height: 1080 },
@@ -26,11 +26,15 @@ const FPS_OPTIONS = [
 const VIDEO_ZOOM_MIN = 0.2;
 const VIDEO_ZOOM_MAX = 1;
 
-
 type PreviewOptions = { transparentBg?: boolean; customBg?: string };
 
-export default function ExportVideoModal({ isOpen, onClose, timelineData, timelineViewRef }: Record<string, DynamicValue>) {
-  const [filename, setFilename] = useState("");
+export default function ExportVideoModal({
+  isOpen,
+  onClose,
+  timelineData,
+  timelineViewRef,
+}: Record<string, DynamicValue>) {
+  const [filename, setFilename] = useState('');
   const [previewData, setPreviewData] = useState(null);
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -38,7 +42,7 @@ export default function ExportVideoModal({ isOpen, onClose, timelineData, timeli
   const [resolution, setResolution] = useState('hd');
   const [customWidth, setCustomWidth] = useState('1920');
   const [customHeight, setCustomHeight] = useState('1080');
-  const [duration, setDuration] = useState<number | "custom">(10);
+  const [duration, setDuration] = useState<number | 'custom'>(10);
   const [customDuration, setCustomDuration] = useState('10');
   const [fps, setFps] = useState(30);
   const [bgOption, setBgOption] = useState('default');
@@ -55,9 +59,11 @@ export default function ExportVideoModal({ isOpen, onClose, timelineData, timeli
 
   useEffect(() => {
     if (!isOpen) return;
-    const handleKeyDown = (e) => { if (e.key === "Escape" && !isExporting) onClose(); };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && !isExporting) onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, isExporting, onClose]);
 
   // Reset state when modal opens
@@ -68,7 +74,7 @@ export default function ExportVideoModal({ isOpen, onClose, timelineData, timeli
     }
     if (timelineData?.file) {
       const file = timelineData.file;
-      setFilename(file.id || file.title || "timeline");
+      setFilename(file.id || file.title || 'timeline');
       setPreviewData(null);
       setIsExporting(false);
       setExportProgress(0);
@@ -82,7 +88,7 @@ export default function ExportVideoModal({ isOpen, onClose, timelineData, timeli
       setShowTitle(false);
       setTitlePosition('bottom-right');
       setTitleStyle('title-logo');
-      setTitleText(file.title || "");
+      setTitleText(file.title || '');
       exportCancelRef.current = false;
     }
   }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -137,7 +143,7 @@ export default function ExportVideoModal({ isOpen, onClose, timelineData, timeli
       if (w > 0 && h > 0) return { width: w, height: h };
       return null;
     }
-    const selectedRes = RESOLUTION_OPTIONS.find(r => r.value === resolution);
+    const selectedRes = RESOLUTION_OPTIONS.find((r) => r.value === resolution);
     return selectedRes ? { width: selectedRes.width, height: selectedRes.height } : null;
   };
 
@@ -236,8 +242,7 @@ export default function ExportVideoModal({ isOpen, onClose, timelineData, timeli
       const showText = titleStyleValue !== 'logo-only';
       const showLogo = titleStyleValue !== 'title-only';
       const watermarkText = showText ? String(titleText || '') : '';
-      const canRenderTitleWatermark =
-        showTitle && (titleStyleValue === 'logo-only' || Boolean(watermarkText));
+      const canRenderTitleWatermark = showTitle && (titleStyleValue === 'logo-only' || Boolean(watermarkText));
       let watermarkCanvas = null;
       if (canRenderTitleWatermark) {
         const wmCanvas = document.createElement('canvas');
@@ -258,7 +263,7 @@ export default function ExportVideoModal({ isOpen, onClose, timelineData, timeli
         const logoWidth = (67 / 25) * logoHeight;
         const logoGap = Math.round(fontSize * 0.35);
         const logoBaselineOffset = fontSize * 0.08;
-        const totalWidth = metrics.width + (showLogo ? ((showText ? logoGap : 0) + logoWidth) : 0);
+        const totalWidth = metrics.width + (showLogo ? (showText ? logoGap : 0) + logoWidth : 0);
         let x;
         let y;
 
@@ -322,10 +327,10 @@ export default function ExportVideoModal({ isOpen, onClose, timelineData, timeli
         const srcBottom = Math.min(sourceFullHeight, vpTop + cropHeight);
         const srcW = srcRight - srcX;
         const srcH = srcBottom - srcY;
-        const dstX = (srcX - vpLeft) / cropWidth * outputW;
-        const dstY = (srcY - vpTop) / cropHeight * outputH;
-        const dstW = srcW / cropWidth * outputW;
-        const dstH = srcH / cropHeight * outputH;
+        const dstX = ((srcX - vpLeft) / cropWidth) * outputW;
+        const dstY = ((srcY - vpTop) / cropHeight) * outputH;
+        const dstW = (srcW / cropWidth) * outputW;
+        const dstH = (srcH / cropHeight) * outputH;
         ctx.drawImage(img, srcX, srcY, srcW, srcH, dstX, dstY, dstW, dstH);
         if (watermarkCanvas) {
           ctx.drawImage(watermarkCanvas, 0, 0);
@@ -336,14 +341,14 @@ export default function ExportVideoModal({ isOpen, onClose, timelineData, timeli
         frame.close();
 
         if (encoder.encodeQueueSize > 5) {
-          await new Promise(r => encoder.addEventListener('dequeue', r, { once: true }));
+          await new Promise((r) => encoder.addEventListener('dequeue', r, { once: true }));
         }
 
         const pct = Math.round(((i + 1) / totalFrames) * 100);
         if (pct >= lastPct + 5) {
           lastPct = pct;
           setExportProgress(pct);
-          await new Promise(r => setTimeout(r, 0));
+          await new Promise((r) => setTimeout(r, 0));
         }
       }
 
@@ -360,7 +365,7 @@ export default function ExportVideoModal({ isOpen, onClose, timelineData, timeli
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      const exportFilename = (filename || "").trim() || (timelineData?.file?.id || 'timeline');
+      const exportFilename = (filename || '').trim() || timelineData?.file?.id || 'timeline';
       link.download = `${exportFilename}.mp4`;
       document.body.appendChild(link);
       link.click();
@@ -369,7 +374,11 @@ export default function ExportVideoModal({ isOpen, onClose, timelineData, timeli
     } catch (error) {
       console.error('Error exporting video:', error);
     } finally {
-      try { if (encoder && encoder.state !== 'closed') encoder.close(); } catch { /* ignore close failures */ }
+      try {
+        if (encoder && encoder.state !== 'closed') encoder.close();
+      } catch {
+        /* ignore close failures */
+      }
       setIsExporting(false);
       setExportProgress(0);
     }
@@ -387,7 +396,7 @@ export default function ExportVideoModal({ isOpen, onClose, timelineData, timeli
 
   const file = timelineData?.file;
   const displayYear = (value) => {
-    if (!Number.isFinite(value)) return "--";
+    if (!Number.isFinite(value)) return '--';
     return formatYear(value, file?.negID, file?.posID, file?.useCalendar === true, file?.hideDecimals);
   };
 
@@ -420,11 +429,8 @@ export default function ExportVideoModal({ isOpen, onClose, timelineData, timeli
   };
 
   const outputDims = getOutputDimensions();
-  const previewBgColor = bgOption === 'secondary'
-    ? 'var(--surface)'
-    : bgOption === 'tertiary'
-      ? 'var(--inset-bg)'
-      : 'var(--app-bg)';
+  const previewBgColor =
+    bgOption === 'secondary' ? 'var(--surface)' : bgOption === 'tertiary' ? 'var(--inset-bg)' : 'var(--app-bg)';
   const previewMetrics = (() => {
     if (!previewData || !outputDims) return null;
     const sourceFullWidth = previewData.canvasWidth || previewData.elementWidth || 1;
@@ -459,11 +465,7 @@ export default function ExportVideoModal({ isOpen, onClose, timelineData, timeli
     <div className="settings-backdrop" onMouseDown={handleBackdropMouseDown} onMouseUp={handleBackdropMouseUp}>
       <div className="settings-modal export-png-modal">
         <div className="settings-header">
-          <button
-            className="settings-back-button"
-            onClick={handleCancel}
-            aria-label="Close"
-          >
+          <button className="settings-back-button" onClick={handleCancel} aria-label="Close">
             <ArrowLeft size={20} strokeWidth={2} />
           </button>
           <h2 className="settings-title">EXPORT VIDEO</h2>
@@ -488,18 +490,20 @@ export default function ExportVideoModal({ isOpen, onClose, timelineData, timeli
                   alt="Export preview"
                   className="export-preview-image export-video-pan-image"
                   draggable={false}
-                  style={{
-                    width: `${previewMetrics?.widthPercent || 100}%`,
-                    maxWidth: 'none',
-                    maxHeight: 'none',
-                    height: `${previewMetrics?.heightPercent || 100}%`,
-                    position: 'absolute',
-                    left: `${previewMetrics?.panLeftStartPercent || 0}%`,
-                    top: `${previewMetrics?.topPercent || 0}%`,
-                    '--pan-left-start': `${previewMetrics?.panLeftStartPercent || 0}%`,
-                    '--pan-left-end': `${previewMetrics?.panLeftEndPercent || 0}%`,
-                    animation: `panPreviewLeft ${previewMetrics?.durationSeconds || getDurationValue()}s linear infinite`,
-                  } as CSSProperties & Record<`--${string}`, string>}
+                  style={
+                    {
+                      width: `${previewMetrics?.widthPercent || 100}%`,
+                      maxWidth: 'none',
+                      maxHeight: 'none',
+                      height: `${previewMetrics?.heightPercent || 100}%`,
+                      position: 'absolute',
+                      left: `${previewMetrics?.panLeftStartPercent || 0}%`,
+                      top: `${previewMetrics?.topPercent || 0}%`,
+                      '--pan-left-start': `${previewMetrics?.panLeftStartPercent || 0}%`,
+                      '--pan-left-end': `${previewMetrics?.panLeftEndPercent || 0}%`,
+                      animation: `panPreviewLeft ${previewMetrics?.durationSeconds || getDurationValue()}s linear infinite`,
+                    } as CSSProperties & Record<`--${string}`, string>
+                  }
                 />
                 {showTitle && (
                   <div className={`export-preview-title export-preview-title-${titlePosition}`}>
@@ -520,13 +524,16 @@ export default function ExportVideoModal({ isOpen, onClose, timelineData, timeli
                     )}
                   </div>
                 )}
-                <div className="export-preview-bounds" style={{
-                  border: '1px dashed var(--ui-muted)',
-                  position: 'absolute',
-                  inset: 0,
-                  pointerEvents: 'none',
-                  boxSizing: 'border-box',
-                }} />
+                <div
+                  className="export-preview-bounds"
+                  style={{
+                    border: '1px dashed var(--ui-muted)',
+                    position: 'absolute',
+                    inset: 0,
+                    pointerEvents: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                />
               </div>
             ) : (
               <div className="export-preview-placeholder">Preview will appear here</div>
@@ -538,10 +545,7 @@ export default function ExportVideoModal({ isOpen, onClose, timelineData, timeli
               <div className="settings-row-left" style={{ flex: 1 }}>
                 <div className="settings-row-label">Exporting...</div>
                 <div className="export-video-progress-bar">
-                  <div
-                    className="export-video-progress-fill"
-                    style={{ width: `${exportProgress}%` }}
-                  />
+                  <div className="export-video-progress-fill" style={{ width: `${exportProgress}%` }} />
                 </div>
               </div>
             </div>
@@ -562,7 +566,9 @@ export default function ExportVideoModal({ isOpen, onClose, timelineData, timeli
                 disabled={isExporting}
               >
                 {RESOLUTION_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
                 ))}
               </select>
               {resolution === 'custom' && (
@@ -609,14 +615,7 @@ export default function ExportVideoModal({ isOpen, onClose, timelineData, timeli
                   max={VIDEO_ZOOM_MAX}
                   step={0.1}
                   value={zoom}
-                  onChange={(e) =>
-                    setZoom(
-                      Math.min(
-                        VIDEO_ZOOM_MAX,
-                        Math.max(VIDEO_ZOOM_MIN, Number(e.target.value)),
-                      ),
-                    )
-                  }
+                  onChange={(e) => setZoom(Math.min(VIDEO_ZOOM_MAX, Math.max(VIDEO_ZOOM_MIN, Number(e.target.value))))}
                   disabled={isExporting}
                 />
                 <div className="settings-slider-labels">
@@ -643,7 +642,9 @@ export default function ExportVideoModal({ isOpen, onClose, timelineData, timeli
                 disabled={isExporting}
               >
                 {DURATION_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
                 ))}
               </select>
               {duration === 'custom' && (
@@ -677,7 +678,9 @@ export default function ExportVideoModal({ isOpen, onClose, timelineData, timeli
                 disabled={isExporting}
               >
                 {FPS_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
                 ))}
               </select>
             </div>
@@ -783,7 +786,7 @@ export default function ExportVideoModal({ isOpen, onClose, timelineData, timeli
                   onChange={(e) => setTitleText(e.target.value)}
                   placeholder="Enter export title"
                   maxLength={120}
-                  disabled={isExporting || titleStyle === "logo-only"}
+                  disabled={isExporting || titleStyle === 'logo-only'}
                 />
               </div>
             </div>
@@ -833,15 +836,10 @@ export default function ExportVideoModal({ isOpen, onClose, timelineData, timeli
               </div>
             </div>
           )}
-
-
         </div>
 
         <div className="settings-footer">
-          <button
-            className="settings-footer-button settings-cancel-button"
-            onClick={handleCancel}
-          >
+          <button className="settings-footer-button settings-cancel-button" onClick={handleCancel}>
             {isExporting ? 'Cancel' : 'Close'}
           </button>
           <button

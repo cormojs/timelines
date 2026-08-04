@@ -28,6 +28,7 @@ bun run build           # production renderer build
 bun run build:viewer    # production viewer build
 bun run typecheck
 bun run lint
+bun run format:check
 bun test
 ```
 

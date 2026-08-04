@@ -8,7 +8,9 @@ function tokenize(input) {
   let i = 0;
   const raw = [];
 
-  const skipWS = () => { while (i < len && (s[i] === ' ' || s[i] === '\t')) i++; };
+  const skipWS = () => {
+    while (i < len && (s[i] === ' ' || s[i] === '\t')) i++;
+  };
   const readWord = () => {
     let w = '';
     while (i < len && !SPECIAL.includes(s[i])) w += s[i++];
@@ -20,10 +22,26 @@ function tokenize(input) {
     if (i >= len) break;
     const ch = s[i];
 
-    if (ch === '(') { raw.push({ t: 'LPAREN' }); i++; continue; }
-    if (ch === ')') { raw.push({ t: 'RPAREN' }); i++; continue; }
-    if (ch === '|') { raw.push({ t: 'OR' }); i++; continue; }
-    if (ch === '~') { raw.push({ t: 'NOT' }); i++; continue; }
+    if (ch === '(') {
+      raw.push({ t: 'LPAREN' });
+      i++;
+      continue;
+    }
+    if (ch === ')') {
+      raw.push({ t: 'RPAREN' });
+      i++;
+      continue;
+    }
+    if (ch === '|') {
+      raw.push({ t: 'OR' });
+      i++;
+      continue;
+    }
+    if (ch === '~') {
+      raw.push({ t: 'NOT' });
+      i++;
+      continue;
+    }
 
     if (ch === '"') {
       i++;
@@ -35,8 +53,12 @@ function tokenize(input) {
     }
 
     if (ch === '<' || ch === '>') {
-      let op = ch; i++;
-      if (i < len && s[i] === '=') { op += '='; i++; }
+      let op = ch;
+      i++;
+      if (i < len && s[i] === '=') {
+        op += '=';
+        i++;
+      }
       skipWS();
       const val = readWord();
       if (val) raw.push({ t: 'LEAF', kind: 'date', op, value: val });
@@ -44,7 +66,10 @@ function tokenize(input) {
     }
 
     const word = readWord();
-    if (!word) { i++; continue; }
+    if (!word) {
+      i++;
+      continue;
+    }
     const wl = word.toLowerCase();
 
     if (wl === 'is:event' || wl === 'is:span' || wl === 'is:era') {
@@ -85,14 +110,16 @@ function parse(tokens) {
   const peek = () => tokens[pos];
   const consume = () => tokens[pos++];
 
-  function parseExpr() { return parseOr(); }
+  function parseExpr() {
+    return parseOr();
+  }
 
   function parseOr() {
     let left = parseAnd();
     while (peek()?.t === 'OR') {
       consume();
       const right = parseAnd();
-      left = left && right ? { t: 'OR', left, right } : (left || right);
+      left = left && right ? { t: 'OR', left, right } : left || right;
     }
     return left;
   }
@@ -177,11 +204,16 @@ function evalLeaf(leaf, el, noteContent) {
       const filterVal = parseDateValue(leaf.value);
       if (filterVal == null) return false;
       switch (leaf.op) {
-        case '<':  return dateVal < filterVal;
-        case '<=': return dateVal <= filterVal;
-        case '>':  return dateVal > filterVal;
-        case '>=': return dateVal >= filterVal;
-        default:   return false;
+        case '<':
+          return dateVal < filterVal;
+        case '<=':
+          return dateVal <= filterVal;
+        case '>':
+          return dateVal > filterVal;
+        case '>=':
+          return dateVal >= filterVal;
+        default:
+          return false;
       }
     }
 
@@ -193,11 +225,16 @@ function evalLeaf(leaf, el, noteContent) {
 function evalNode(node, el, noteContent) {
   if (!node) return true;
   switch (node.t) {
-    case 'AND': return evalNode(node.left, el, noteContent) && evalNode(node.right, el, noteContent);
-    case 'OR':  return evalNode(node.left, el, noteContent) || evalNode(node.right, el, noteContent);
-    case 'NOT': return !evalNode(node.operand, el, noteContent);
-    case 'LEAF': return evalLeaf(node, el, noteContent);
-    default: return true;
+    case 'AND':
+      return evalNode(node.left, el, noteContent) && evalNode(node.right, el, noteContent);
+    case 'OR':
+      return evalNode(node.left, el, noteContent) || evalNode(node.right, el, noteContent);
+    case 'NOT':
+      return !evalNode(node.operand, el, noteContent);
+    case 'LEAF':
+      return evalLeaf(node, el, noteContent);
+    default:
+      return true;
   }
 }
 

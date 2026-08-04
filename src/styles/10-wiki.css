@@ -9,7 +9,9 @@
   color: var(--text-subtle);
   text-decoration: none;
   font-weight: inherit;
-  transition: color 0.15s ease, text-decoration-color 0.15s ease;
+  transition:
+    color 0.15s ease,
+    text-decoration-color 0.15s ease;
 }
 
 .wiki-header-link:hover {
@@ -31,7 +33,9 @@
 }
 
 @keyframes wiki-refresh-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .wiki-refresh-btn-loading svg {
@@ -39,8 +43,13 @@
 }
 
 @keyframes wiki-pulse {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 1; }
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 .wiki-loading {
@@ -124,7 +133,9 @@
   cursor: pointer;
   border-radius: 5px;
   padding: 0;
-  transition: background 0.1s ease, color 0.1s ease;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease;
   text-decoration: none;
 }
 
@@ -136,7 +147,10 @@
 .wiki-url-card-btn-hover {
   opacity: 0;
   pointer-events: none;
-  transition: background 0.1s ease, color 0.1s ease, opacity 0.15s ease;
+  transition:
+    background 0.1s ease,
+    color 0.1s ease,
+    opacity 0.15s ease;
 }
 
 .wiki-url-card:hover .wiki-url-card-btn-hover {
@@ -202,7 +216,9 @@
   cursor: pointer;
   padding: 4px 10px;
   border-radius: 6px;
-  transition: background 0.1s ease, border-color 0.1s ease;
+  transition:
+    background 0.1s ease,
+    border-color 0.1s ease;
 }
 
 .wiki-url-input-btn:hover {
@@ -296,7 +312,9 @@
   color: var(--link-color);
   text-decoration: none;
   border-bottom: 1px solid color-mix(in srgb, var(--link-color), transparent 60%);
-  transition: border-color 0.15s, color 0.15s;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
 }
 
 .wiki-render a:hover {
@@ -449,8 +467,8 @@
 .wiki-render .mw-disambig,
 .wiki-render .toc,
 .wiki-render .mw-heading .mw-editsection,
-.wiki-render [role="navigation"],
-.wiki-render [role="note"],
+.wiki-render [role='navigation'],
+.wiki-render [role='note'],
 .wiki-render .shortdescription,
 .wiki-render .geo-nondefault,
 .wiki-render .geo-dec,
@@ -518,7 +536,7 @@
 }
 
 .wiki-render .infobox .infobox-label,
-.wiki-render .infobox th[scope="row"] {
+.wiki-render .infobox th[scope='row'] {
   width: 34%;
   font-weight: 700;
   color: var(--ui-muted);
@@ -555,7 +573,7 @@
 }
 
 .wiki-render .infobox .hlist li + li::before {
-  content: " \00B7 ";
+  content: ' \00B7 ';
   color: var(--text-subtle);
 }
 
@@ -647,7 +665,7 @@
 }
 
 .wiki-render .wiki-sidebar-summary::after {
-  content: "[show]";
+  content: '[show]';
   font-size: var(--text-2xs);
   color: #3366cc;
   font-weight: normal;
@@ -657,7 +675,7 @@
 }
 
 .wiki-render details[open] > .wiki-sidebar-summary::after {
-  content: "[hide]";
+  content: '[hide]';
 }
 
 .wiki-render .wiki-sidebar-content {

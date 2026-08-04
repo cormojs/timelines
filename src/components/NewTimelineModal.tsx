@@ -1,13 +1,13 @@
-import { ArrowLeft } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
-import { parseTimelineInput } from "../utils/dateUtils";
-import { DETAIL_MIN, DETAIL_MID, DETAIL_MAX, detailToSlider, sliderToDetail } from "../utils/sliderUtils";
-import "../styles/07-modals-menus.css";
+import { ArrowLeft } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { parseTimelineInput } from '../utils/dateUtils';
+import { DETAIL_MIN, DETAIL_MID, DETAIL_MAX, detailToSlider, sliderToDetail } from '../utils/sliderUtils';
+import '../styles/07-modals-menus.css';
 
 export default function NewTimelineModal({ isOpen, onClose, onCreate }) {
-  const [title, setTitle] = useState("");
-  const [start, setStart] = useState("0");
-  const [end, setEnd] = useState("2024");
+  const [title, setTitle] = useState('');
+  const [start, setStart] = useState('0');
+  const [end, setEnd] = useState('2024');
   const [detailLevel, setDetailLevel] = useState(1);
   const [detailSlider, setDetailSlider] = useState(50);
   const [useSpreadsheet, setUseSpreadsheet] = useState(false);
@@ -21,9 +21,11 @@ export default function NewTimelineModal({ isOpen, onClose, onCreate }) {
 
   useEffect(() => {
     if (!isOpen) return;
-    const handleKeyDown = (e) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
   useEffect(() => {
@@ -37,8 +39,8 @@ export default function NewTimelineModal({ isOpen, onClose, onCreate }) {
     };
 
     updateTooltip();
-    window.addEventListener("resize", updateTooltip);
-    return () => window.removeEventListener("resize", updateTooltip);
+    window.addEventListener('resize', updateTooltip);
+    return () => window.removeEventListener('resize', updateTooltip);
   }, [detailSlider]);
 
   if (!isOpen) return null;
@@ -61,12 +63,12 @@ export default function NewTimelineModal({ isOpen, onClose, onCreate }) {
   const handleCreate = async () => {
     const errors = [];
     if (!title.trim()) {
-      errors.push("Please enter a timeline name.");
+      errors.push('Please enter a timeline name.');
     }
 
     const sanitized = sanitizeFilename(title);
     if (!sanitized) {
-      errors.push("Timeline name must contain at least one letter or number.");
+      errors.push('Timeline name must contain at least one letter or number.');
     }
 
     const parsedStart = parseTimelineInput(start);
@@ -75,15 +77,15 @@ export default function NewTimelineModal({ isOpen, onClose, onCreate }) {
     const endValue = parsedEnd.value;
 
     if (!Number.isFinite(startValue)) {
-      errors.push("Start point must be a number or MM/DD/YYYY.");
+      errors.push('Start point must be a number or MM/DD/YYYY.');
     }
 
     if (!Number.isFinite(endValue)) {
-      errors.push("End point must be a number or MM/DD/YYYY.");
+      errors.push('End point must be a number or MM/DD/YYYY.');
     }
 
     if (Number.isFinite(startValue) && Number.isFinite(endValue) && startValue >= endValue) {
-      errors.push("Start point must be less than end point.");
+      errors.push('Start point must be less than end point.');
     }
 
     if (errors.length > 0) {
@@ -110,9 +112,9 @@ export default function NewTimelineModal({ isOpen, onClose, onCreate }) {
       return;
     }
 
-    setTitle("");
-    setStart("0");
-    setEnd("2024");
+    setTitle('');
+    setStart('0');
+    setEnd('2024');
     setDetailLevel(1);
     setDetailSlider(50);
     setUseSpreadsheet(false);
@@ -123,9 +125,9 @@ export default function NewTimelineModal({ isOpen, onClose, onCreate }) {
 
   const handleCancel = () => {
     // Reset form
-    setTitle("");
-    setStart("0");
-    setEnd("2024");
+    setTitle('');
+    setStart('0');
+    setEnd('2024');
     setDetailLevel(1);
     setDetailSlider(50);
     setUseSpreadsheet(false);
@@ -139,11 +141,7 @@ export default function NewTimelineModal({ isOpen, onClose, onCreate }) {
     <div className="settings-backdrop" onClick={handleBackdropClick}>
       <div className="settings-modal">
         <div className="settings-header">
-          <button
-            className="settings-back-button"
-            onClick={handleCancel}
-            aria-label="Close"
-          >
+          <button className="settings-back-button" onClick={handleCancel} aria-label="Close">
             <ArrowLeft size={20} strokeWidth={2} />
           </button>
           <h2 className="settings-title">NEW TIMELINE</h2>
@@ -163,7 +161,9 @@ export default function NewTimelineModal({ isOpen, onClose, onCreate }) {
           <div className="settings-row">
             <div className="settings-row-left">
               <div className="settings-row-label">Timeline Name</div>
-              <div className="settings-row-description">Your file will be saved as: {title ? title.toLowerCase().replace(/\s+/g, '-') : 'untitled'}.timeline</div>
+              <div className="settings-row-description">
+                Your file will be saved as: {title ? title.toLowerCase().replace(/\s+/g, '-') : 'untitled'}.timeline
+              </div>
             </div>
             <div className="settings-row-right">
               <input
@@ -175,7 +175,12 @@ export default function NewTimelineModal({ isOpen, onClose, onCreate }) {
                   setTitle(e.target.value);
                   if (validationErrors.length) setValidationErrors([]);
                 }}
-                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleCreate(); } }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleCreate();
+                  }
+                }}
                 placeholder="Enter timeline name"
                 autoFocus
                 maxLength={100}
@@ -251,10 +256,7 @@ export default function NewTimelineModal({ isOpen, onClose, onCreate }) {
                   onMouseUp={() => setShowDetailTooltip(false)}
                 />
                 {showDetailTooltip && (
-                  <div
-                    className="settings-slider-tooltip"
-                    style={{ left: detailTooltipLeft }}
-                  >
+                  <div className="settings-slider-tooltip" style={{ left: detailTooltipLeft }}>
                     {detailLevel}x
                   </div>
                 )}
@@ -274,11 +276,7 @@ export default function NewTimelineModal({ isOpen, onClose, onCreate }) {
             </div>
             <div className="settings-row-right">
               <label className="settings-toggle">
-                <input
-                  type="checkbox"
-                  checked={useSpreadsheet}
-                  onChange={(e) => setUseSpreadsheet(e.target.checked)}
-                />
+                <input type="checkbox" checked={useSpreadsheet} onChange={(e) => setUseSpreadsheet(e.target.checked)} />
                 <span className="settings-toggle-slider"></span>
               </label>
             </div>
@@ -287,15 +285,13 @@ export default function NewTimelineModal({ isOpen, onClose, onCreate }) {
           <div className="settings-row">
             <div className="settings-row-left">
               <div className="settings-row-label">Map View</div>
-              <div className="settings-row-description">Enable adding coordinates to events, eras, and spans to view them on a map.</div>
+              <div className="settings-row-description">
+                Enable adding coordinates to events, eras, and spans to view them on a map.
+              </div>
             </div>
             <div className="settings-row-right">
               <label className="settings-toggle">
-                <input
-                  type="checkbox"
-                  checked={useMaps}
-                  onChange={(e) => setUseMaps(e.target.checked)}
-                />
+                <input type="checkbox" checked={useMaps} onChange={(e) => setUseMaps(e.target.checked)} />
                 <span className="settings-toggle-slider"></span>
               </label>
             </div>
@@ -308,20 +304,13 @@ export default function NewTimelineModal({ isOpen, onClose, onCreate }) {
             </div>
             <div className="settings-row-right">
               <label className="settings-toggle">
-                <input
-                  type="checkbox"
-                  checked={useWiki}
-                  onChange={(e) => setUseWiki(e.target.checked)}
-                />
+                <input type="checkbox" checked={useWiki} onChange={(e) => setUseWiki(e.target.checked)} />
                 <span className="settings-toggle-slider"></span>
               </label>
             </div>
           </div>
 
-          <div className="settings-form-note">
-            These options can be changed later in timeline settings.
-          </div>
-
+          <div className="settings-form-note">These options can be changed later in timeline settings.</div>
         </div>
 
         <div className="settings-footer">

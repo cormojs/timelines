@@ -1,16 +1,14 @@
-import { useState, useRef, useEffect } from "react";
-import { X } from "lucide-react";
-import { ICON_CATEGORIES, ALL_ICONS } from "../config/elementIcons";
+import { useState, useRef, useEffect } from 'react';
+import { X } from 'lucide-react';
+import { ICON_CATEGORIES, ALL_ICONS } from '../config/elementIcons';
 
 export default function IconPicker({ value, onChange }) {
   const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState('');
   const searchRef = useRef(null);
   const popoverRef = useRef(null);
 
-  const CurrentIcon = value
-    ? ALL_ICONS.find((i) => i.name === value)?.component
-    : null;
+  const CurrentIcon = value ? ALL_ICONS.find((i) => i.name === value)?.component : null;
 
   useEffect(() => {
     if (open) setTimeout(() => searchRef.current?.focus(), 0);
@@ -21,18 +19,16 @@ export default function IconPicker({ value, onChange }) {
     const handler = (e) => {
       if (!popoverRef.current?.contains(e.target)) setOpen(false);
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
-  const filtered = query.trim()
-    ? ALL_ICONS.filter((i) => i.name.toLowerCase().includes(query.toLowerCase()))
-    : null;
+  const filtered = query.trim() ? ALL_ICONS.filter((i) => i.name.toLowerCase().includes(query.toLowerCase())) : null;
 
   const handleSelect = (name) => {
     onChange(name === value ? null : name);
     setOpen(false);
-    setQuery("");
+    setQuery('');
   };
 
   return (
@@ -40,19 +36,14 @@ export default function IconPicker({ value, onChange }) {
       <>
         <button
           type="button"
-          className={`icon-picker-trigger${value ? " has-icon" : ""}`}
+          className={`icon-picker-trigger${value ? ' has-icon' : ''}`}
           onClick={() => setOpen((v) => !v)}
-          title={value ? `Icon: ${value}` : "Add icon"}
+          title={value ? `Icon: ${value}` : 'Add icon'}
         >
           {CurrentIcon ? <CurrentIcon size={14} /> : <span className="icon-picker-placeholder">No icon</span>}
         </button>
         {value && (
-          <button
-            type="button"
-            className="icon-picker-clear"
-            onClick={() => onChange(null)}
-            title="Remove icon"
-          >
+          <button type="button" className="icon-picker-clear" onClick={() => onChange(null)} title="Remove icon">
             <X size={10} />
           </button>
         )}
@@ -77,7 +68,7 @@ export default function IconPicker({ value, onChange }) {
                     <button
                       key={entry.name}
                       type="button"
-                      className={`icon-picker-cell${value === entry.name ? " is-selected" : ""}`}
+                      className={`icon-picker-cell${value === entry.name ? ' is-selected' : ''}`}
                       title={entry.name}
                       onClick={() => handleSelect(entry.name)}
                     >
@@ -97,7 +88,7 @@ export default function IconPicker({ value, onChange }) {
                       <button
                         key={entry.name}
                         type="button"
-                        className={`icon-picker-cell${value === entry.name ? " is-selected" : ""}`}
+                        className={`icon-picker-cell${value === entry.name ? ' is-selected' : ''}`}
                         title={entry.name}
                         onClick={() => handleSelect(entry.name)}
                       >

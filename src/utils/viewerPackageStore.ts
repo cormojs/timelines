@@ -17,26 +17,26 @@ let current: ViewerPackageStore | null = null;
 // Mirrors sanitizeNoteFilename in electron/main.cts so bare noteFile refs
 // find the entry the desktop app would have written
 const sanitizeNoteFilename = (value) => {
-  const base = String(value || "").replace(/\.md$/i, "");
+  const base = String(value || '').replace(/\.md$/i, '');
   const cleaned = base
     .trim()
-    .replace(/[^\w.-]+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-+|-+$/g, "")
+    .replace(/[^\w.-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
     .toLowerCase();
-  return `${cleaned || "note"}.md`;
+  return `${cleaned || 'note'}.md`;
 };
 
 const MIME_BY_EXT: Record<string, string> = {
-  png: "image/png",
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  gif: "image/gif",
-  webp: "image/webp",
-  svg: "image/svg+xml",
-  avif: "image/avif",
-  mp4: "video/mp4",
-  webm: "video/webm",
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  svg: 'image/svg+xml',
+  avif: 'image/avif',
+  mp4: 'video/mp4',
+  webm: 'video/webm',
 };
 
 // pkg: { notes, assets } from packageReader; pass null to clear
@@ -50,17 +50,17 @@ export function setViewerPackage(pkg: ViewerPackage | null) {
   }
   const assetUrls: Record<string, string> = {};
   for (const [rel, bytes] of Object.entries(pkg.assets || {})) {
-    const ext = rel.split(".").pop()?.toLowerCase() ?? "";
-    assetUrls[rel] = URL.createObjectURL(new Blob([bytes], { type: MIME_BY_EXT[ext] || "application/octet-stream" }));
+    const ext = rel.split('.').pop()?.toLowerCase() ?? '';
+    assetUrls[rel] = URL.createObjectURL(new Blob([bytes], { type: MIME_BY_EXT[ext] || 'application/octet-stream' }));
   }
   current = { notes: pkg.notes || {}, assetUrls };
 }
 
 export function getPackageNote(filename: string | null | undefined) {
   if (!current) return null;
-  const raw = String(filename || "").replace(/\\/g, "/");
+  const raw = String(filename || '').replace(/\\/g, '/');
   if (Object.prototype.hasOwnProperty.call(current.notes, raw)) return current.notes[raw];
-  if (!raw.includes("/")) {
+  if (!raw.includes('/')) {
     const sanitized = sanitizeNoteFilename(raw);
     if (Object.prototype.hasOwnProperty.call(current.notes, sanitized)) return current.notes[sanitized];
   }
@@ -69,6 +69,6 @@ export function getPackageNote(filename: string | null | undefined) {
 
 export function resolvePackageAssetSrc(src: string | null | undefined) {
   if (!current) return null;
-  const key = String(src || "").replace(/\\/g, "/");
+  const key = String(src || '').replace(/\\/g, '/');
   return current.assetUrls[key] || null;
 }

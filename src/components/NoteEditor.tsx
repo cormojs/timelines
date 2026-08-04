@@ -1,5 +1,19 @@
-import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from "react";
-import { Heading1, Heading2, Heading3, Bold, Italic, Strikethrough, Underline, Highlighter, Link2, Trash2, Unlink, ImagePlay, Paperclip } from "lucide-react";
+import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
+import {
+  Heading1,
+  Heading2,
+  Heading3,
+  Bold,
+  Italic,
+  Strikethrough,
+  Underline,
+  Highlighter,
+  Link2,
+  Trash2,
+  Unlink,
+  ImagePlay,
+  Paperclip,
+} from 'lucide-react';
 
 type NoteEditorProps = {
   initialContent?: string;
@@ -17,13 +31,13 @@ export type NoteEditorHandle = {
 
 const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function NoteEditor(
   { initialContent, isNoteLoading, noteExists, onSave, onUnlink, onDelete, onPickLocalImage },
-  ref
+  ref,
 ) {
-  const [noteContent, setNoteContent] = useState(initialContent ?? "");
+  const [noteContent, setNoteContent] = useState(initialContent ?? '');
   const noteContentRef = useRef(noteContent);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   noteContentRef.current = noteContent;
-  const savedContentRef = useRef(initialContent ?? "");
+  const savedContentRef = useRef(initialContent ?? '');
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onSaveRef = useRef(onSave);
   onSaveRef.current = onSave;
@@ -39,7 +53,7 @@ const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function NoteEd
   }, []);
 
   useEffect(() => {
-    const next = initialContent ?? "";
+    const next = initialContent ?? '';
     // A save echoes back through this prop; resetting on it would clobber keystrokes typed meanwhile
     if (next === savedContentRef.current) return;
     savedContentRef.current = next;
@@ -58,16 +72,20 @@ const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function NoteEd
   }, [noteContent, flushSave]);
 
   useEffect(() => {
-    window.addEventListener("beforeunload", flushSave);
+    window.addEventListener('beforeunload', flushSave);
     return () => {
-      window.removeEventListener("beforeunload", flushSave);
+      window.removeEventListener('beforeunload', flushSave);
       flushSave();
     };
   }, [flushSave]);
 
-  useImperativeHandle(ref, () => ({
-    save: flushSave,
-  }), [flushSave]);
+  useImperativeHandle(
+    ref,
+    () => ({
+      save: flushSave,
+    }),
+    [flushSave],
+  );
 
   const wrapSelection = (prefix, suffix = prefix) => {
     const textarea = textareaRef.current;
@@ -168,27 +186,53 @@ const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function NoteEd
     <div className="note-editor">
       <div className="note-toolbar">
         <div className="note-toolbar-format">
-          <button type="button" onClick={() => insertHeading(1)} title="Heading 1"><Heading1 size={14} /></button>
-          <button type="button" onClick={() => insertHeading(2)} title="Heading 2"><Heading2 size={14} /></button>
-          <button type="button" onClick={() => insertHeading(3)} title="Heading 3"><Heading3 size={14} /></button>
+          <button type="button" onClick={() => insertHeading(1)} title="Heading 1">
+            <Heading1 size={14} />
+          </button>
+          <button type="button" onClick={() => insertHeading(2)} title="Heading 2">
+            <Heading2 size={14} />
+          </button>
+          <button type="button" onClick={() => insertHeading(3)} title="Heading 3">
+            <Heading3 size={14} />
+          </button>
           <div className="note-toolbar-divider" />
-          <button type="button" onClick={() => wrapSelection('**')} title="Bold"><Bold size={14} /></button>
-          <button type="button" onClick={() => wrapSelection('*')} title="Italic"><Italic size={14} /></button>
-          <button type="button" onClick={() => wrapSelection('~~')} title="Strikethrough"><Strikethrough size={14} /></button>
-          <button type="button" onClick={() => wrapSelection('__')} title="Underline"><Underline size={14} /></button>
-          <button type="button" onClick={() => wrapSelection('==')} title="Highlight"><Highlighter size={14} /></button>
+          <button type="button" onClick={() => wrapSelection('**')} title="Bold">
+            <Bold size={14} />
+          </button>
+          <button type="button" onClick={() => wrapSelection('*')} title="Italic">
+            <Italic size={14} />
+          </button>
+          <button type="button" onClick={() => wrapSelection('~~')} title="Strikethrough">
+            <Strikethrough size={14} />
+          </button>
+          <button type="button" onClick={() => wrapSelection('__')} title="Underline">
+            <Underline size={14} />
+          </button>
+          <button type="button" onClick={() => wrapSelection('==')} title="Highlight">
+            <Highlighter size={14} />
+          </button>
           <div className="note-toolbar-divider" />
-          <button type="button" onClick={insertLink} title="Link"><Link2 size={14} /></button>
-          <button type="button" onClick={insertImage} title="Embed image or video"><ImagePlay size={14} /></button>
+          <button type="button" onClick={insertLink} title="Link">
+            <Link2 size={14} />
+          </button>
+          <button type="button" onClick={insertImage} title="Embed image or video">
+            <ImagePlay size={14} />
+          </button>
           {onPickLocalImage && (
-            <button type="button" onClick={insertLocalImage} title="Insert local image"><Paperclip size={14} /></button>
+            <button type="button" onClick={insertLocalImage} title="Insert local image">
+              <Paperclip size={14} />
+            </button>
           )}
         </div>
         {noteExists && (
           <div className="note-toolbar-actions">
             <div className="note-toolbar-divider" />
-            <button type="button" onClick={onUnlink} title="Unlink Note"><Unlink size={14} /></button>
-            <button type="button" onClick={onDelete} title="Delete Note"><Trash2 size={14} /></button>
+            <button type="button" onClick={onUnlink} title="Unlink Note">
+              <Unlink size={14} />
+            </button>
+            <button type="button" onClick={onDelete} title="Delete Note">
+              <Trash2 size={14} />
+            </button>
           </div>
         )}
       </div>
@@ -198,7 +242,7 @@ const NoteEditor = forwardRef<NoteEditorHandle, NoteEditorProps>(function NoteEd
         value={noteContent}
         onChange={(e) => setNoteContent(e.target.value)}
         onBlur={flushSave}
-        placeholder={isNoteLoading ? "Loading note..." : "Write your note..."}
+        placeholder={isNoteLoading ? 'Loading note...' : 'Write your note...'}
         rows={8}
       />
     </div>

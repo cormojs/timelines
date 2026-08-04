@@ -6,10 +6,10 @@ export const daysInMonth = (year, month) => {
 
 const precisionFromValue = (value) => {
   if (!Number.isFinite(value)) return null;
-  if (Number.isInteger(value)) return "year";
+  if (Number.isInteger(value)) return 'year';
   const scaled = value * 12;
   const isMonthGrid = Math.abs(scaled - Math.round(scaled)) < 1e-6;
-  return isMonthGrid ? "month" : "day";
+  return isMonthGrid ? 'month' : 'day';
 };
 
 const dateToFractionalYear = (date) => {
@@ -23,27 +23,27 @@ const dateToFractionalYear = (date) => {
 export const todayFractionalYear = () => dateToFractionalYear(new Date());
 
 // Format is a display + input lens only; stored labels stay canonical ISO.
-let activeDateFormat = "MDY"; // "MDY" | "DMY" | "ISO"
+let activeDateFormat = 'MDY'; // "MDY" | "DMY" | "ISO"
 export const setActiveDateFormat = (fmt) => {
-  activeDateFormat = fmt === "DMY" || fmt === "ISO" ? fmt : "MDY";
+  activeDateFormat = fmt === 'DMY' || fmt === 'ISO' ? fmt : 'MDY';
 };
 export const getActiveDateFormat = () => activeDateFormat;
 
-const pad2 = (n) => String(n).padStart(2, "0");
+const pad2 = (n) => String(n).padStart(2, '0');
 const normalizeYear = (y) => (Number.isFinite(y) && y >= 0 && y <= 99 ? y + 2000 : y);
 
 // Canonical ISO stored label; year precision needs no label.
 const canonicalDateLabel = (year, month, day, precision) => {
-  if (precision === "year") return null;
-  if (precision === "month") return `${year}-${pad2(month)}`;
+  if (precision === 'year') return null;
+  if (precision === 'month') return `${year}-${pad2(month)}`;
   return `${year}-${pad2(month)}-${pad2(day)}`;
 };
 
 export const formatCalendarDate = (year, month, day, precision, fmt = activeDateFormat) => {
-  if (precision === "year") return `${year}`;
-  if (precision === "month") return fmt === "ISO" ? `${year}-${pad2(month)}` : `${pad2(month)}/${year}`;
-  if (fmt === "ISO") return `${year}-${pad2(month)}-${pad2(day)}`;
-  if (fmt === "DMY") return `${pad2(day)}/${pad2(month)}/${year}`;
+  if (precision === 'year') return `${year}`;
+  if (precision === 'month') return fmt === 'ISO' ? `${year}-${pad2(month)}` : `${pad2(month)}/${year}`;
+  if (fmt === 'ISO') return `${year}-${pad2(month)}-${pad2(day)}`;
+  if (fmt === 'DMY') return `${pad2(day)}/${pad2(month)}/${year}`;
   return `${pad2(month)}/${pad2(day)}/${year}`;
 };
 
@@ -67,18 +67,18 @@ const parseCalendarDate = (raw, fmt = activeDateFormat) => {
   const iso = /^(\d{4})-(\d{1,2})(?:-(\d{1,2}))?$/.exec(raw);
   if (iso) {
     const hasDay = iso[3] !== undefined;
-    return buildCalendarDate(Number(iso[1]), Number(iso[2]), hasDay ? Number(iso[3]) : 1, hasDay ? "day" : "month");
+    return buildCalendarDate(Number(iso[1]), Number(iso[2]), hasDay ? Number(iso[3]) : 1, hasDay ? 'day' : 'month');
   }
-  if (raw.includes("/")) {
-    const parts = raw.split("/").map((p) => p.trim());
+  if (raw.includes('/')) {
+    const parts = raw.split('/').map((p) => p.trim());
     if (parts.length === 2) {
-      return buildCalendarDate(normalizeYear(Number(parts[1])), Number(parts[0]), 1, "month");
+      return buildCalendarDate(normalizeYear(Number(parts[1])), Number(parts[0]), 1, 'month');
     }
     if (parts.length === 3) {
       const [a, b, c] = parts.map(Number);
-      return fmt === "DMY"
-        ? buildCalendarDate(normalizeYear(c), b, a, "day")
-        : buildCalendarDate(normalizeYear(c), a, b, "day");
+      return fmt === 'DMY'
+        ? buildCalendarDate(normalizeYear(c), b, a, 'day')
+        : buildCalendarDate(normalizeYear(c), a, b, 'day');
     }
   }
   return null;
@@ -87,36 +87,36 @@ const parseCalendarDate = (raw, fmt = activeDateFormat) => {
 const DATE_KEYWORD_RE = /^(current|current-month|current-year|today|now)$/i;
 
 export const parseDateKeyword = (raw) => {
-  if (typeof raw !== "string" || !DATE_KEYWORD_RE.test(raw.trim())) return null;
+  if (typeof raw !== 'string' || !DATE_KEYWORD_RE.test(raw.trim())) return null;
   const kw = raw.trim().toLowerCase();
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth() + 1;
   const day = now.getDate();
-  if (kw === "current-year") return { value: year, precision: "year" };
-  if (kw === "current-month") return { value: year + (month - 1) / 12, precision: "month" };
+  if (kw === 'current-year') return { value: year, precision: 'year' };
+  if (kw === 'current-month') return { value: year + (month - 1) / 12, precision: 'month' };
   return {
     value: year + (month - 1) / 12 + (day - 1) / (daysInMonth(year, month) * 12),
-    precision: "day",
+    precision: 'day',
   };
 };
 
 const DYNAMIC_LABEL_NAMES = {
-  current: "Today",
-  today: "Today",
-  now: "Today",
-  "current-month": "This month",
-  "current-year": "This year",
+  current: 'Today',
+  today: 'Today',
+  now: 'Today',
+  'current-month': 'This month',
+  'current-year': 'This year',
 };
 
 // Read-only display: keywords -> "This year (2026)", fixed dates -> active format.
 export const displayDateLabel = (label) => {
-  if (typeof label !== "string") return label ?? null;
+  if (typeof label !== 'string') return label ?? null;
   const kw = parseDateKeyword(label);
   if (kw !== null) {
     const { year, month, day } = fractionalYearToDate(kw.value);
     const resolved = formatCalendarDate(year, month, day, kw.precision);
-    return `${DYNAMIC_LABEL_NAMES[label.trim().toLowerCase()] || "Today"} (${resolved})`;
+    return `${DYNAMIC_LABEL_NAMES[label.trim().toLowerCase()] || 'Today'} (${resolved})`;
   }
   const cal = parseCalendarDate(label);
   if (cal) return formatCalendarDate(cal.year, cal.month, cal.day, cal.precision);
@@ -125,7 +125,7 @@ export const displayDateLabel = (label) => {
 
 // Editable-field form: keywords stay literal so they can be re-typed.
 export const formatDateForInput = (label) => {
-  if (typeof label !== "string" || !label.trim()) return "";
+  if (typeof label !== 'string' || !label.trim()) return '';
   if (parseDateKeyword(label) !== null) return label.trim().toLowerCase();
   const cal = parseCalendarDate(label);
   if (cal) return formatCalendarDate(cal.year, cal.month, cal.day, cal.precision);
@@ -134,8 +134,8 @@ export const formatDateForInput = (label) => {
 
 // Legacy slash labels were always MM/DD/YYYY; upgrade to ISO regardless of active format.
 export const normalizeLegacyDateLabel = (label) => {
-  if (typeof label !== "string" || !label.includes("/")) return label;
-  const cal = parseCalendarDate(label, "MDY");
+  if (typeof label !== 'string' || !label.includes('/')) return label;
+  const cal = parseCalendarDate(label, 'MDY');
   return cal ? cal.label : label;
 };
 
@@ -143,7 +143,7 @@ export const parseTimelineInput = (value) => {
   if (value === null || value === undefined) {
     return { value: null, label: null, precision: null };
   }
-  if (typeof value === "number" && Number.isFinite(value)) {
+  if (typeof value === 'number' && Number.isFinite(value)) {
     return { value, label: null, precision: precisionFromValue(value) };
   }
 

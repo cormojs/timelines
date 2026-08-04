@@ -1,4 +1,4 @@
-import { Component, type ErrorInfo, type ReactNode } from "react";
+import { Component, type ErrorInfo, type ReactNode } from 'react';
 
 type ErrorBoundaryProps = {
   children: ReactNode;
@@ -27,15 +27,11 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
     if (this.state.error) {
       return (
         <div className="error-boundary-fallback">
-          <span className="error-boundary-fallback__title">
-            {this.props.name} crashed
-          </span>
-          <span className="error-boundary-fallback__message">
-            {this.state.error.message}
-          </span>
+          <span className="error-boundary-fallback__title">{this.props.name} crashed</span>
+          <span className="error-boundary-fallback__message">{this.state.error.message}</span>
           <button
             className="settings-footer-button settings-create-button"
-            style={{ marginTop: "8px" }}
+            style={{ marginTop: '8px' }}
             onClick={() => this.setState({ error: null })}
           >
             Reload panel

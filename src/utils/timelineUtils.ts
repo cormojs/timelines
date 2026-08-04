@@ -1,9 +1,6 @@
-import { daysInMonth, displayDateLabel, getActiveDateFormat, formatCalendarDate } from "./dateUtils";
+import { daysInMonth, displayDateLabel, getActiveDateFormat, formatCalendarDate } from './dateUtils';
 
-export const MONTH_LABELS = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-];
+export const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export function formatYear(year, negID, posID, useCalendar = false, hideDecimals = false) {
   if (year < 0) {
@@ -21,41 +18,41 @@ export function formatYear(year, negID, posID, useCalendar = false, hideDecimals
       const month = monthIndex + 1;
       const monthFraction = Math.max(0, fraction * 12 - monthIndex);
       const isMonthPrecision = Math.abs(monthFraction) < 1e-9;
-      const isIso = getActiveDateFormat() === "ISO";
+      const isIso = getActiveDateFormat() === 'ISO';
       if (isMonthPrecision) {
         // Keep the month-name form for slash formats; ISO gets YYYY-MM.
         const label = isIso
-          ? formatCalendarDate(yearInt, month, 1, "month", "ISO")
+          ? formatCalendarDate(yearInt, month, 1, 'month', 'ISO')
           : `${MONTH_LABELS[monthIndex]} ${yearInt}`;
         return posID ? `${label} ${posID}` : label;
       }
       const days = daysInMonth(yearInt, month);
       const day = Math.min(days, Math.max(1, Math.floor(monthFraction * days + 1e-9) + 1));
-      const label = formatCalendarDate(yearInt, month, day, "day");
+      const label = formatCalendarDate(yearInt, month, day, 'day');
       return posID ? `${label} ${posID}` : label;
     }
 
-    const display = hideDecimals ? Math.round(year) : (hasFraction ? year : yearInt);
+    const display = hideDecimals ? Math.round(year) : hasFraction ? year : yearInt;
     const label = `${display}`;
     return posID ? `${label} ${posID}` : label;
   }
-  return "0";
+  return '0';
 }
 
 const clampChannel = (value) => Math.max(0, Math.min(255, Math.round(value)));
 
 const mixColor = (base, target, amount) => clampChannel(base + (target - base) * amount);
 
-const toHex = (value) => value.toString(16).padStart(2, "0");
+const toHex = (value) => value.toString(16).padStart(2, '0');
 
 export function getReadableTextColor(background) {
-  if (!background || typeof background !== "string") return "#1A1A1A";
-  const hex = background.replace("#", "").trim();
-  if (hex.length !== 6) return "#1A1A1A";
+  if (!background || typeof background !== 'string') return '#1A1A1A';
+  const hex = background.replace('#', '').trim();
+  if (hex.length !== 6) return '#1A1A1A';
   const r = parseInt(hex.slice(0, 2), 16);
   const g = parseInt(hex.slice(2, 4), 16);
   const b = parseInt(hex.slice(4, 6), 16);
-  if ([r, g, b].some((v) => Number.isNaN(v))) return "#1A1A1A";
+  if ([r, g, b].some((v) => Number.isNaN(v))) return '#1A1A1A';
 
   const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
   const amount = luminance < 0.7 ? 0.7 : 0.45;
@@ -68,8 +65,8 @@ export function getReadableTextColor(background) {
   return `#${toHex(outR)}${toHex(outG)}${toHex(outB)}`;
 }
 
- // Scrollbar Width = (viewport width / (range * detail * scale)) * 100
- // (1200 / (range × detail × 0.5)) × 100 = 20 (Solving for detail: detail = 12000 / range)
+// Scrollbar Width = (viewport width / (range * detail * scale)) * 100
+// (1200 / (range × detail × 0.5)) × 100 = 20 (Solving for detail: detail = 12000 / range)
 
 export function calculateDetailLevel(range) {
   const absRange = Math.abs(range);
@@ -97,12 +94,11 @@ export function pickStep(range) {
   return niceBase * Math.pow(10, exponent);
 }
 
-
 // build child -> { parentId, offset } from spans
 // Each child span declares its parent via span.parent (string ID).
 // Children of the same parent alternate above/below with increasing offset.
 // Pattern: -1, +1, -2, +2, -3, +3, ...
-export function buildSpanChildPlacement(spans, branchOrdering = "later-first") {
+export function buildSpanChildPlacement(spans, branchOrdering = 'later-first') {
   const placement = {};
   const spanById = Object.fromEntries(spans.map((span) => [span.id, span]));
   const isContiguous = (left, right) =>
@@ -118,14 +114,14 @@ export function buildSpanChildPlacement(spans, branchOrdering = "later-first") {
       parentId: parent.id,
       offset: 0,
       priority: -1,
-      mode: "extend",
+      mode: 'extend',
     };
   }
 
   // Group children by their parent
   const childrenByParent = {};
   for (const span of spans) {
-    if (placement[span.id]?.mode === "extend") continue;
+    if (placement[span.id]?.mode === 'extend') continue;
     if (span.parent) {
       if (!childrenByParent[span.parent]) childrenByParent[span.parent] = [];
       childrenByParent[span.parent].push(span.id);
@@ -136,13 +132,13 @@ export function buildSpanChildPlacement(spans, branchOrdering = "later-first") {
     // offset -1 = lower lane number = larger Y = BELOW parent (lower on screen)
     // offset +1 = higher lane number = smaller Y = ABOVE parent (higher on screen)
     const orderedChildren =
-      branchOrdering === "original"
+      branchOrdering === 'original'
         ? [...childIds]
         : [...childIds].sort((aId, bId) => {
-            const a = spans.find(s => s.id === aId);
-            const b = spans.find(s => s.id === bId);
-            const aHasChildren = spans.some(s => s.parent === aId);
-            const bHasChildren = spans.some(s => s.parent === bId);
+            const a = spans.find((s) => s.id === aId);
+            const b = spans.find((s) => s.id === bId);
+            const aHasChildren = spans.some((s) => s.parent === aId);
+            const bHasChildren = spans.some((s) => s.parent === bId);
             if (aHasChildren !== bHasChildren) return aHasChildren ? -1 : 1;
             const aStart = a?.start ?? 0;
             const bStart = b?.start ?? 0;
@@ -197,7 +193,7 @@ export function layoutSpans({
   const spanLaneEnds = [];
   const spanLaneIntervals = [];
   const spanLaneById = {};
-  const spanById = Object.fromEntries(spans.map(s => [s.id, s]));
+  const spanById = Object.fromEntries(spans.map((s) => [s.id, s]));
   const finalSpans = [];
   const familyBands = new Map();
 
@@ -219,14 +215,14 @@ export function layoutSpans({
 
   const CSS_SPAN_HEIGHT = 20;
 
-  const sizeRank = (size) => size === "thick" ? 2 : size === "thin" ? 0 : 1;
+  const sizeRank = (size) => (size === 'thick' ? 2 : size === 'thin' ? 0 : 1);
   const getEffectiveSize = (s) => {
-    if (!s) return "normal";
+    if (!s) return 'normal';
     const maxRank = sizeRank(s.spanSize);
-    return maxRank === 2 ? "thick" : maxRank === 0 ? "thin" : "normal";
+    return maxRank === 2 ? 'thick' : maxRank === 0 ? 'thin' : 'normal';
   };
-  const isThickSpan = (s) => getEffectiveSize(s) === "thick";
-  const isThinSpan = (s) => getEffectiveSize(s) === "thin";
+  const isThickSpan = (s) => getEffectiveSize(s) === 'thick';
+  const isThinSpan = (s) => getEffectiveSize(s) === 'thin';
 
   function spanFitsAllNeededLanes(lane, span, rootId) {
     if (!spanFitsInLane(lane, span.start, span.end, rootId)) return false;
@@ -242,9 +238,9 @@ export function layoutSpans({
     const stk = [spanId];
     while (stk.length > 0) {
       const cur = stk.pop();
-      for (const childId of (parentToChildren[cur] || [])) {
+      for (const childId of parentToChildren[cur] || []) {
         const cp = spanChildPlacement[childId];
-        if (cp?.mode === "extend") {
+        if (cp?.mode === 'extend') {
           const es = spanById[childId];
           if (!es || !spanFitsAllNeededLanes(lane, es, rootId)) return false;
           stk.push(childId);
@@ -306,12 +302,11 @@ export function layoutSpans({
     return result;
   };
 
-  const spansOverlap = (startA, endA, startB, endB) =>
-    startA < endB && endA > startB;
+  const spansOverlap = (startA, endA, startB, endB) => startA < endB && endA > startB;
 
-  const rootSpans = spans.filter(span => !childToParent[span.id]);
-  const familyRoots = rootSpans.filter(span => parentToChildren[span.id]?.length > 0);
-  const otherRoots = rootSpans.filter(span => !parentToChildren[span.id]?.length);
+  const rootSpans = spans.filter((span) => !childToParent[span.id]);
+  const familyRoots = rootSpans.filter((span) => parentToChildren[span.id]?.length > 0);
+  const otherRoots = rootSpans.filter((span) => !parentToChildren[span.id]?.length);
 
   familyRoots.sort((a, b) => a.start - b.start);
   otherRoots.sort((a, b) => a.start - b.start);
@@ -372,8 +367,7 @@ export function layoutSpans({
       if (!spansOverlap(familyRange.start, familyRange.end, band.start, band.end)) continue;
       const candidateMin = baseLane + minOffset;
       const candidateMax = baseLane + maxOffset;
-      const overlapsBand =
-        candidateMin <= band.maxLane && candidateMax >= band.minLane;
+      const overlapsBand = candidateMin <= band.maxLane && candidateMax >= band.minLane;
       if (overlapsBand) return false;
     }
 
@@ -400,7 +394,7 @@ export function layoutSpans({
     const thick = isThickSpan(span);
     const thin = isThinSpan(span);
 
-    if (placement?.mode === "extend") {
+    if (placement?.mode === 'extend') {
       const parentLane = spanLaneById[placement.parentId];
       if (parentLane !== undefined) {
         lane = parentLane;
@@ -475,7 +469,9 @@ export function layoutSpans({
       : BASE_LINE_Y - SPAN_OFFSET - SPAN_HEIGHT - topLane * (SPAN_HEIGHT + SPAN_VERTICAL_GAP);
     const spanHeight = thick
       ? CSS_SPAN_HEIGHT + SPAN_HEIGHT + SPAN_VERTICAL_GAP
-      : thin ? Math.round(CSS_SPAN_HEIGHT / 2) : CSS_SPAN_HEIGHT;
+      : thin
+        ? Math.round(CSS_SPAN_HEIGHT / 2)
+        : CSS_SPAN_HEIGHT;
     const topOffset = thin ? Math.round((CSS_SPAN_HEIGHT - spanHeight) / 2) : 0;
 
     finalSpans.push({
@@ -501,13 +497,13 @@ export function layoutSpans({
         if (aStart !== bStart) return bStart - aStart;
         return String(a.id).localeCompare(String(b.id));
       })
-      .forEach(child => placeSpan(child));
+      .forEach((child) => placeSpan(child));
   }
 
-  familyRoots.forEach(span => placeSpan(span));
-  otherRoots.forEach(span => placeSpan(span));
+  familyRoots.forEach((span) => placeSpan(span));
+  otherRoots.forEach((span) => placeSpan(span));
   // Place any remaining spans that weren't reached via a root (safety net).
-  spans.forEach(span => placeSpan(span));
+  spans.forEach((span) => placeSpan(span));
 
   if (finalSpans.length > 0) {
     const minLane = Math.min(...finalSpans.map((span) => span.lane));
@@ -581,7 +577,7 @@ export function layoutSpans({
 }
 
 let measureCache = new Map();
-let measureCacheConfig = "";
+let measureCacheConfig = '';
 
 export function layoutEvents({
   events,
@@ -603,9 +599,7 @@ export function layoutEvents({
   useCalendar = false,
   hideDecimals = false,
 }) {
-  const laidOut = [...events]
-    .sort((a, b) => a.date - b.date)
-    .map((ev) => ({ ...ev, _x: yearToPx(ev.date) }));
+  const laidOut = [...events].sort((a, b) => a.date - b.date).map((ev) => ({ ...ev, _x: yearToPx(ev.date) }));
 
   const eventHeight = Math.round(eventWidth / 6);
   const paddingV = Math.max(2, Math.round(eventHeight * 0.08));
@@ -621,8 +615,8 @@ export function layoutEvents({
   const squareSize = Math.round(eventWidth * 0.467);
 
   // Create an offscreen probe matching .event styling for accurate height measurement
-  const probe = document.createElement("div");
-  probe.className = "event";
+  const probe = document.createElement('div');
+  probe.className = 'event';
   probe.style.setProperty('--event-width', `${eventWidth}px`);
   probe.style.setProperty('--event-height', `${eventHeight}px`);
   probe.style.setProperty('--event-height-noyear', `${noYearHeight}px`);
@@ -637,34 +631,33 @@ export function layoutEvents({
   probe.style.setProperty('--event-tile-width', `${thumbTileWidth}px`);
   probe.style.setProperty('--event-banner-height', `${bannerHeight}px`);
   probe.style.setProperty('--event-font-scale', `${eventFontSize / 10}`);
-  const probeTitle = document.createElement("div");
-  probeTitle.className = "event-title";
-  const probeDate = document.createElement("div");
-  probeDate.className = "event-date";
-  const probeYearSpan = document.createElement("span");
-  probeYearSpan.className = "event-year";
-  probeYearSpan.textContent = "0000";
-  const probeTags = document.createElement("span");
-  probeTags.className = "pinned-tags probe-tags";
+  const probeTitle = document.createElement('div');
+  probeTitle.className = 'event-title';
+  const probeDate = document.createElement('div');
+  probeDate.className = 'event-date';
+  const probeYearSpan = document.createElement('span');
+  probeYearSpan.className = 'event-year';
+  probeYearSpan.textContent = '0000';
+  const probeTags = document.createElement('span');
+  probeTags.className = 'pinned-tags probe-tags';
   let probeTextContent = null;
   probeDate.appendChild(probeYearSpan);
   probe.appendChild(probeTitle);
   probe.appendChild(probeDate);
 
-  const getVisiblePinnedTags = (tags) =>
-    (Array.isArray(tags) ? tags : []).filter((tag) => pinnedTags.includes(tag));
+  const getVisiblePinnedTags = (tags) => (Array.isArray(tags) ? tags : []).filter((tag) => pinnedTags.includes(tag));
 
   const setProbeTags = (tags) => {
-    probeTags.innerHTML = "";
+    probeTags.innerHTML = '';
     tags.forEach((tag) => {
-      const span = document.createElement("span");
-      span.className = "pinned-tag probe-tag";
+      const span = document.createElement('span');
+      span.className = 'pinned-tag probe-tag';
       span.textContent = tag;
       probeTags.appendChild(span);
     });
   };
   const syncProbeDateRow = ({ showDateRow, showYear, visibleTags, hasThumbnailLayout = false }) => {
-    probe.classList.toggle("event-no-year", !showDateRow);
+    probe.classList.toggle('event-no-year', !showDateRow);
 
     const dateParent = hasThumbnailLayout ? probeTextContent : probe;
     if (!showDateRow) {
@@ -697,10 +690,10 @@ export function layoutEvents({
     }
   };
   Object.assign(probe.style, {
-    position: "absolute",
-    visibility: "hidden",
-    pointerEvents: "none",
-    left: "-9999px",
+    position: 'absolute',
+    visibility: 'hidden',
+    pointerEvents: 'none',
+    left: '-9999px',
   });
   if (fontFamily) {
     probe.style.fontFamily = fontFamily;
@@ -708,13 +701,15 @@ export function layoutEvents({
   document.body.appendChild(probe);
 
   // Measure the fixed single-line height from CSS
-  probeTitle.textContent = "X";
+  probeTitle.textContent = 'X';
   syncProbeDateRow({ showDateRow: true, showYear: true, visibleTags: [] });
   const singleLineHeight = probe.offsetHeight;
   syncProbeDateRow({ showDateRow: false, showYear: false, visibleTags: [] });
   const noYearSingleLineHeight = probe.offsetHeight;
   syncProbeDateRow({ showDateRow: true, showYear: true, visibleTags: [] });
-  const probeBorderSize = (parseInt(getComputedStyle(probe).borderTopWidth, 10) || 0) + (parseInt(getComputedStyle(probe).borderBottomWidth, 10) || 0);
+  const probeBorderSize =
+    (parseInt(getComputedStyle(probe).borderTopWidth, 10) || 0) +
+    (parseInt(getComputedStyle(probe).borderBottomWidth, 10) || 0);
   probe.style.height = 'auto';
   probe.style.minHeight = '0';
   const textContentHeight = probe.offsetHeight;
@@ -723,25 +718,35 @@ export function layoutEvents({
 
   let measureEvent;
   if (fixedEventHeight) {
-    measureEvent = (title, tags, yearLabel, icon, thumbnail, thumbnailStyle, hideYears, sourceLink, eventBorderStyle) => {
-      if (thumbnail && (thumbnailStyle === "square-fill" || thumbnailStyle === "circle-fill")) {
-        const sqBorder = eventBorderStyle === "none" ? 0 : probeBorderSize;
+    measureEvent = (
+      title,
+      tags,
+      yearLabel,
+      icon,
+      thumbnail,
+      thumbnailStyle,
+      hideYears,
+      sourceLink,
+      eventBorderStyle,
+    ) => {
+      if (thumbnail && (thumbnailStyle === 'square-fill' || thumbnailStyle === 'circle-fill')) {
+        const sqBorder = eventBorderStyle === 'none' ? 0 : probeBorderSize;
         return { boxHeight: squareSize + sqBorder, isMultiLine: false, squareSize, boxWidth: squareSize + 4 };
       }
-      if (thumbnail && thumbnailStyle === "banner") {
+      if (thumbnail && thumbnailStyle === 'banner') {
         return { boxHeight: textContentHeight + bannerHeight, isMultiLine: true, boxWidth: EVENT_WIDTH };
       }
       if (thumbnail) {
         return { boxHeight: singleLineHeight, isMultiLine: false, boxWidth: EVENT_WIDTH };
       }
       let h = singleLineHeight;
-      if (eventBorderStyle === "none") h -= probeBorderSize;
+      if (eventBorderStyle === 'none') h -= probeBorderSize;
       return { boxHeight: h, isMultiLine: false, boxWidth: EVENT_WIDTH };
     };
   } else {
     // Switch to auto-height for measuring multi-line content
-    probe.classList.add("multi-lane");
-    probe.style.height = "auto";
+    probe.classList.add('multi-lane');
+    probe.style.height = 'auto';
     syncProbeDateRow({ showDateRow: true, showYear: true, visibleTags: [] });
     const baseContentHeight = probe.offsetHeight;
     syncProbeDateRow({ showDateRow: false, showYear: false, visibleTags: [] });
@@ -749,31 +754,30 @@ export function layoutEvents({
     syncProbeDateRow({ showDateRow: true, showYear: true, visibleTags: [] });
 
     // Reusable icon placeholder
-    const probeIcon = document.createElement("span");
+    const probeIcon = document.createElement('span');
     probeIcon.style.cssText = `float: left; width: ${eventFontSize}px; height: ${eventFontSize}px; margin-right: 3px; margin-top: 1px;`;
 
-    const probeThumbnailTile = document.createElement("div");
-    probeThumbnailTile.className = "event-thumbnail-tile";
+    const probeThumbnailTile = document.createElement('div');
+    probeThumbnailTile.className = 'event-thumbnail-tile';
     // Fix the width for probe measurement since aspect-ratio:1 is based on height
     probeThumbnailTile.style.width = `${thumbTileWidth}px`;
-    probeTextContent = document.createElement("div");
-    probeTextContent.className = "event-text-content";
+    probeTextContent = document.createElement('div');
+    probeTextContent.className = 'event-text-content';
 
-    probe.classList.add("has-thumbnail");
+    probe.classList.add('has-thumbnail');
     probeTextContent.appendChild(probeTitle);
     probeTextContent.appendChild(probeDate);
-    probe.innerHTML = "";
+    probe.innerHTML = '';
     probe.appendChild(probeThumbnailTile);
     probe.appendChild(probeTextContent);
-    probeTitle.textContent = "X";
+    probeTitle.textContent = 'X';
     syncProbeDateRow({ showDateRow: true, showYear: true, visibleTags: [], hasThumbnailLayout: true });
     const thumbnailBaseContentHeight = probe.offsetHeight;
     syncProbeDateRow({ showDateRow: false, showYear: false, visibleTags: [], hasThumbnailLayout: true });
     const thumbnailNoYearBaseContentHeight = probe.offsetHeight;
 
-
-    probe.classList.remove("has-thumbnail");
-    probe.innerHTML = "";
+    probe.classList.remove('has-thumbnail');
+    probe.innerHTML = '';
     probe.appendChild(probeTitle);
     probe.appendChild(probeDate);
     syncProbeDateRow({ showDateRow: true, showYear: true, visibleTags: [] });
@@ -783,15 +787,15 @@ export function layoutEvents({
     const setupProbeLayout = (hasThumbnail) => {
       if (hasThumbnail === lastHasThumbnail) return;
       lastHasThumbnail = hasThumbnail;
-      probe.innerHTML = "";
+      probe.innerHTML = '';
       if (hasThumbnail) {
-        probe.classList.add("has-thumbnail");
+        probe.classList.add('has-thumbnail');
         probeTextContent.appendChild(probeTitle);
         probeTextContent.appendChild(probeDate);
         probe.appendChild(probeThumbnailTile);
         probe.appendChild(probeTextContent);
       } else {
-        probe.classList.remove("has-thumbnail");
+        probe.classList.remove('has-thumbnail');
         probe.appendChild(probeTitle);
         probe.appendChild(probeDate);
       }
@@ -799,18 +803,28 @@ export function layoutEvents({
 
     const BANNER_HEIGHT = bannerHeight;
 
-    measureEvent = (title, tags, yearLabel, icon, thumbnail, thumbnailStyle, hideYears, sourceLink, eventBorderStyle) => {
-      if (thumbnail && (thumbnailStyle === "square-fill" || thumbnailStyle === "circle-fill")) {
-        const sqBorder = eventBorderStyle === "none" ? 0 : probeBorderSize;
+    measureEvent = (
+      title,
+      tags,
+      yearLabel,
+      icon,
+      thumbnail,
+      thumbnailStyle,
+      hideYears,
+      sourceLink,
+      eventBorderStyle,
+    ) => {
+      if (thumbnail && (thumbnailStyle === 'square-fill' || thumbnailStyle === 'circle-fill')) {
+        const sqBorder = eventBorderStyle === 'none' ? 0 : probeBorderSize;
         return { boxHeight: squareSize + sqBorder, isMultiLine: false, squareSize, boxWidth: squareSize + 4 };
       }
-      const isBanner = thumbnail && thumbnailStyle === "banner";
+      const isBanner = thumbnail && thumbnailStyle === 'banner';
       const hasStripThumb = thumbnail && !isBanner;
       const visibleTags = getVisiblePinnedTags(tags);
       const showDateRow = hideYears !== true || visibleTags.length > 0;
       const showYear = hideYears !== true;
       setupProbeLayout(hasStripThumb);
-      probe.classList.toggle("has-source-link", !!sourceLink);
+      probe.classList.toggle('has-source-link', !!sourceLink);
       syncProbeDateRow({
         showDateRow,
         showYear,
@@ -818,16 +832,20 @@ export function layoutEvents({
         hasThumbnailLayout: hasStripThumb,
       });
       const baseline = showDateRow
-        ? (hasStripThumb ? thumbnailBaseContentHeight : baseContentHeight)
-        : (hasStripThumb ? thumbnailNoYearBaseContentHeight : noYearBaseContentHeight);
-      probeTitle.innerHTML = "";
+        ? hasStripThumb
+          ? thumbnailBaseContentHeight
+          : baseContentHeight
+        : hasStripThumb
+          ? thumbnailNoYearBaseContentHeight
+          : noYearBaseContentHeight;
+      probeTitle.innerHTML = '';
       if (icon) probeTitle.appendChild(probeIcon);
-      probeTitle.appendChild(document.createTextNode(title || "X"));
+      probeTitle.appendChild(document.createTextNode(title || 'X'));
       if (showYear) {
-        probeYearSpan.textContent = yearLabel || "0000";
+        probeYearSpan.textContent = yearLabel || '0000';
       }
       const naturalHeight = probe.offsetHeight;
-      const borderAdj = eventBorderStyle === "none" ? probeBorderSize : 0;
+      const borderAdj = eventBorderStyle === 'none' ? probeBorderSize : 0;
       if (isBanner) {
         probe.style.minHeight = '0';
         const textHeight = probe.offsetHeight;
@@ -837,11 +855,9 @@ export function layoutEvents({
       const isMultiLine = naturalHeight > baseline;
       const canonicalHeight = showDateRow ? singleLineHeight : noYearSingleLineHeight;
       return {
-        boxHeight: (isMultiLine
-          ? naturalHeight
-          : hasStripThumb
-            ? Math.max(naturalHeight, canonicalHeight)
-            : canonicalHeight) - borderAdj,
+        boxHeight:
+          (isMultiLine ? naturalHeight : hasStripThumb ? Math.max(naturalHeight, canonicalHeight) : canonicalHeight) -
+          borderAdj,
         isMultiLine,
         boxWidth: EVENT_WIDTH,
       };
@@ -850,8 +866,15 @@ export function layoutEvents({
 
   // Cache by measurement inputs; probe-derived heights in the config key catch CSS/theme changes
   const configKey = JSON.stringify([
-    fixedEventHeight, eventWidth, eventFontSize, fontFamily || "", pinnedTags,
-    singleLineHeight, noYearSingleLineHeight, textContentHeight, probeBorderSize,
+    fixedEventHeight,
+    eventWidth,
+    eventFontSize,
+    fontFamily || '',
+    pinnedTags,
+    singleLineHeight,
+    noYearSingleLineHeight,
+    textContentHeight,
+    probeBorderSize,
   ]);
   if (configKey !== measureCacheConfig) {
     measureCacheConfig = configKey;
@@ -859,10 +882,30 @@ export function layoutEvents({
   }
   const measureEventUncached = measureEvent;
   measureEvent = (title, tags, yearLabel, icon, thumbnail, thumbnailStyle, hideYears, sourceLink, eventBorderStyle) => {
-    const key = JSON.stringify([title, tags, yearLabel, !!icon, thumbnail || "", thumbnailStyle || "", hideYears === true, !!sourceLink, eventBorderStyle || ""]);
+    const key = JSON.stringify([
+      title,
+      tags,
+      yearLabel,
+      !!icon,
+      thumbnail || '',
+      thumbnailStyle || '',
+      hideYears === true,
+      !!sourceLink,
+      eventBorderStyle || '',
+    ]);
     let box = measureCache.get(key);
     if (!box) {
-      box = measureEventUncached(title, tags, yearLabel, icon, thumbnail, thumbnailStyle, hideYears, sourceLink, eventBorderStyle);
+      box = measureEventUncached(
+        title,
+        tags,
+        yearLabel,
+        icon,
+        thumbnail,
+        thumbnailStyle,
+        hideYears,
+        sourceLink,
+        eventBorderStyle,
+      );
       if (measureCache.size >= 20000) measureCache.clear();
       measureCache.set(key, box);
     }
@@ -879,8 +922,14 @@ export function layoutEvents({
 
   const finalEvents = laidOut.map((event) => {
     const x = event._x;
-    const yearLabel = displayDateLabel(event.dateLabel) ?? formatYear(event.date, negID, posID, useCalendar, hideDecimals);
-    const { boxHeight, isMultiLine, squareSize, boxWidth = EVENT_WIDTH } = measureEvent(
+    const yearLabel =
+      displayDateLabel(event.dateLabel) ?? formatYear(event.date, negID, posID, useCalendar, hideDecimals);
+    const {
+      boxHeight,
+      isMultiLine,
+      squareSize,
+      boxWidth = EVENT_WIDTH,
+    } = measureEvent(
       event.title,
       event.tags,
       yearLabel,
@@ -889,7 +938,7 @@ export function layoutEvents({
       event.thumbnailStyle,
       event.hideYears,
       event.sourceLink,
-      event.eventBorderStyle
+      event.eventBorderStyle,
     );
 
     // Find placed events that horizontally overlap
@@ -898,14 +947,13 @@ export function layoutEvents({
 
     const conflicts = placed
       .filter((p) => p.right + EVENT_GAP > left)
-      .sort((a, b) => belowLine ? a.top - b.top : b.top - a.top);
+      .sort((a, b) => (belowLine ? a.top - b.top : b.top - a.top));
 
     let top;
     if (belowLine) {
       top = LANE0_TOP;
       for (const c of conflicts) {
-        if (top < c.top + c.boxHeight + VERTICAL_GAP &&
-            top + boxHeight + VERTICAL_GAP > c.top) {
+        if (top < c.top + c.boxHeight + VERTICAL_GAP && top + boxHeight + VERTICAL_GAP > c.top) {
           top = c.top + c.boxHeight + VERTICAL_GAP;
         }
       }
@@ -913,8 +961,7 @@ export function layoutEvents({
       const minBottom = LANE0_TOP + singleLineHeight;
       top = Math.min(LANE0_TOP, minBottom - boxHeight);
       for (const c of conflicts) {
-        if (top < c.top + c.boxHeight + VERTICAL_GAP &&
-            top + boxHeight + VERTICAL_GAP > c.top) {
+        if (top < c.top + c.boxHeight + VERTICAL_GAP && top + boxHeight + VERTICAL_GAP > c.top) {
           top = c.top - boxHeight - VERTICAL_GAP;
         }
       }

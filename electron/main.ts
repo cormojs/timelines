@@ -35,30 +35,34 @@ const gitSyncRepoDir = () => path.join(app.getPath('userData'), 'git-sync-repo')
 const gitSyncStatePath = () => path.join(app.getPath('userData'), 'git-sync-state.json');
 const gitSyncCredsPath = () => path.join(app.getPath('userData'), 'git-sync-credentials.json');
 
-const safeName = (value) => String(value || '')
-  .trim()
-  .replace(/[^\w.-]+/g, '-')
-  .replace(/-+/g, '-')
-  .replace(/^-+|-+$/g, '')
-  .toLowerCase();
+const safeName = (value) =>
+  String(value || '')
+    .trim()
+    .replace(/[^\w.-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase();
 
 const sanitizeId = (value, fallback = '') => safeName(value) || fallback;
 
 const sanitizeTimelinePath = (value) => {
   const parts = String(value || '').split(/[/\\]/);
-  const sanitized = parts.map(p => safeName(p)).filter(Boolean);
+  const sanitized = parts.map((p) => safeName(p)).filter(Boolean);
   return sanitized.length > 0 ? sanitized.join('/') : 'timeline';
 };
 
 // Existing files/folders keep their on-disk name verbatim; only traversal parts are stripped
 const existingTimelinePath = (value) => {
-  const parts = String(value || '').split(/[/\\]/).filter(p => p && p !== '.' && p !== '..');
+  const parts = String(value || '')
+    .split(/[/\\]/)
+    .filter((p) => p && p !== '.' && p !== '..');
   return parts.length > 0 ? parts.join('/') : 'timeline';
 };
 
-const samePath = (a, b) => process.platform === 'win32'
-  ? path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase()
-  : path.resolve(a) === path.resolve(b);
+const samePath = (a, b) =>
+  process.platform === 'win32'
+    ? path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase()
+    : path.resolve(a) === path.resolve(b);
 
 // Notes/assets folders are keyed by immutable file.uid; older timelines fall back to file.id
 const deriveStorageId = (file) => file?.uid || file?.id?.replace(/-timeline$/, '') || null;
@@ -77,7 +81,7 @@ async function listTimelineFilesRecursive(dir, baseDir) {
     for (const entry of entries) {
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        results.push(...await listTimelineFilesRecursive(fullPath, baseDir));
+        results.push(...(await listTimelineFilesRecursive(fullPath, baseDir)));
       } else if (entry.isFile() && entry.name.endsWith('.timeline')) {
         const rel = path.relative(baseDir, fullPath).replace(/\\/g, '/');
         results.push({ fullPath, relativeId: rel.replace(/\.timeline$/, '') });
@@ -121,7 +125,9 @@ const resolveNotePath = async (timelineId, notePath) => {
 };
 // Cached because the asset protocol reads settings on every image request; writers invalidate
 let appSettingsCache = null;
-const invalidateAppSettingsCache = () => { appSettingsCache = null; };
+const invalidateAppSettingsCache = () => {
+  appSettingsCache = null;
+};
 const readAppSettings = async () => {
   if (appSettingsCache) return appSettingsCache;
   try {
@@ -164,13 +170,13 @@ async function saveGitSyncCredentials(credentials) {
   const json = JSON.stringify(credentials);
   const payload = safeStorage.isEncryptionAvailable()
     ? {
-      encrypted: true,
-      data: safeStorage.encryptString(json).toString('base64'),
-    }
+        encrypted: true,
+        data: safeStorage.encryptString(json).toString('base64'),
+      }
     : {
-      encrypted: false,
-      data: Buffer.from(json, 'utf8').toString('base64'),
-    };
+        encrypted: false,
+        data: Buffer.from(json, 'utf8').toString('base64'),
+      };
   await writeFileAtomic(gitSyncCredsPath(), JSON.stringify(payload, null, 2));
 }
 
@@ -362,10 +368,7 @@ function setupAutoUpdater() {
 
 function setupOsmTileRequestHeaders() {
   const tileFilter = {
-    urls: [
-      'https://tile.openstreetmap.org/*',
-      'https://*.tile.openstreetmap.org/*',
-    ],
+    urls: ['https://tile.openstreetmap.org/*', 'https://*.tile.openstreetmap.org/*'],
   };
 
   session.defaultSession.webRequest.onBeforeSendHeaders(tileFilter, (details, callback) => {
@@ -528,10 +531,7 @@ app.on('before-quit', (event) => {
   if (status.pendingCount <= 0 || status.state === 'offline' || status.state === 'auth-expired') return;
   gitSyncQuitStarted = true;
   event.preventDefault();
-  Promise.race([
-    gitSync.syncNow(),
-    new Promise((resolve) => setTimeout(resolve, 5000)),
-  ]).finally(() => {
+  Promise.race([gitSync.syncNow(), new Promise((resolve) => setTimeout(resolve, 5000))]).finally(() => {
     app.quit();
   });
 });
@@ -603,41 +603,45 @@ ipcMain.handle('list-timelines', async () => {
     const userDataDir = await getTimelinesDir();
     const files = await listTimelineFilesRecursive(userDataDir, userDataDir);
 
-    const timelines = (await Promise.all(
-      files.map(async ({ fullPath, relativeId }) => {
-        try {
-          const content = await fs.readFile(fullPath);
-          // Packages copied into the library folder are listed too; opening
-          // one runs the transparent import (see import-timeline)
-          const isPackage = isZipBuffer(content);
-          const data = isPackage
-            ? JSON.parse(readPackage(content).timelineJson)
-            : JSON.parse(content.toString('utf8'));
-          const stat = await fs.stat(fullPath);
-          const parts = relativeId.split('/');
-          const folder = parts.length > 1 ? parts.slice(0, -1).join('/') : '';
-          const storageId = deriveStorageId(data.file);
-          const thumbnailPath = path.join(await getAssetsDir(storageId), '.timeline-thumbnail.jpg');
-          const thumbnailStat = await fs.stat(thumbnailPath).catch(() => null);
-          return {
-            id: relativeId,
-            uid: storageId,
-            name: data.file?.title || parts[parts.length - 1],
-            neverSync: Boolean(data.file?.neverSync),
-            modifiedAt: stat.mtimeMs,
-            eventCount: Array.isArray(data.elements) ? data.elements.length : 0,
-            folder,
-            ...(thumbnailStat ? {
-              thumbnailUrl: `${toAssetUrl(thumbnailPath)}&v=${Math.floor(thumbnailStat.mtimeMs)}`,
-            } : {}),
-            ...(isPackage ? { isPackage: true, packagePath: fullPath } : {}),
-          };
-        } catch (err) {
-          console.warn(`Skipping corrupt timeline ${relativeId}:`, err.message);
-          return null;
-        }
-      })
-    )).filter(Boolean);
+    const timelines = (
+      await Promise.all(
+        files.map(async ({ fullPath, relativeId }) => {
+          try {
+            const content = await fs.readFile(fullPath);
+            // Packages copied into the library folder are listed too; opening
+            // one runs the transparent import (see import-timeline)
+            const isPackage = isZipBuffer(content);
+            const data = isPackage
+              ? JSON.parse(readPackage(content).timelineJson)
+              : JSON.parse(content.toString('utf8'));
+            const stat = await fs.stat(fullPath);
+            const parts = relativeId.split('/');
+            const folder = parts.length > 1 ? parts.slice(0, -1).join('/') : '';
+            const storageId = deriveStorageId(data.file);
+            const thumbnailPath = path.join(await getAssetsDir(storageId), '.timeline-thumbnail.jpg');
+            const thumbnailStat = await fs.stat(thumbnailPath).catch(() => null);
+            return {
+              id: relativeId,
+              uid: storageId,
+              name: data.file?.title || parts[parts.length - 1],
+              neverSync: Boolean(data.file?.neverSync),
+              modifiedAt: stat.mtimeMs,
+              eventCount: Array.isArray(data.elements) ? data.elements.length : 0,
+              folder,
+              ...(thumbnailStat
+                ? {
+                    thumbnailUrl: `${toAssetUrl(thumbnailPath)}&v=${Math.floor(thumbnailStat.mtimeMs)}`,
+                  }
+                : {}),
+              ...(isPackage ? { isPackage: true, packagePath: fullPath } : {}),
+            };
+          } catch (err) {
+            console.warn(`Skipping corrupt timeline ${relativeId}:`, err.message);
+            return null;
+          }
+        }),
+      )
+    ).filter(Boolean);
 
     return timelines;
   } catch (error) {
@@ -656,12 +660,14 @@ ipcMain.handle('load-timeline', async (event, filename) => {
     if (data.file && !data.file.uid) {
       // One-time migration: stamp the immutable storage uid
       data.file.uid = data.file.id?.replace(/-timeline$/, '') || safePath.split('/').pop();
-      await writeFileAtomic(filePath, JSON.stringify(data, null, 2))
-        .catch((e) => console.warn('Could not persist timeline uid:', e.message));
+      await writeFileAtomic(filePath, JSON.stringify(data, null, 2)).catch((e) =>
+        console.warn('Could not persist timeline uid:', e.message),
+      );
     }
     const storageId = deriveStorageId(data.file);
-    await healMissingAssets(data.elements, storageId, filePath)
-      .catch((e) => console.warn('Asset folder recovery skipped:', e.message));
+    await healMissingAssets(data.elements, storageId, filePath).catch((e) =>
+      console.warn('Asset folder recovery skipped:', e.message),
+    );
     const resolvedData = { ...data, elements: await resolveThumbnails(data.elements, storageId) };
     console.log(`Loaded timeline: ${filename}`);
     return resolvedData;
@@ -712,9 +718,11 @@ function extractNoteImageSrcs(markdown): string[] {
 
 const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-const rewriteNoteSrc = (content, oldSrc, newSrc) => content
-  .split(`](${oldSrc})`).join(`](${newSrc})`)
-  .replace(new RegExp(`(src\\s*=\\s*["'])${escapeRegExp(oldSrc)}(["'])`, 'gi'), `$1${newSrc}$2`);
+const rewriteNoteSrc = (content, oldSrc, newSrc) =>
+  content
+    .split(`](${oldSrc})`)
+    .join(`](${newSrc})`)
+    .replace(new RegExp(`(src\\s*=\\s*["'])${escapeRegExp(oldSrc)}(["'])`, 'gi'), `$1${newSrc}$2`);
 
 // Collects a timeline's thumbnails, notes, and note images as zip entries; elements must be in stored-ref form
 async function collectPackageFiles(data, storageId) {
@@ -746,7 +754,10 @@ async function collectPackageFiles(data, storageId) {
     const ref = el.thumbnail;
     if (!ref || typeof ref !== 'string' || ref.includes('://')) continue;
     const abs = await findThumbnailFile(ref, assetsRoot, timelineAssetsDir);
-    if (!abs) { skipped.push(ref); continue; }
+    if (!abs) {
+      skipped.push(ref);
+      continue;
+    }
     try {
       files[`assets/${ref.replace(/\\/g, '/')}`] = new Uint8Array(await fs.readFile(abs));
     } catch {
@@ -761,7 +772,10 @@ async function collectPackageFiles(data, storageId) {
       const notePath = storageId ? await resolveNotePath(storageId, el.noteFile) : null;
       if (notePath) content = await fs.readFile(notePath, 'utf8');
     } catch {}
-    if (content === null) { skipped.push(el.noteFile); continue; }
+    if (content === null) {
+      skipped.push(el.noteFile);
+      continue;
+    }
 
     for (const src of extractNoteImageSrcs(content)) {
       if (src.startsWith('timelines-asset://')) {
@@ -772,7 +786,12 @@ async function collectPackageFiles(data, storageId) {
           continue;
         }
         let bytes;
-        try { bytes = new Uint8Array(await fs.readFile(decoded)); } catch { skipped.push(src); continue; }
+        try {
+          bytes = new Uint8Array(await fs.readFile(decoded));
+        } catch {
+          skipped.push(src);
+          continue;
+        }
         // Absolute asset URLs don't travel; store flat and point the note copy at the bare name
         const entry = addAssetBytes(`assets/${path.basename(decoded)}`, bytes);
         content = rewriteNoteSrc(content, src, entry.slice('assets/'.length));
@@ -781,9 +800,17 @@ async function collectPackageFiles(data, storageId) {
       if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(src)) continue; // external URL / other scheme
       if (src.includes('/') || src.includes('\\')) continue; // only bare refs resolve in notes
       const abs = await findThumbnailFile(src, assetsRoot, timelineAssetsDir);
-      if (!abs) { skipped.push(src); continue; }
+      if (!abs) {
+        skipped.push(src);
+        continue;
+      }
       let bytes;
-      try { bytes = new Uint8Array(await fs.readFile(abs)); } catch { skipped.push(src); continue; }
+      try {
+        bytes = new Uint8Array(await fs.readFile(abs));
+      } catch {
+        skipped.push(src);
+        continue;
+      }
       const entry = addAssetBytes(`assets/${src}`, bytes);
       if (entry !== `assets/${src}`) {
         content = rewriteNoteSrc(content, src, entry.slice('assets/'.length));
@@ -850,7 +877,9 @@ async function writeExtractedFile(baseDir, rel, contents) {
   for (;;) {
     const target = path.join(dir, candidate);
     let existing = null;
-    try { existing = await fs.readFile(target); } catch {}
+    try {
+      existing = await fs.readFile(target);
+    } catch {}
     if (existing === null) {
       await fs.writeFile(target, bytes);
       break;
@@ -924,9 +953,10 @@ async function installTimelineFromBuffer(buf: Uint8Array, opts: TimelineInstallO
 
   data.file = data.file && typeof data.file === 'object' ? data.file : {};
   if (!data.file.uid) {
-    data.file.uid = data.file.id?.replace(/-timeline$/, '')
-      || (sourcePath ? safeName(path.basename(sourcePath).replace(/\.(timeline|json)$/i, '')) : '')
-      || `timeline-${Date.now()}`;
+    data.file.uid =
+      data.file.id?.replace(/-timeline$/, '') ||
+      (sourcePath ? safeName(path.basename(sourcePath).replace(/\.(timeline|json)$/i, '')) : '') ||
+      `timeline-${Date.now()}`;
   }
 
   const existing = await findTimelineByUid(data.file.uid);
@@ -1017,10 +1047,8 @@ async function installTimelineFromBuffer(buf: Uint8Array, opts: TimelineInstallO
   let folderPrefix = '';
   if (sourcePath) {
     const sourceRel = path.relative(path.resolve(timelinesDir), path.resolve(sourcePath));
-    sourceInLibrary = Boolean(pkg)
-      && /\.timeline$/i.test(sourcePath)
-      && !sourceRel.startsWith('..')
-      && !path.isAbsolute(sourceRel);
+    sourceInLibrary =
+      Boolean(pkg) && /\.timeline$/i.test(sourcePath) && !sourceRel.startsWith('..') && !path.isAbsolute(sourceRel);
     // Keep a library package's folder placement when converting it
     const sourceFolder = sourceInLibrary ? path.dirname(sourceRel.replace(/\\/g, '/')) : '';
     folderPrefix = sourceFolder && sourceFolder !== '.' ? `${sanitizeTimelinePath(sourceFolder)}/` : '';
@@ -1318,9 +1346,7 @@ ipcMain.handle('move-folder', async (event, { folderPath, targetFolder }) => {
     const baseDir = await getTimelinesDir();
     const safeSrc = existingTimelinePath(folderPath);
     const folderName = safeSrc.split('/').pop();
-    const safeDest = targetFolder
-      ? `${existingTimelinePath(targetFolder)}/${folderName}`
-      : folderName;
+    const safeDest = targetFolder ? `${existingTimelinePath(targetFolder)}/${folderName}` : folderName;
     if (safeSrc === safeDest) return { success: true };
     // Prevent moving into own subtree
     if (safeDest.startsWith(safeSrc + '/')) return { success: false, error: 'Cannot move folder into itself' };
@@ -1390,7 +1416,9 @@ ipcMain.handle('move-timeline', async (event, { id, targetFolder }) => {
     const oldNotesPath = path.join(notesBase, ...sanitizeTimelinePath(safePath).split('/'));
     const newNotesPath = path.join(notesBase, ...sanitizeTimelinePath(newRelId).split('/'));
     if (oldNotesPath !== newNotesPath) {
-      await fs.rename(oldNotesPath, newNotesPath).catch(e => { if (e.code !== 'ENOENT') throw e; });
+      await fs.rename(oldNotesPath, newNotesPath).catch((e) => {
+        if (e.code !== 'ENOENT') throw e;
+      });
     }
     markGitSyncStructureDirty();
     return { success: true, newId: newRelId };
@@ -1577,7 +1605,9 @@ ipcMain.handle('rename-timeline', async (event, { oldId, newId }) => {
     if (fsSync.existsSync(newFilePath)) return { success: false, error: 'EXISTS' };
 
     await fs.mkdir(path.dirname(newFilePath), { recursive: true });
-    await fs.rename(oldFilePath, newFilePath).catch(e => { if (e.code !== 'ENOENT') throw e; });
+    await fs.rename(oldFilePath, newFilePath).catch((e) => {
+      if (e.code !== 'ENOENT') throw e;
+    });
 
     // Storage folders are keyed by immutable file.uid, so they don't move on rename
     markGitSyncStructureDirty();
@@ -1618,11 +1648,25 @@ ipcMain.handle('get-app-settings', async () => {
 });
 
 const ALLOWED_SETTINGS_KEYS = new Set([
-  'timelineStorageDir', 'storageDir', 'notesStorageDir',
+  'timelineStorageDir',
+  'storageDir',
+  'notesStorageDir',
   'themeKey',
-  'theme', 'notesSubfolder', 'notesSubfolderEnabled',
-  'appFontFamily', 'appFontSize', 'keybinds', 'hardwareAcceleration', 'startMaximized', 'assetsStorageDir', 'homeSortMode', 'homeViewMode', 'homeSidebarWidth',
-  'gitSyncAutoSync', 'gitSyncIntervalMinutes', 'gitSyncMachineLabel',
+  'theme',
+  'notesSubfolder',
+  'notesSubfolderEnabled',
+  'appFontFamily',
+  'appFontSize',
+  'keybinds',
+  'hardwareAcceleration',
+  'startMaximized',
+  'assetsStorageDir',
+  'homeSortMode',
+  'homeViewMode',
+  'homeSidebarWidth',
+  'gitSyncAutoSync',
+  'gitSyncIntervalMinutes',
+  'gitSyncMachineLabel',
 ]);
 
 ipcMain.handle('set-app-settings', async (event, settings) => {
@@ -1635,7 +1679,9 @@ ipcMain.handle('set-app-settings', async (event, settings) => {
     try {
       const raw = await fs.readFile(filePath, 'utf8');
       existing = JSON.parse(raw);
-    } catch { /* first run or corrupt file — start fresh */ }
+    } catch {
+      /* first run or corrupt file — start fresh */
+    }
     const merged = { ...existing };
     for (const key of Object.keys(settings)) {
       if (ALLOWED_SETTINGS_KEYS.has(key)) {
@@ -1661,7 +1707,10 @@ ipcMain.handle('git-sync-connect', async (event, payload) => {
       return { success: false, error: 'Missing repository URL' };
     }
     if (/^(ssh:\/\/|git@)/i.test(remoteUrl)) {
-      return { success: false, error: 'This build currently supports HTTPS remotes with a personal access token. Use an https:// clone URL.' };
+      return {
+        success: false,
+        error: 'This build currently supports HTTPS remotes with a personal access token. Use an https:// clone URL.',
+      };
     }
     if (!token) {
       return { success: false, error: 'Missing personal access token' };
@@ -1954,7 +2003,9 @@ const decodeAssetUrl = (value) => {
       assetPath = '/' + assetPath;
     }
     return assetPath;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 };
 
 // Storage ref for a thumbnail: bare filename (in the timeline's assets folder)
@@ -1982,9 +2033,7 @@ function extractThumbnailRef(thumbnail, assetsRoot, timelineAssetsDir) {
 // whichever exists on disk wins, so legacy refs keep resolving either way
 function thumbnailCandidatePaths(ref, assetsRoot, timelineAssetsDir) {
   const hasSlash = ref.includes('/') || ref.includes('\\');
-  const dirs = hasSlash
-    ? [assetsRoot, timelineAssetsDir]
-    : [timelineAssetsDir, assetsRoot];
+  const dirs = hasSlash ? [assetsRoot, timelineAssetsDir] : [timelineAssetsDir, assetsRoot];
   const normalizedRoot = path.normalize(assetsRoot);
   return dirs
     .filter(Boolean)
@@ -2015,7 +2064,7 @@ async function stripThumbnails(elements, storageId) {
   if (!Array.isArray(elements)) return elements;
   const assetsRoot = await getAssetsRootDir();
   const timelineAssetsDir = storageId ? await getAssetsDir(storageId) : null;
-  return elements.map(el => {
+  return elements.map((el) => {
     if (!el.thumbnail) return el;
     const ref = extractThumbnailRef(el.thumbnail, assetsRoot, timelineAssetsDir);
     return ref ? { ...el, thumbnail: ref } : el;
@@ -2026,13 +2075,15 @@ async function resolveThumbnails(elements, storageId) {
   if (!Array.isArray(elements) || !storageId) return elements;
   const assetsRoot = await getAssetsRootDir();
   const timelineAssetsDir = await getAssetsDir(storageId);
-  return Promise.all(elements.map(async el => {
-    if (!el.thumbnail) return el;
-    const ref = extractThumbnailRef(el.thumbnail, assetsRoot, timelineAssetsDir);
-    if (!ref) return el;
-    const url = await resolveThumbnailRef(ref, assetsRoot, timelineAssetsDir);
-    return url ? { ...el, thumbnail: url } : el;
-  }));
+  return Promise.all(
+    elements.map(async (el) => {
+      if (!el.thumbnail) return el;
+      const ref = extractThumbnailRef(el.thumbnail, assetsRoot, timelineAssetsDir);
+      if (!ref) return el;
+      const url = await resolveThumbnailRef(ref, assetsRoot, timelineAssetsDir);
+      return url ? { ...el, thumbnail: url } : el;
+    }),
+  );
 }
 
 // If the expected assets folder is missing but exactly one other folder
@@ -2041,22 +2092,32 @@ async function resolveThumbnails(elements, storageId) {
 // are copied
 async function healMissingAssets(elements, storageId, currentFilePath) {
   if (!Array.isArray(elements) || !storageId) return;
-  const refs = [...new Set(
-    elements
-      .map(el => el.thumbnail)
-      .filter(t => t && typeof t === 'string' && !t.includes('://') && !/[\\/]/.test(t))
-  )];
+  const refs = [
+    ...new Set(
+      elements
+        .map((el) => el.thumbnail)
+        .filter((t) => t && typeof t === 'string' && !t.includes('://') && !/[\\/]/.test(t)),
+    ),
+  ];
   if (refs.length === 0) return;
 
   const dir = await getAssetsDir(storageId);
   const root = await getAssetsRootDir();
 
-  try { await fs.access(dir); return; } catch {}
+  try {
+    await fs.access(dir);
+    return;
+  } catch {}
 
   // In-place custom assets at the root already resolve, nothing to recover
   let allAtRoot = true;
   for (const ref of refs) {
-    try { await fs.access(path.join(root, ref)); } catch { allAtRoot = false; break; }
+    try {
+      await fs.access(path.join(root, ref));
+    } catch {
+      allAtRoot = false;
+      break;
+    }
   }
   if (allAtRoot) return;
 
@@ -2081,7 +2142,12 @@ async function healMissingAssets(elements, storageId, currentFilePath) {
     const candidate = path.join(root, entry.name);
     let containsAll = true;
     for (const ref of refs) {
-      try { await fs.access(path.join(candidate, ref)); } catch { containsAll = false; break; }
+      try {
+        await fs.access(path.join(candidate, ref));
+      } catch {
+        containsAll = false;
+        break;
+      }
     }
     if (containsAll) {
       if (match) return; // multiple matches, don't guess
@@ -2115,7 +2181,11 @@ async function importImageByPath(imagePath, timelineId) {
     let destPath = path.join(timelineAssetsDir, path.basename(imagePath));
     let counter = 1;
     while (true) {
-      try { await fs.access(destPath); } catch { break; }
+      try {
+        await fs.access(destPath);
+      } catch {
+        break;
+      }
       const ext = path.extname(imagePath);
       const base = path.basename(imagePath, ext);
       destPath = path.join(timelineAssetsDir, `${base}-${counter}${ext}`);
@@ -2125,9 +2195,10 @@ async function importImageByPath(imagePath, timelineId) {
     finalAssetPath = destPath;
   }
 
-  const ref = toPosixRelative(timelineAssetsDir, finalAssetPath)
-    ?? toPosixRelative(assetsBase, finalAssetPath)
-    ?? path.basename(finalAssetPath);
+  const ref =
+    toPosixRelative(timelineAssetsDir, finalAssetPath) ??
+    toPosixRelative(assetsBase, finalAssetPath) ??
+    path.basename(finalAssetPath);
   return { success: true, relativePath: ref, assetUrl: toAssetUrl(finalAssetPath) };
 }
 
@@ -2234,7 +2305,9 @@ ipcMain.handle('save-user-theme', async (event, { id, content }) => {
       return { success: false, error: 'Missing id or content' };
     }
     let parsed;
-    try { parsed = JSON.parse(content); } catch {
+    try {
+      parsed = JSON.parse(content);
+    } catch {
       return { success: false, error: 'Invalid JSON' };
     }
     const dir = userThemesDir();
@@ -2314,11 +2387,7 @@ ipcMain.handle('list-fonts', async () => {
         const fullPath = path.join(dir, file);
         // Use custom protocol instead of file:// for security
         const fileUrl = `local-font://font/${encodeURIComponent(fullPath)}`;
-        const format = ext === '.otf'
-          ? 'opentype'
-          : ext === '.ttf'
-            ? 'truetype'
-            : ext.slice(1);
+        const format = ext === '.otf' ? 'opentype' : ext === '.ttf' ? 'truetype' : ext.slice(1);
         return { name, path: fullPath, fileUrl, format };
       });
 

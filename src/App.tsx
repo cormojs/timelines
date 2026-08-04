@@ -1,16 +1,16 @@
-import { useMemo, useState, useRef, useEffect, useCallback, startTransition } from "react";
-import TimelineView from "./components/TimelineView";
-import SpreadsheetView from "./components/SpreadsheetView";
-import Sidebar from "./components/Sidebar";
-import RightPanel from "./components/RightPanel";
-import ErrorBoundary from "./components/ErrorBoundary";
-import SettingsModal from "./components/SettingsModal";
-import NewTimelineModal from "./components/NewTimelineModal";
-import ExportPngModal from "./components/ExportPngModal";
-import ExportVideoModal from "./components/ExportVideoModal";
-import TopBar from "./components/TopBar";
-import HomePage from "./components/HomePage";
-import SearchOverlay from "./components/SearchOverlay";
+import { useMemo, useState, useRef, useEffect, useCallback, startTransition } from 'react';
+import TimelineView from './components/TimelineView';
+import SpreadsheetView from './components/SpreadsheetView';
+import Sidebar from './components/Sidebar';
+import RightPanel from './components/RightPanel';
+import ErrorBoundary from './components/ErrorBoundary';
+import SettingsModal from './components/SettingsModal';
+import NewTimelineModal from './components/NewTimelineModal';
+import ExportPngModal from './components/ExportPngModal';
+import ExportVideoModal from './components/ExportVideoModal';
+import TopBar from './components/TopBar';
+import HomePage from './components/HomePage';
+import SearchOverlay from './components/SearchOverlay';
 import {
   saveTimelineToFile,
   chooseTimelinesDir,
@@ -28,21 +28,35 @@ import {
   exportTimelinePackage,
   importTimeline,
   updateTimelineTitle,
-} from "./utils/electronApi";
-import { updateElementWithNewId, generateUniqueRandomElementId, generateIdFromTitle, generateStorageUid, getStorageId, ensureUniqueElementIds } from "./utils/idUtils";
-import { applyTheme, getInitialThemeKey } from "./utils/theme";
-import { loadThemeConfig } from "./utils/themeLoader";
-import { countOldFormatThemes, isOldFormatTheme, migrateThemeColors } from "./utils/themeMigration";
-import { getAppSettings, saveAppSettings } from "./utils/appSettings";
-import { cloneDefaultKeybinds, loadKeybinds, matchesKeybind } from "./utils/keybinds";
-import { parseTimelineInput, snapToMonthGrid, snapToDayGrid, setActiveDateFormat, getActiveDateFormat, normalizeLegacyDateLabel } from "./utils/dateUtils";
-import { parseFilterQuery } from "./utils/filterUtils";
-import "./styles/index.css";
+} from './utils/electronApi';
+import {
+  updateElementWithNewId,
+  generateUniqueRandomElementId,
+  generateIdFromTitle,
+  generateStorageUid,
+  getStorageId,
+  ensureUniqueElementIds,
+} from './utils/idUtils';
+import { applyTheme, getInitialThemeKey } from './utils/theme';
+import { loadThemeConfig } from './utils/themeLoader';
+import { countOldFormatThemes, isOldFormatTheme, migrateThemeColors } from './utils/themeMigration';
+import { getAppSettings, saveAppSettings } from './utils/appSettings';
+import { cloneDefaultKeybinds, loadKeybinds, matchesKeybind } from './utils/keybinds';
+import {
+  parseTimelineInput,
+  snapToMonthGrid,
+  snapToDayGrid,
+  setActiveDateFormat,
+  getActiveDateFormat,
+  normalizeLegacyDateLabel,
+} from './utils/dateUtils';
+import { parseFilterQuery } from './utils/filterUtils';
+import './styles/index.css';
 
-const DEFAULT_GROUP_ID = "g-main";
+const DEFAULT_GROUP_ID = 'g-main';
 const DEFAULT_GROUP = {
   id: DEFAULT_GROUP_ID,
-  title: "Main",
+  title: 'Main',
   order: 0,
   stack: 0,
   hideBand: true,
@@ -58,52 +72,53 @@ const SELECTION_NAV_REPEAT_INTERVAL_MS = 140;
 const CARD_THUMBNAIL_WIDTH = 640;
 const CARD_THUMBNAIL_HEIGHT = 240;
 
-const createCardThumbnail = (imageUrl) => new Promise((resolve, reject) => {
-  const image = new Image();
-  image.onload = () => {
-    const canvas = document.createElement("canvas");
-    canvas.width = CARD_THUMBNAIL_WIDTH;
-    canvas.height = CARD_THUMBNAIL_HEIGHT;
-    const context = canvas.getContext("2d");
-    if (!context) {
-      reject(new Error("Could not create thumbnail canvas"));
-      return;
-    }
+const createCardThumbnail = (imageUrl) =>
+  new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = CARD_THUMBNAIL_WIDTH;
+      canvas.height = CARD_THUMBNAIL_HEIGHT;
+      const context = canvas.getContext('2d');
+      if (!context) {
+        reject(new Error('Could not create thumbnail canvas'));
+        return;
+      }
 
-    const rootStyles = getComputedStyle(document.documentElement);
-    context.fillStyle = rootStyles.getPropertyValue("--surface").trim() || "#fffaf4";
-    context.fillRect(0, 0, canvas.width, canvas.height);
+      const rootStyles = getComputedStyle(document.documentElement);
+      context.fillStyle = rootStyles.getPropertyValue('--surface').trim() || '#fffaf4';
+      context.fillRect(0, 0, canvas.width, canvas.height);
 
-    const scale = Math.min(canvas.width / image.naturalWidth, canvas.height / image.naturalHeight);
-    const width = image.naturalWidth * scale;
-    const height = image.naturalHeight * scale;
-    context.drawImage(image, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height);
-    resolve(canvas.toDataURL("image/jpeg", 0.82));
-  };
-  image.onerror = () => reject(new Error("Could not load generated timeline preview"));
-  image.src = imageUrl;
-});
+      const scale = Math.min(canvas.width / image.naturalWidth, canvas.height / image.naturalHeight);
+      const width = image.naturalWidth * scale;
+      const height = image.naturalHeight * scale;
+      context.drawImage(image, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height);
+      resolve(canvas.toDataURL('image/jpeg', 0.82));
+    };
+    image.onerror = () => reject(new Error('Could not load generated timeline preview'));
+    image.src = imageUrl;
+  });
 
 // Bare filename of a local thumbnail; null for external URLs
 const getLocalThumbnailFilename = (thumbnail) => {
-  if (!thumbnail || typeof thumbnail !== "string") return null;
-  if (thumbnail.startsWith("timelines-asset://")) {
+  if (!thumbnail || typeof thumbnail !== 'string') return null;
+  if (thumbnail.startsWith('timelines-asset://')) {
     try {
       const url = new URL(thumbnail);
-      const p = url.searchParams.get("p");
+      const p = url.searchParams.get('p');
       const decoded = p !== null ? p : decodeURIComponent(url.pathname.slice(1));
       return decoded.split(/[\\/]/).pop() || null;
     } catch {
       return null;
     }
   }
-  if (!thumbnail.includes("://")) return thumbnail.split(/[\\/]/).pop() || null;
+  if (!thumbnail.includes('://')) return thumbnail.split(/[\\/]/).pop() || null;
   return null;
 };
 
 function App() {
   const normalizeTimelineData = useCallback((data) => {
-    if (!data || typeof data !== "object") return data;
+    if (!data || typeof data !== 'object') return data;
 
     const elements = ensureUniqueElementIds(Array.isArray(data.elements) ? data.elements : []);
     const groupsRaw = Array.isArray(data.file?.groups) ? data.file.groups : [];
@@ -114,7 +129,7 @@ function App() {
         ...DEFAULT_GROUP,
         ...group,
         id: group?.id || fallbackId,
-        title: group?.title || (index === 0 ? "Main" : `Group ${index + 1}`),
+        title: group?.title || (index === 0 ? 'Main' : `Group ${index + 1}`),
         order: Number.isFinite(group?.order) ? group.order : index,
         stack: Number.isFinite(group?.stack) ? group.stack : index,
         visible: group?.visible !== false,
@@ -129,7 +144,7 @@ function App() {
     const branchParentMap = {};
     const mergeParentMap = {};
     for (const el of elements) {
-      if (el.type !== "span") continue;
+      if (el.type !== 'span') continue;
       const branches = Array.isArray(el.branches) ? el.branches : [];
       const forks = Array.isArray(el.forks) ? el.forks : [];
       const allBranches = Array.from(new Set([...branches, ...forks]));
@@ -143,28 +158,29 @@ function App() {
     }
 
     const spanGroupById = Object.fromEntries(
-      elements.filter((el) => el.type === "span" && groupIdSet.has(el.groupId)).map((el) => [el.id, el.groupId])
+      elements.filter((el) => el.type === 'span' && groupIdSet.has(el.groupId)).map((el) => [el.id, el.groupId]),
     );
 
     const nextElements = elements.map((element) => {
       const next = { ...element };
-      if (typeof next.dateLabel === "string") next.dateLabel = normalizeLegacyDateLabel(next.dateLabel);
-      if (typeof next.startLabel === "string") next.startLabel = normalizeLegacyDateLabel(next.startLabel);
-      if (typeof next.endLabel === "string") next.endLabel = normalizeLegacyDateLabel(next.endLabel);
-      const needsGroupId = next.type === "event" || next.type === "span";
+      if (typeof next.dateLabel === 'string') next.dateLabel = normalizeLegacyDateLabel(next.dateLabel);
+      if (typeof next.startLabel === 'string') next.startLabel = normalizeLegacyDateLabel(next.startLabel);
+      if (typeof next.endLabel === 'string') next.endLabel = normalizeLegacyDateLabel(next.endLabel);
+      const needsGroupId = next.type === 'event' || next.type === 'span';
       if (needsGroupId && !groupIdSet.has(next.groupId)) {
-        const parentGroupId = next.type === "event" && Array.isArray(next.parents)
-          ? next.parents.map((pid) => spanGroupById[pid]).find(Boolean)
-          : undefined;
+        const parentGroupId =
+          next.type === 'event' && Array.isArray(next.parents)
+            ? next.parents.map((pid) => spanGroupById[pid]).find(Boolean)
+            : undefined;
         next.groupId = parentGroupId ?? defaultGroupId;
       }
 
       // Strip stale default color auto-set on every new event by an older version.
-      if (next.type === "event" && next.color === "#EDE6DA") {
+      if (next.type === 'event' && next.color === '#EDE6DA') {
         delete next.color;
       }
 
-      if (next.type !== "span") return next;
+      if (next.type !== 'span') return next;
 
       const { branches: _b, forks: _f, merges: _m, ...rest } = next;
       if (!rest.parent && branchParentMap[element.id]) {
@@ -177,8 +193,8 @@ function App() {
     });
 
     const file = { ...(data.file || {}), groups };
-    if (typeof file.startLabel === "string") file.startLabel = normalizeLegacyDateLabel(file.startLabel);
-    if (typeof file.endLabel === "string") file.endLabel = normalizeLegacyDateLabel(file.endLabel);
+    if (typeof file.startLabel === 'string') file.startLabel = normalizeLegacyDateLabel(file.startLabel);
+    if (typeof file.endLabel === 'string') file.endLabel = normalizeLegacyDateLabel(file.endLabel);
     if (file.useWikipedia && !file.useWiki) {
       file.useWiki = file.useWikipedia;
     }
@@ -200,13 +216,13 @@ function App() {
   const [isLeftCollapsed, setIsLeftCollapsed] = useState(false);
   const [isRightCollapsed, setIsRightCollapsed] = useState(false);
   const [rightLockState, setRightLockState] = useState(null); // null | "open" | "closed"
-  const [viewMode, setViewMode] = useState("timeline"); // "timeline" | "spreadsheet"
+  const [viewMode, setViewMode] = useState('timeline'); // "timeline" | "spreadsheet"
   const [isRightMaximized, setIsRightMaximized] = useState(false);
   const [lastSelectedId, setLastSelectedId] = useState(null);
 
   const [selectedId, setSelectedId] = useState(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [settingsRenameError, setSettingsRenameError] = useState("");
+  const [settingsRenameError, setSettingsRenameError] = useState('');
   const [screenshotToast, setScreenshotToast] = useState(false);
   const [deleteElementDialog, setDeleteElementDialog] = useState(null);
   const [deleteElementWithNotes, setDeleteElementWithNotes] = useState(false);
@@ -214,7 +230,7 @@ function App() {
   const [downloadPngTrigger, setDownloadPngTrigger] = useState(0);
   const [timelineData, setTimelineData] = useState(null);
   // Sync the date-format lens with the open timeline before children render.
-  const fileDateFormat = timelineData?.file?.dateFormat || "MDY";
+  const fileDateFormat = timelineData?.file?.dateFormat || 'MDY';
   if (getActiveDateFormat() !== fileDateFormat) setActiveDateFormat(fileDateFormat);
   const [currentTimelineId, setCurrentTimelineId] = useState(null);
   const currentTimelineIdRef = useRef(null);
@@ -229,10 +245,10 @@ function App() {
   const [themeKey, setThemeKey] = useState(defaultThemeKey);
   const [appThemeKey, setAppThemeKey] = useState(defaultThemeKey);
   const [appThemePreference, setAppThemePreference] = useState(defaultThemeKey);
-  const [timelineStorageDir, setTimelineStorageDir] = useState("");
-  const [notesStorageDir, setNotesStorageDir] = useState("");
-  const [assetsStorageDir, setAssetsStorageDir] = useState("");
-  const [appFontFamily, setAppFontFamily] = useState("Inter");
+  const [timelineStorageDir, setTimelineStorageDir] = useState('');
+  const [notesStorageDir, setNotesStorageDir] = useState('');
+  const [assetsStorageDir, setAssetsStorageDir] = useState('');
+  const [appFontFamily, setAppFontFamily] = useState('Inter');
   const [appFontSize, setAppFontSize] = useState(14);
   const [hardwareAcceleration, setHardwareAcceleration] = useState(true);
   const [startMaximized, setStartMaximized] = useState(false);
@@ -241,7 +257,7 @@ function App() {
   const [activeTags, setActiveTags] = useState([]);
   const [hiddenTags, setHiddenTags] = useState([]);
   const [pinnedTags, setPinnedTags] = useState([]);
-  const [chipQuery, setChipQuery] = useState("");
+  const [chipQuery, setChipQuery] = useState('');
   const parsedChipQuery = useMemo(() => parseFilterQuery(chipQuery), [chipQuery]);
   const [viewportYear, setViewportYear] = useState(null);
   const handleViewportYearChange = useCallback((year) => {
@@ -314,11 +330,7 @@ function App() {
           }
         } else if (!isRightCollapsed) {
           const lastDistance = rightLastDistanceRef.current;
-          if (
-            rightMaxReachedRef.current &&
-            Number.isFinite(lastDistance) &&
-            distanceFromRight < lastDistance - 4
-          ) {
+          if (rightMaxReachedRef.current && Number.isFinite(lastDistance) && distanceFromRight < lastDistance - 4) {
             rightReversedAfterMaxRef.current = true;
           }
           const next = Math.min(Math.max(distanceFromRight, MIN_WIDTH), MAX_WIDTH);
@@ -339,16 +351,16 @@ function App() {
         rightMaxReachedRef.current = false;
         rightReversedAfterMaxRef.current = false;
         rightLastDistanceRef.current = null;
-        document.body.classList.remove("dragging");
+        document.body.classList.remove('dragging');
       }
     }
 
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
 
     return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
     };
   }, [isLeftCollapsed, isRightCollapsed, isRightMaximized]);
 
@@ -382,19 +394,18 @@ function App() {
       const target = e.target;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
       const deleteBind = keybinds.delete;
-      const altDeleteBind = { keys: ["Backspace"] };
+      const altDeleteBind = { keys: ['Backspace'] };
       if (!matchesKeybind(e, deleteBind) && !matchesKeybind(e, altDeleteBind)) return;
       e.preventDefault();
       if (!timelineData?.elements) return;
-      const element = timelineData.elements.find(el => el.id === selectedId);
+      const element = timelineData.elements.find((el) => el.id === selectedId);
       if (!element) return;
       handleRequestDelete(element.id);
     }
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedId, timelineData, keybinds]);
-
 
   const refreshUserThemes = async () => {
     if (!window.electron?.listThemes) return;
@@ -449,9 +460,7 @@ function App() {
 
   useEffect(() => {
     const resolvedDefault = getInitialThemeKey(themeConfig);
-    setThemeKey((current) =>
-      themeConfig.themes?.[current] ? current : resolvedDefault
-    );
+    setThemeKey((current) => (themeConfig.themes?.[current] ? current : resolvedDefault));
   }, [themeConfig]);
 
   useEffect(() => {
@@ -488,7 +497,9 @@ function App() {
   }, [timelineData]);
 
   // Keep ref in sync so saveCurrentTimeline can read it inside stale closures
-  useEffect(() => { currentTimelineIdRef.current = currentTimelineId; }, [currentTimelineId]);
+  useEffect(() => {
+    currentTimelineIdRef.current = currentTimelineId;
+  }, [currentTimelineId]);
 
   useEffect(() => {
     if (!window.electron?.onGitSyncApplied) return undefined;
@@ -509,13 +520,16 @@ function App() {
   }, []);
 
   // Saves the open timeline where it currently lives; explicit-path writes use saveTimelineToFile via enqueuePersist
-  const saveCurrentTimeline = useCallback(async (data) => {
-    const id = currentTimelineIdRef.current || data?.file?.id?.replace(/-timeline$/, '') || 'timeline';
-    return enqueuePersist(() => saveTimelineToFile(data, id));
-  }, [enqueuePersist]);
+  const saveCurrentTimeline = useCallback(
+    async (data) => {
+      const id = currentTimelineIdRef.current || data?.file?.id?.replace(/-timeline$/, '') || 'timeline';
+      return enqueuePersist(() => saveTimelineToFile(data, id));
+    },
+    [enqueuePersist],
+  );
 
   const handleCloseSettings = useCallback(() => {
-    setSettingsRenameError("");
+    setSettingsRenameError('');
     setIsSettingsOpen(false);
   }, []);
 
@@ -536,59 +550,60 @@ function App() {
     });
   }, []);
 
-  const handleRenameTimelineFromLibrary = useCallback(async (id, title) => {
-    if (!id) return { success: false, error: 'Missing timeline id' };
-    if (!title || !String(title).trim()) return { success: false, error: 'INVALID_TITLE' };
+  const handleRenameTimelineFromLibrary = useCallback(
+    async (id, title) => {
+      if (!id) return { success: false, error: 'Missing timeline id' };
+      if (!title || !String(title).trim()) return { success: false, error: 'INVALID_TITLE' };
 
-    if (currentTimelineIdRef.current !== id || !timelineData) {
-      const result = await updateTimelineTitle(id, title);
-      if (result?.success) handleLibraryTimelineRenamed(result);
-      return result;
-    }
+      if (currentTimelineIdRef.current !== id || !timelineData) {
+        const result = await updateTimelineTitle(id, title);
+        if (result?.success) handleLibraryTimelineRenamed(result);
+        return result;
+      }
 
-    const oldPathId = currentTimelineIdRef.current;
-    const nextTimelineId = generateIdFromTitle(title, "timeline").replace(/^timeline-/, "");
-    if (!nextTimelineId) return { success: false, error: 'INVALID_TITLE' };
+      const oldPathId = currentTimelineIdRef.current;
+      const nextTimelineId = generateIdFromTitle(title, 'timeline').replace(/^timeline-/, '');
+      if (!nextTimelineId) return { success: false, error: 'INVALID_TITLE' };
 
-    const folderPrefix = oldPathId.includes('/')
-      ? oldPathId.slice(0, oldPathId.lastIndexOf('/') + 1)
-      : '';
-    const nextPathId = `${folderPrefix}${nextTimelineId}`;
-    const updatedData = {
-      ...timelineData,
-      file: {
-        ...timelineData.file,
-        id: `${nextTimelineId}-timeline`,
-        title,
-      },
-    };
+      const folderPrefix = oldPathId.includes('/') ? oldPathId.slice(0, oldPathId.lastIndexOf('/') + 1) : '';
+      const nextPathId = `${folderPrefix}${nextTimelineId}`;
+      const updatedData = {
+        ...timelineData,
+        file: {
+          ...timelineData.file,
+          id: `${nextTimelineId}-timeline`,
+          title,
+        },
+      };
 
-    if (nextPathId === oldPathId) {
+      if (nextPathId === oldPathId) {
+        setTimelineData(updatedData);
+        const result = await enqueuePersist(() => saveTimelineToFile(updatedData, oldPathId));
+        if (!result?.success) return result;
+        return { success: true, oldId: oldPathId, newId: nextPathId, title, fileId: updatedData.file.id };
+      }
+
+      currentTimelineIdRef.current = nextPathId;
+      setCurrentTimelineId(nextPathId);
       setTimelineData(updatedData);
-      const result = await enqueuePersist(() => saveTimelineToFile(updatedData, oldPathId));
-      if (!result?.success) return result;
+
+      const result = await enqueuePersist(async () => {
+        const renameResult = await renameTimeline({ oldId: oldPathId, newId: nextPathId });
+        if (!renameResult?.success) return renameResult;
+        return saveTimelineToFile(updatedData, nextPathId);
+      });
+
+      if (!result?.success) {
+        currentTimelineIdRef.current = oldPathId;
+        setCurrentTimelineId(oldPathId);
+        setTimelineData(timelineData);
+        return result;
+      }
+
       return { success: true, oldId: oldPathId, newId: nextPathId, title, fileId: updatedData.file.id };
-    }
-
-    currentTimelineIdRef.current = nextPathId;
-    setCurrentTimelineId(nextPathId);
-    setTimelineData(updatedData);
-
-    const result = await enqueuePersist(async () => {
-      const renameResult = await renameTimeline({ oldId: oldPathId, newId: nextPathId });
-      if (!renameResult?.success) return renameResult;
-      return saveTimelineToFile(updatedData, nextPathId);
-    });
-
-    if (!result?.success) {
-      currentTimelineIdRef.current = oldPathId;
-      setCurrentTimelineId(oldPathId);
-      setTimelineData(timelineData);
-      return result;
-    }
-
-    return { success: true, oldId: oldPathId, newId: nextPathId, title, fileId: updatedData.file.id };
-  }, [enqueuePersist, handleLibraryTimelineRenamed, timelineData]);
+    },
+    [enqueuePersist, handleLibraryTimelineRenamed, timelineData],
+  );
 
   const undoTimeline = () => {
     if (!timelineData) return;
@@ -629,9 +644,9 @@ function App() {
       if (!timelineData) return;
       const target = e.target;
       const isEditable =
-        target?.tagName === "INPUT" ||
-        target?.tagName === "TEXTAREA" ||
-        target?.tagName === "SELECT" ||
+        target?.tagName === 'INPUT' ||
+        target?.tagName === 'TEXTAREA' ||
+        target?.tagName === 'SELECT' ||
         target?.isContentEditable;
       if (isEditable) return;
       if (matchesKeybind(e, keybinds.undo)) {
@@ -640,16 +655,20 @@ function App() {
       } else if (matchesKeybind(e, keybinds.redo)) {
         e.preventDefault();
         redoTimeline();
-      } else if (e.shiftKey && e.key === "S") {
+      } else if (e.shiftKey && e.key === 'S') {
         e.preventDefault();
-        window.electron?.captureScreenshot()
-          .then(() => { setScreenshotToast(true); setTimeout(() => setScreenshotToast(false), 2000); })
-          .catch((err) => console.error("[screenshot] error:", err));
+        window.electron
+          ?.captureScreenshot()
+          .then(() => {
+            setScreenshotToast(true);
+            setTimeout(() => setScreenshotToast(false), 2000);
+          })
+          .catch((err) => console.error('[screenshot] error:', err));
       }
     };
 
-    window.addEventListener("keydown", handleUndoRedo);
-    return () => window.removeEventListener("keydown", handleUndoRedo);
+    window.addEventListener('keydown', handleUndoRedo);
+    return () => window.removeEventListener('keydown', handleUndoRedo);
   }, [timelineData, currentTimelineId, keybinds]);
 
   useEffect(() => {
@@ -658,16 +677,16 @@ function App() {
       if (!matchesKeybind(e, keybinds.search)) return;
       const target = e.target;
       const isEditable =
-        target?.tagName === "INPUT" ||
-        target?.tagName === "TEXTAREA" ||
-        target?.tagName === "SELECT" ||
+        target?.tagName === 'INPUT' ||
+        target?.tagName === 'TEXTAREA' ||
+        target?.tagName === 'SELECT' ||
         target?.isContentEditable;
       if (isEditable) return;
       e.preventDefault();
       setIsSearchOpen(true);
     };
-    window.addEventListener("keydown", handleSearchKey);
-    return () => window.removeEventListener("keydown", handleSearchKey);
+    window.addEventListener('keydown', handleSearchKey);
+    return () => window.removeEventListener('keydown', handleSearchKey);
   }, [timelineData, keybinds]);
 
   useEffect(() => {
@@ -675,9 +694,9 @@ function App() {
     const handleAddShortcuts = (e) => {
       const target = e.target;
       const isEditable =
-        target?.tagName === "INPUT" ||
-        target?.tagName === "TEXTAREA" ||
-        target?.tagName === "SELECT" ||
+        target?.tagName === 'INPUT' ||
+        target?.tagName === 'TEXTAREA' ||
+        target?.tagName === 'SELECT' ||
         target?.isContentEditable;
       if (isEditable) return;
 
@@ -693,14 +712,14 @@ function App() {
       }
     };
 
-    window.addEventListener("keydown", handleAddShortcuts);
-    return () => window.removeEventListener("keydown", handleAddShortcuts);
+    window.addEventListener('keydown', handleAddShortcuts);
+    return () => window.removeEventListener('keydown', handleAddShortcuts);
   }, [timelineData, keybinds, viewportYear]);
 
   const handleSelect = (id) => {
     setSelectedId(id);
     if (id) setLastSelectedId(id);
-    if (id && rightLockState !== "closed") setIsRightCollapsed(false);
+    if (id && rightLockState !== 'closed') setIsRightCollapsed(false);
   };
 
   const handleSearchSelect = (id) => {
@@ -715,10 +734,10 @@ function App() {
   };
 
   useEffect(() => {
-    if (!selectedId && isRightMaximized && rightLockState !== "open") {
+    if (!selectedId && isRightMaximized && rightLockState !== 'open') {
       setIsRightMaximized(false);
     }
-    if (!selectedId && rightLockState !== "open") {
+    if (!selectedId && rightLockState !== 'open') {
       if (!isRightCollapsed) {
         // default: collapse when nothing selected
       }
@@ -784,17 +803,13 @@ function App() {
   };
 
   const handleUpdateGroup = (groupId, updates) => {
-    if (!groupId || !updates || typeof updates !== "object") return;
+    if (!groupId || !updates || typeof updates !== 'object') return;
     setTimelineData((prevData) => {
       const existing = Array.isArray(prevData.file?.groups) ? prevData.file.groups : [];
       const baseGroups = existing.length > 0 ? existing : [DEFAULT_GROUP];
-      const nextGroups = baseGroups.map((group) => (
-        group.id === groupId ? { ...group, ...updates } : group
-      ));
+      const nextGroups = baseGroups.map((group) => (group.id === groupId ? { ...group, ...updates } : group));
       const hasMatch = baseGroups.some((group) => group.id === groupId);
-      const finalGroups = hasMatch
-        ? nextGroups
-        : [...nextGroups, { ...DEFAULT_GROUP, id: groupId, ...updates }];
+      const finalGroups = hasMatch ? nextGroups : [...nextGroups, { ...DEFAULT_GROUP, id: groupId, ...updates }];
       const updatedData = {
         ...prevData,
         file: {
@@ -818,12 +833,23 @@ function App() {
         const existingIds = new Set(existing.map((g) => g.id).filter(Boolean));
         let nextIndex = existing.length + 1;
         let nextId = `g-${nextIndex}`;
-        while (existingIds.has(nextId)) { nextIndex++; nextId = `g-${nextIndex}`; }
-        group = { id: nextId, title, order: existing.length, stack: existing.length, visible: true, locked: false, hideBand: true };
+        while (existingIds.has(nextId)) {
+          nextIndex++;
+          nextId = `g-${nextIndex}`;
+        }
+        group = {
+          id: nextId,
+          title,
+          order: existing.length,
+          stack: existing.length,
+          visible: true,
+          locked: false,
+          hideBand: true,
+        };
         updatedGroups = [...existing, group];
       }
       const updatedElements = (prevData.elements ?? []).map((el) =>
-        el.id === elementId ? { ...el, groupId: group.id } : el
+        el.id === elementId ? { ...el, groupId: group.id } : el,
       );
       const updatedData = { ...prevData, file: { ...prevData.file, groups: updatedGroups }, elements: updatedElements };
       saveCurrentTimeline(updatedData).catch(console.error);
@@ -859,7 +885,7 @@ function App() {
       const fallbackGroupId = remainingGroups[0].id;
 
       const nextElements = (prevData.elements || []).map((element) => {
-        if ((element.type === "event" || element.type === "span") && element.groupId === groupId) {
+        if ((element.type === 'event' || element.type === 'span') && element.groupId === groupId) {
           return { ...element, groupId: fallbackGroupId };
         }
         return element;
@@ -936,9 +962,11 @@ function App() {
       if (deleteElementWithImage) {
         const filename = getLocalThumbnailFilename(element.thumbnail);
         // Don't delete the file if a surviving element still references the same image
-        const sharedWithSurvivor = filename && timelineData?.elements?.some(
-          (el) => !deletedIds.has(el.id) && getLocalThumbnailFilename(el.thumbnail) === filename
-        );
+        const sharedWithSurvivor =
+          filename &&
+          timelineData?.elements?.some(
+            (el) => !deletedIds.has(el.id) && getLocalThumbnailFilename(el.thumbnail) === filename,
+          );
         if (filename && !sharedWithSurvivor && !removedImages.has(filename)) {
           removedImages.add(filename);
           await deleteAsset({ timelineId, filename }).catch(console.error);
@@ -963,7 +991,6 @@ function App() {
 
       const updatedData = updateElementWithNewId(prevData, nextElement, originalId);
 
-      
       saveCurrentTimeline(updatedData)
         .then(() => {
           console.log('Timeline saved to file successfully');
@@ -980,23 +1007,28 @@ function App() {
     if (!timelineData?.file) return;
     const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
     const fallbackMid = (timelineData.file.start + timelineData.file.end) / 2;
-    const baseYear = Number.isFinite(clickYear) ? clickYear : Number.isFinite(viewportYear) ? viewportYear : fallbackMid;
+    const baseYear = Number.isFinite(clickYear)
+      ? clickYear
+      : Number.isFinite(viewportYear)
+        ? viewportYear
+        : fallbackMid;
     const clampedYear = clamp(baseYear, timelineData.file.start, timelineData.file.end);
     const snappedYear = timelineData.file.useCalendar === true ? snapToDayGrid(clampedYear) : Math.round(clampedYear);
-    const eventId = generateUniqueRandomElementId(timelineData.elements, "event");
+    const eventId = generateUniqueRandomElementId(timelineData.elements, 'event');
     const newEvent = {
       id: eventId,
-      type: "event",
-      title: "New Event",
+      type: 'event',
+      title: 'New Event',
       date: snappedYear,
       groupId: groupId || null,
       parents: [],
-      eventLineStyle: "solid",
-      eventBorderStyle: "solid",
+      eventLineStyle: 'solid',
+      eventBorderStyle: 'solid',
     };
-    const eventWithCoords = Number.isFinite(clickCoords?.lat) && Number.isFinite(clickCoords?.lng)
-      ? { ...newEvent, lat: clickCoords.lat, lng: clickCoords.lng }
-      : newEvent;
+    const eventWithCoords =
+      Number.isFinite(clickCoords?.lat) && Number.isFinite(clickCoords?.lng)
+        ? { ...newEvent, lat: clickCoords.lat, lng: clickCoords.lng }
+        : newEvent;
 
     setTimelineData((prevData) => {
       const updatedData = {
@@ -1018,25 +1050,30 @@ function App() {
     const range = timelineData.file.end - timelineData.file.start;
     const duration = Math.max(1, Math.floor(range / 4));
     const fallbackStart = timelineData.file.start + Math.floor(range / 2);
-    const baseStart = Number.isFinite(clickYear) ? clickYear : Number.isFinite(viewportYear) ? viewportYear : fallbackStart;
+    const baseStart = Number.isFinite(clickYear)
+      ? clickYear
+      : Number.isFinite(viewportYear)
+        ? viewportYear
+        : fallbackStart;
     const start = clamp(baseStart, timelineData.file.start, timelineData.file.end);
     const snappedStart = timelineData.file.useCalendar === true ? snapToDayGrid(start) : Math.round(start);
     const end = clamp(snappedStart + duration, timelineData.file.start, timelineData.file.end);
 
-    const spanId = generateUniqueRandomElementId(timelineData.elements, "span");
+    const spanId = generateUniqueRandomElementId(timelineData.elements, 'span');
     const defaultGroupId = groupId || timelineData.file?.groups?.[0]?.id || DEFAULT_GROUP_ID;
     const newSpan = {
       id: spanId,
-      type: "span",
-      title: "New Span",
+      type: 'span',
+      title: 'New Span',
       start: snappedStart,
       end,
       groupId: defaultGroupId,
-      color: "#A6977E",
+      color: '#A6977E',
     };
-    const spanWithCoords = Number.isFinite(clickCoords?.lat) && Number.isFinite(clickCoords?.lng)
-      ? { ...newSpan, lat: clickCoords.lat, lng: clickCoords.lng }
-      : newSpan;
+    const spanWithCoords =
+      Number.isFinite(clickCoords?.lat) && Number.isFinite(clickCoords?.lng)
+        ? { ...newSpan, lat: clickCoords.lat, lng: clickCoords.lng }
+        : newSpan;
 
     setTimelineData((prevData) => {
       const updatedData = {
@@ -1060,9 +1097,7 @@ function App() {
     const range = tlEnd - tlStart;
     const duration = Math.max(1, Math.floor(range / 3));
 
-    const topLevelEras = timelineData.elements
-      .filter((el) => el.type === "era")
-      .sort((a, b) => a.start - b.start);
+    const topLevelEras = timelineData.elements.filter((el) => el.type === 'era').sort((a, b) => a.start - b.start);
 
     const isFree = (s, e) => !topLevelEras.some((era) => s < era.end && e > era.start);
 
@@ -1080,18 +1115,19 @@ function App() {
       }
     }
 
-    const eraId = generateUniqueRandomElementId(timelineData.elements, "era");
+    const eraId = generateUniqueRandomElementId(timelineData.elements, 'era');
     const newEra = {
       id: eraId,
-      type: "era",
-      title: "New Era",
+      type: 'era',
+      title: 'New Era',
       start,
       end,
-      color: "#F4D05A",
+      color: '#F4D05A',
     };
-    const eraWithCoords = Number.isFinite(clickCoords?.lat) && Number.isFinite(clickCoords?.lng)
-      ? { ...newEra, lat: clickCoords.lat, lng: clickCoords.lng }
-      : newEra;
+    const eraWithCoords =
+      Number.isFinite(clickCoords?.lat) && Number.isFinite(clickCoords?.lng)
+        ? { ...newEra, lat: clickCoords.lat, lng: clickCoords.lng }
+        : newEra;
 
     setTimelineData((prevData) => {
       const updatedData = {
@@ -1122,7 +1158,7 @@ function App() {
         title: nextTitle,
       };
 
-      if (original.type === "span") {
+      if (original.type === 'span') {
         delete baseCopy.parent;
         delete baseCopy.extendFrom;
         delete baseCopy.mergeParent;
@@ -1144,15 +1180,18 @@ function App() {
     setTimelineData((prevData) => {
       const filteredElements = prevData.elements.filter((el) => !toDelete.has(el.id));
 
-      const cleanedElements = filteredElements.map(el => {
-        if (el.type === "event" && el.parents?.some((id) => toDelete.has(id))) {
+      const cleanedElements = filteredElements.map((el) => {
+        if (el.type === 'event' && el.parents?.some((id) => toDelete.has(id))) {
           return {
             ...el,
             parents: el.parents.filter((id) => !toDelete.has(id)),
           };
         }
 
-        if (el.type === "span" && (toDelete.has(el.parent) || toDelete.has(el.extendFrom) || toDelete.has(el.mergeParent))) {
+        if (
+          el.type === 'span' &&
+          (toDelete.has(el.parent) || toDelete.has(el.extendFrom) || toDelete.has(el.mergeParent))
+        ) {
           const cleaned = { ...el };
           if (toDelete.has(cleaned.parent)) delete cleaned.parent;
           if (toDelete.has(cleaned.extendFrom)) delete cleaned.extendFrom;
@@ -1176,122 +1215,120 @@ function App() {
     setSelectedId(null);
   };
 
-  const handleUpdateTimeline = useCallback((patch) => {
-    // Patch: only the settings the user changed are present, so untouched fields aren't clobbered.
-    const { title, start, end } = patch;
-    if ("dateFormat" in patch) setActiveDateFormat(patch.dateFormat || "MDY");
-    const parsedStart = parseTimelineInput(start);
-    const parsedEnd = parseTimelineInput(end);
-    setTimelineData((prevData) => {
-      const oldTimelineId = prevData.file?.id?.replace(/-timeline$/, '') || 'timeline';
-      const nextTimelineId = title
-        ? generateIdFromTitle(title, "timeline").replace(/^timeline-/, "")
-        : oldTimelineId;
-      const effUseCalendar = ("useCalendar" in patch ? patch.useCalendar : prevData.file?.useCalendar) === true;
-      const startValue = parsedStart.value ?? prevData.file.start;
-      const endValue = parsedEnd.value ?? prevData.file.end;
-      const nextFile = {
-        ...prevData.file,
-        ...patch,
-        id: `${nextTimelineId}-timeline`,
-        start:
-          effUseCalendar && parsedStart.precision !== "day"
-            ? snapToMonthGrid(startValue)
-            : startValue,
-        end:
-          effUseCalendar && parsedEnd.precision !== "day"
-            ? snapToMonthGrid(endValue)
-            : endValue,
-      };
+  const handleUpdateTimeline = useCallback(
+    (patch) => {
+      // Patch: only the settings the user changed are present, so untouched fields aren't clobbered.
+      const { title, start, end } = patch;
+      if ('dateFormat' in patch) setActiveDateFormat(patch.dateFormat || 'MDY');
+      const parsedStart = parseTimelineInput(start);
+      const parsedEnd = parseTimelineInput(end);
+      setTimelineData((prevData) => {
+        const oldTimelineId = prevData.file?.id?.replace(/-timeline$/, '') || 'timeline';
+        const nextTimelineId = title ? generateIdFromTitle(title, 'timeline').replace(/^timeline-/, '') : oldTimelineId;
+        const effUseCalendar = ('useCalendar' in patch ? patch.useCalendar : prevData.file?.useCalendar) === true;
+        const startValue = parsedStart.value ?? prevData.file.start;
+        const endValue = parsedEnd.value ?? prevData.file.end;
+        const nextFile = {
+          ...prevData.file,
+          ...patch,
+          id: `${nextTimelineId}-timeline`,
+          start: effUseCalendar && parsedStart.precision !== 'day' ? snapToMonthGrid(startValue) : startValue,
+          end: effUseCalendar && parsedEnd.precision !== 'day' ? snapToMonthGrid(endValue) : endValue,
+        };
 
-      // Normalize the merged file; operate on nextFile so untouched fields are preserved.
-      delete nextFile.breaks;
-      if (!nextFile.startLabel) delete nextFile.startLabel;
-      if (!nextFile.endLabel) delete nextFile.endLabel;
-      delete nextFile.useMonths;
-      delete nextFile.useDays;
-      delete nextFile.datePrecision;
-      if (!nextFile.useCalendar) delete nextFile.useCalendar;
-      if (!nextFile.tickDensity || nextFile.tickDensity === 1) delete nextFile.tickDensity;
-      if (!nextFile.scaleSections || nextFile.scaleSections.length === 0) delete nextFile.scaleSections;
-      if (!nextFile.scaleType || nextFile.scaleType === "default") delete nextFile.scaleType;
-      if (!nextFile.logScaleFactor || nextFile.scaleType !== "logarithmic") delete nextFile.logScaleFactor;
-      if (!nextFile.dateFormat || nextFile.dateFormat === "MDY") delete nextFile.dateFormat;
-      if (!nextFile.layout) delete nextFile.layout;
-      if (!nextFile.branchOrdering) delete nextFile.branchOrdering;
-      if (!nextFile.fixedEventHeight) delete nextFile.fixedEventHeight;
-      delete nextFile.compactEvents;
-      delete nextFile.eventHeight;
-      if (!nextFile.eventWidth || nextFile.eventWidth === 150) delete nextFile.eventWidth;
-      if (!nextFile.eventFontSize || nextFile.eventFontSize === 10) delete nextFile.eventFontSize;
-      if (!nextFile.thinConnectors) delete nextFile.thinConnectors;
-      if (!nextFile.eventLinesToGroupBottom) delete nextFile.eventLinesToGroupBottom;
-      if (!nextFile.hideDecimals) delete nextFile.hideDecimals;
-      if (!nextFile.showGrid) delete nextFile.showGrid;
-      if (!nextFile.showTodayLine) delete nextFile.showTodayLine;
-      if (!nextFile.spanColorEvents) delete nextFile.spanColorEvents;
-      if (!nextFile.disableGroups) delete nextFile.disableGroups;
-      if (!nextFile.panelGroupMode || nextFile.panelGroupMode === "default") delete nextFile.panelGroupMode;
-      if (!nextFile.nestEraSubGroups) delete nextFile.nestEraSubGroups;
-      if (!nextFile.autoHideEmptyGroups) delete nextFile.autoHideEmptyGroups;
-      delete nextFile.useEraGroupsInPanel;
-      delete nextFile.useSpanGroupsInPanel;
-      if (!nextFile.keepSelection) delete nextFile.keepSelection;
-      if (!nextFile.useWiki) delete nextFile.useWiki;
-      if (!nextFile.useSpreadsheet) delete nextFile.useSpreadsheet;
-      if (!nextFile.useMaps) delete nextFile.useMaps;
-      if (!nextFile.mapTileUrl) delete nextFile.mapTileUrl;
-      if (!nextFile.mapLimitToViewportYear) delete nextFile.mapLimitToViewportYear;
-      if (!nextFile.mapEventMarker || nextFile.mapEventMarker === "pin") delete nextFile.mapEventMarker;
-      if (!nextFile.mapSpanMarker || nextFile.mapSpanMarker === "circle") delete nextFile.mapSpanMarker;
-      if (!nextFile.mapEraMarker || nextFile.mapEraMarker === "diamond") delete nextFile.mapEraMarker;
-      if (!nextFile.font || String(nextFile.font).toLowerCase() === "default") delete nextFile.font;
+        // Normalize the merged file; operate on nextFile so untouched fields are preserved.
+        delete nextFile.breaks;
+        if (!nextFile.startLabel) delete nextFile.startLabel;
+        if (!nextFile.endLabel) delete nextFile.endLabel;
+        delete nextFile.useMonths;
+        delete nextFile.useDays;
+        delete nextFile.datePrecision;
+        if (!nextFile.useCalendar) delete nextFile.useCalendar;
+        if (!nextFile.tickDensity || nextFile.tickDensity === 1) delete nextFile.tickDensity;
+        if (!nextFile.scaleSections || nextFile.scaleSections.length === 0) delete nextFile.scaleSections;
+        if (!nextFile.scaleType || nextFile.scaleType === 'default') delete nextFile.scaleType;
+        if (!nextFile.logScaleFactor || nextFile.scaleType !== 'logarithmic') delete nextFile.logScaleFactor;
+        if (!nextFile.dateFormat || nextFile.dateFormat === 'MDY') delete nextFile.dateFormat;
+        if (!nextFile.layout) delete nextFile.layout;
+        if (!nextFile.branchOrdering) delete nextFile.branchOrdering;
+        if (!nextFile.fixedEventHeight) delete nextFile.fixedEventHeight;
+        delete nextFile.compactEvents;
+        delete nextFile.eventHeight;
+        if (!nextFile.eventWidth || nextFile.eventWidth === 150) delete nextFile.eventWidth;
+        if (!nextFile.eventFontSize || nextFile.eventFontSize === 10) delete nextFile.eventFontSize;
+        if (!nextFile.thinConnectors) delete nextFile.thinConnectors;
+        if (!nextFile.eventLinesToGroupBottom) delete nextFile.eventLinesToGroupBottom;
+        if (!nextFile.hideDecimals) delete nextFile.hideDecimals;
+        if (!nextFile.showGrid) delete nextFile.showGrid;
+        if (!nextFile.showTodayLine) delete nextFile.showTodayLine;
+        if (!nextFile.spanColorEvents) delete nextFile.spanColorEvents;
+        if (!nextFile.disableGroups) delete nextFile.disableGroups;
+        if (!nextFile.panelGroupMode || nextFile.panelGroupMode === 'default') delete nextFile.panelGroupMode;
+        if (!nextFile.nestEraSubGroups) delete nextFile.nestEraSubGroups;
+        if (!nextFile.autoHideEmptyGroups) delete nextFile.autoHideEmptyGroups;
+        delete nextFile.useEraGroupsInPanel;
+        delete nextFile.useSpanGroupsInPanel;
+        if (!nextFile.keepSelection) delete nextFile.keepSelection;
+        if (!nextFile.useWiki) delete nextFile.useWiki;
+        if (!nextFile.useSpreadsheet) delete nextFile.useSpreadsheet;
+        if (!nextFile.useMaps) delete nextFile.useMaps;
+        if (!nextFile.mapTileUrl) delete nextFile.mapTileUrl;
+        if (!nextFile.mapLimitToViewportYear) delete nextFile.mapLimitToViewportYear;
+        if (!nextFile.mapEventMarker || nextFile.mapEventMarker === 'pin') delete nextFile.mapEventMarker;
+        if (!nextFile.mapSpanMarker || nextFile.mapSpanMarker === 'circle') delete nextFile.mapSpanMarker;
+        if (!nextFile.mapEraMarker || nextFile.mapEraMarker === 'diamond') delete nextFile.mapEraMarker;
+        if (!nextFile.font || String(nextFile.font).toLowerCase() === 'default') delete nextFile.font;
 
-      const updatedData = {
-        ...prevData,
-        file: nextFile,
-      };
+        const updatedData = {
+          ...prevData,
+          file: nextFile,
+        };
 
-      // The physical file lives at currentTimelineId, which carries the folder; file.id never does
-      const oldPathId = currentTimelineIdRef.current || oldTimelineId;
-      const folderPrefix = oldPathId.includes('/') ? oldPathId.slice(0, oldPathId.lastIndexOf('/') + 1) : '';
-      const nextPathId = `${folderPrefix}${nextTimelineId}`;
+        // The physical file lives at currentTimelineId, which carries the folder; file.id never does
+        const oldPathId = currentTimelineIdRef.current || oldTimelineId;
+        const folderPrefix = oldPathId.includes('/') ? oldPathId.slice(0, oldPathId.lastIndexOf('/') + 1) : '';
+        const nextPathId = `${folderPrefix}${nextTimelineId}`;
 
-      // Rename only on an actual title edit; a HomePage rename legitimately leaves title and filename out of sync
-      const titleChanged = title !== prevData.file?.title;
-      if (titleChanged && nextPathId !== oldPathId) {
-        // The effect syncing this ref runs post-render, too late for the save below
-        currentTimelineIdRef.current = nextPathId;
-        setCurrentTimelineId(nextPathId);
-        const oldTitle = prevData.file?.title;
-        enqueuePersist(async () => {
-          const result = await renameTimeline({ oldId: oldPathId, newId: nextPathId });
-          if (result?.error === 'EXISTS') {
-            setSettingsRenameError(`A timeline named "${title}" already exists. Keeping the name "${oldTitle}".`);
-            const revertedData = { ...updatedData, file: { ...updatedData.file, id: `${oldTimelineId}-timeline`, title: oldTitle } };
-            currentTimelineIdRef.current = oldPathId;
-            setCurrentTimelineId(oldPathId);
-            setTimelineData(revertedData);
-            return saveTimelineToFile(revertedData, oldPathId);
-          }
-          setSettingsRenameError("");
-          return saveTimelineToFile(updatedData, nextPathId);
-        }).catch(console.error);
-      } else {
-        saveCurrentTimeline(updatedData).catch(console.error);
-      }
+        // Rename only on an actual title edit; a HomePage rename legitimately leaves title and filename out of sync
+        const titleChanged = title !== prevData.file?.title;
+        if (titleChanged && nextPathId !== oldPathId) {
+          // The effect syncing this ref runs post-render, too late for the save below
+          currentTimelineIdRef.current = nextPathId;
+          setCurrentTimelineId(nextPathId);
+          const oldTitle = prevData.file?.title;
+          enqueuePersist(async () => {
+            const result = await renameTimeline({ oldId: oldPathId, newId: nextPathId });
+            if (result?.error === 'EXISTS') {
+              setSettingsRenameError(`A timeline named "${title}" already exists. Keeping the name "${oldTitle}".`);
+              const revertedData = {
+                ...updatedData,
+                file: { ...updatedData.file, id: `${oldTimelineId}-timeline`, title: oldTitle },
+              };
+              currentTimelineIdRef.current = oldPathId;
+              setCurrentTimelineId(oldPathId);
+              setTimelineData(revertedData);
+              return saveTimelineToFile(revertedData, oldPathId);
+            }
+            setSettingsRenameError('');
+            return saveTimelineToFile(updatedData, nextPathId);
+          }).catch(console.error);
+        } else {
+          saveCurrentTimeline(updatedData).catch(console.error);
+        }
 
-      return updatedData;
-    });
-  }, [enqueuePersist, saveCurrentTimeline]);
+        return updatedData;
+      });
+    },
+    [enqueuePersist, saveCurrentTimeline],
+  );
 
   const handlePatchFile = (patch) => {
     setTimelineData((prevData) => {
       const nextFile = { ...prevData.file, ...patch };
-      if (!nextFile.panelGroupMode || nextFile.panelGroupMode === "default") delete nextFile.panelGroupMode;
+      if (!nextFile.panelGroupMode || nextFile.panelGroupMode === 'default') delete nextFile.panelGroupMode;
       if (!nextFile.nestEraSubGroups) delete nextFile.nestEraSubGroups;
-      if (nextFile.panelSortField !== "name") delete nextFile.panelSortField;
-      if (nextFile.panelSortOrder !== "desc") delete nextFile.panelSortOrder;
+      if (nextFile.panelSortField !== 'name') delete nextFile.panelSortField;
+      if (nextFile.panelSortOrder !== 'desc') delete nextFile.panelSortOrder;
       const updatedData = { ...prevData, file: nextFile };
       saveCurrentTimeline(updatedData).catch(console.error);
       return updatedData;
@@ -1326,16 +1363,16 @@ function App() {
   };
 
   const handleDownloadPackage = async () => {
-    const baseName = timelineData.file?.uid || timelineData.file?.id?.replace(/-timeline$/, "") || "timeline";
+    const baseName = timelineData.file?.uid || timelineData.file?.id?.replace(/-timeline$/, '') || 'timeline';
     const result = await exportTimelinePackage(timelineData, `${baseName}.timeline`);
     if (result?.success && result.skipped?.length > 0) {
       setSkippedFilesNotice({
-        title: "EXPORT FINISHED",
+        title: 'EXPORT FINISHED',
         message: `Package exported, but ${result.skipped.length} referenced file(s) could not be found and were skipped:`,
         files: result.skipped,
       });
     } else if (result && !result.success && !result.canceled) {
-      alert(`Failed to export package: ${result.error || "unknown error"}`);
+      alert(`Failed to export package: ${result.error || 'unknown error'}`);
     }
   };
 
@@ -1343,22 +1380,20 @@ function App() {
     if (result?.success && result.id) {
       if (result.skipped?.length > 0) {
         setSkippedFilesNotice({
-          title: "IMPORT FINISHED",
+          title: 'IMPORT FINISHED',
           message: `Imported, but ${result.skipped.length} bundled file(s) could not be written:`,
           files: result.skipped,
         });
       }
       await handleLoadTimeline(result.id);
     } else if (result && !result.success && !result.canceled) {
-      alert(`Failed to import timeline: ${result.error || "unknown error"}`);
+      alert(`Failed to import timeline: ${result.error || 'unknown error'}`);
     }
   };
 
   // sourcePath skips the file picker
   const handleImportTimeline = async (sourcePath) => {
-    const result = await importTimeline(
-      typeof sourcePath === "string" && sourcePath ? { sourcePath } : undefined
-    );
+    const result = await importTimeline(typeof sourcePath === 'string' && sourcePath ? { sourcePath } : undefined);
     if (result?.conflict) {
       setImportConflict({ title: result.title, sourcePath: result.sourcePath });
       return;
@@ -1381,19 +1416,18 @@ function App() {
         </div>
         <div className="confirm-content">
           <p className="confirm-text">
-            This file looks like "{importConflict.title}", a timeline that is already in
-            your library. You can open your existing timeline, or import this file as a
-            separate copy alongside it.
+            This file looks like "{importConflict.title}", a timeline that is already in your library. You can open your
+            existing timeline, or import this file as a separate copy alongside it.
           </p>
         </div>
         <div className="confirm-actions">
           <button className="settings-folder-button" onClick={() => setImportConflict(null)}>
             Cancel
           </button>
-          <button className="settings-folder-button" onClick={() => handleResolveImportConflict("copy")}>
+          <button className="settings-folder-button" onClick={() => handleResolveImportConflict('copy')}>
             Import as Copy
           </button>
-          <button className="settings-folder-button" onClick={() => handleResolveImportConflict("open-existing")}>
+          <button className="settings-folder-button" onClick={() => handleResolveImportConflict('open-existing')}>
             Open Existing
           </button>
         </div>
@@ -1431,7 +1465,7 @@ function App() {
 
   const handleExportPng = (options) => {
     setExportPngOptions(options);
-    setDownloadPngTrigger(prev => prev + 1);
+    setDownloadPngTrigger((prev) => prev + 1);
   };
 
   const handleDownloadVideo = () => {
@@ -1441,7 +1475,7 @@ function App() {
   const handleLoadTimeline = async (timelineId) => {
     try {
       if (!window.electron?.loadTimeline) {
-        throw new Error("Timeline loading is only available in the desktop app.");
+        throw new Error('Timeline loading is only available in the desktop app.');
       }
       const loadedTimeline = await window.electron.loadTimeline(timelineId);
 
@@ -1462,7 +1496,7 @@ function App() {
 
     try {
       const rootStyles = getComputedStyle(document.documentElement);
-      const secondaryBg = rootStyles.getPropertyValue("--surface").trim() || "#fffaf4";
+      const secondaryBg = rootStyles.getPropertyValue('--surface').trim() || '#fffaf4';
       const preview = await timelineViewRef.current.generatePreview({
         customBg: secondaryBg,
         maxWidth: 1280,
@@ -1472,10 +1506,10 @@ function App() {
       if (!preview?.imageUrl) return;
       const dataUrl = await createCardThumbnail(preview.imageUrl);
       const result = await window.electron.saveTimelineThumbnail({ timelineId, dataUrl });
-      if (result?.success === false) throw new Error(result.error || "Thumbnail save failed");
+      if (result?.success === false) throw new Error(result.error || 'Thumbnail save failed');
       setThumbnailRefreshSignal((value) => value + 1);
     } catch (error) {
-      console.warn("Could not update timeline card thumbnail:", error);
+      console.warn('Could not update timeline card thumbnail:', error);
     }
   }, []);
 
@@ -1501,29 +1535,29 @@ function App() {
   // Failures return { error } for inline display; native alerts break input focus in Electron
   const handleCreateTimeline = async (timelineConfig) => {
     // Create new timeline data structure
-    const timelineId = generateIdFromTitle(timelineConfig.title, "timeline").replace(/^timeline-/, "");
-      const newTimeline = {
-        file: {
-          id: `${timelineId}-timeline`,
-          uid: generateStorageUid(timelineId),
-          type: "timeline",
+    const timelineId = generateIdFromTitle(timelineConfig.title, 'timeline').replace(/^timeline-/, '');
+    const newTimeline = {
+      file: {
+        id: `${timelineId}-timeline`,
+        uid: generateStorageUid(timelineId),
+        type: 'timeline',
         title: timelineConfig.title,
-        appVersion: "0.7.0-alpha.1",
+        appVersion: '0.7.0-alpha.1',
         start: timelineConfig.start,
         end: timelineConfig.end,
-          detailLevel: timelineConfig.detailLevel,
-          theme: timelineConfig.theme || defaultThemeKey,
-          startLabel: timelineConfig.startLabel,
-          endLabel: timelineConfig.endLabel,
-          layout: timelineConfig.layout || "Horizontal",
-          branchOrdering: timelineConfig.branchOrdering || "later-first",
-          useSpreadsheet: timelineConfig.useSpreadsheet || undefined,
-          useMaps: timelineConfig.useMaps || undefined,
-          useWiki: timelineConfig.useWiki || undefined,
-          groups: [DEFAULT_GROUP],
-        },
-        elements: []
-      };
+        detailLevel: timelineConfig.detailLevel,
+        theme: timelineConfig.theme || defaultThemeKey,
+        startLabel: timelineConfig.startLabel,
+        endLabel: timelineConfig.endLabel,
+        layout: timelineConfig.layout || 'Horizontal',
+        branchOrdering: timelineConfig.branchOrdering || 'later-first',
+        useSpreadsheet: timelineConfig.useSpreadsheet || undefined,
+        useMaps: timelineConfig.useMaps || undefined,
+        useWiki: timelineConfig.useWiki || undefined,
+        groups: [DEFAULT_GROUP],
+      },
+      elements: [],
+    };
 
     if (!timelineConfig.startLabel) delete newTimeline.file.startLabel;
     if (!timelineConfig.endLabel) delete newTimeline.file.endLabel;
@@ -1534,7 +1568,9 @@ function App() {
       const result = await enqueuePersist(() => saveTimelineToFile(newTimeline, saveId, { create: true }));
       if (!result?.success) {
         if (result?.error === 'EXISTS') {
-          return { error: `A timeline named "${timelineConfig.title}" already exists${timelineConfig.folder ? ' in that folder' : ''}. Choose a different name.` };
+          return {
+            error: `A timeline named "${timelineConfig.title}" already exists${timelineConfig.folder ? ' in that folder' : ''}. Choose a different name.`,
+          };
         }
         throw new Error(result?.error || 'Save failed');
       }
@@ -1564,7 +1600,7 @@ function App() {
       let saveId = null;
       for (let counter = 1; counter <= 50; counter++) {
         const duplicateName = `${timelineData.file.title} Copy${counter > 1 ? ` ${counter}` : ''}`;
-        const duplicateId = generateIdFromTitle(duplicateName, "timeline").replace(/^timeline-/, "");
+        const duplicateId = generateIdFromTitle(duplicateName, 'timeline').replace(/^timeline-/, '');
         const candidateData = {
           ...timelineData,
           file: {
@@ -1601,57 +1637,61 @@ function App() {
 
   const isElectron = window.electron !== undefined;
 
-  const resolveThemeKey = useCallback((value, fallback = defaultThemeKey) => {
-    if (!value) return fallback;
-    const lower = String(value).toLowerCase();
-    if (lower === "default") return fallback;
-    const match = Object.keys(themeConfig.themes || {}).find(
-      (key) => key.toLowerCase() === lower
-    );
-    return match || fallback;
-  }, [defaultThemeKey, themeConfig]);
+  const resolveThemeKey = useCallback(
+    (value, fallback = defaultThemeKey) => {
+      if (!value) return fallback;
+      const lower = String(value).toLowerCase();
+      if (lower === 'default') return fallback;
+      const match = Object.keys(themeConfig.themes || {}).find((key) => key.toLowerCase() === lower);
+      return match || fallback;
+    },
+    [defaultThemeKey, themeConfig],
+  );
 
   const resolveFontStack = (family) => {
-    const fallback =
-      '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    const fallback = '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
     if (!family) return fallback;
     const normalized = String(family);
     const lower = normalized.toLowerCase();
-    if (lower === "default") return fallback;
-    if (lower === "system") {
+    if (lower === 'default') return fallback;
+    if (lower === 'system') {
       return 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
     }
-    const safeName = normalized.replace(/([\\"])/g, "\\$1");
+    const safeName = normalized.replace(/([\\"])/g, '\\$1');
     return `"${safeName}", ${fallback}`;
   };
 
-  const getThemeFont = useCallback((themeKeyValue) => {
-    const theme = themeConfig.themes?.[themeKeyValue];
-    const font = theme?.font;
-    if (typeof font !== "object" || font === null || !("family" in font) || typeof font.family !== "string") return null;
-    return {
-      family: font.family,
-      cssUrl: "cssUrl" in font && typeof font.cssUrl === "string" ? font.cssUrl : undefined,
-    };
-  }, [themeConfig]);
+  const getThemeFont = useCallback(
+    (themeKeyValue) => {
+      const theme = themeConfig.themes?.[themeKeyValue];
+      const font = theme?.font;
+      if (typeof font !== 'object' || font === null || !('family' in font) || typeof font.family !== 'string')
+        return null;
+      return {
+        family: font.family,
+        cssUrl: 'cssUrl' in font && typeof font.cssUrl === 'string' ? font.cssUrl : undefined,
+      };
+    },
+    [themeConfig],
+  );
 
   const resolveFontChoice = (setting, themeFont) => {
-    const normalized = String(setting || "").trim();
+    const normalized = String(setting || '').trim();
     const lower = normalized.toLowerCase();
-    if (!normalized || lower === "default") {
+    if (!normalized || lower === 'default') {
       if (themeFont?.family) {
         return {
           family: themeFont.family,
-          source: "theme",
+          source: 'theme',
           cssUrl: themeFont.cssUrl,
         };
       }
-      return { family: "Inter", source: "inter" };
+      return { family: 'Inter', source: 'inter' };
     }
-    if (lower === "system") {
-      return { family: "system", source: "system" };
+    if (lower === 'system') {
+      return { family: 'system', source: 'system' };
     }
-    return { family: normalized, source: "user" };
+    return { family: normalized, source: 'user' };
   };
 
   useEffect(() => {
@@ -1661,10 +1701,10 @@ function App() {
       const [settings, savedKeybinds] = await Promise.all([getAppSettings(), loadKeybinds()]);
       if (!isMounted) return;
       setAppThemePreference(settings?.theme || defaultThemeKey);
-      const storedTimelineDir = settings?.timelineStorageDir ?? settings?.storageDir ?? "";
-      const storedNotesDir = settings?.notesStorageDir ?? "";
-      const storedAssetsDir = settings?.assetsStorageDir ?? "";
-      const storedFontFamily = settings?.appFontFamily ?? "Inter";
+      const storedTimelineDir = settings?.timelineStorageDir ?? settings?.storageDir ?? '';
+      const storedNotesDir = settings?.notesStorageDir ?? '';
+      const storedAssetsDir = settings?.assetsStorageDir ?? '';
+      const storedFontFamily = settings?.appFontFamily ?? 'Inter';
       const storedFontSize = settings?.appFontSize ?? 14;
       setTimelineStorageDir(storedTimelineDir);
       setNotesStorageDir(storedNotesDir);
@@ -1698,19 +1738,18 @@ function App() {
   }, [themeKey, themeConfig]);
 
   useEffect(() => {
-    const styleId = "user-fonts";
-    const style =
-      document.getElementById(styleId) || document.createElement("style");
+    const styleId = 'user-fonts';
+    const style = document.getElementById(styleId) || document.createElement('style');
     style.id = styleId;
     const css = (availableFonts || [])
       .map((font) => {
-        const name = String(font.name || "").replace(/([\\"])/g, "\\$1");
-        if (!name || !font.fileUrl) return "";
+        const name = String(font.name || '').replace(/([\\"])/g, '\\$1');
+        if (!name || !font.fileUrl) return '';
         const isItalic = /italic/i.test(name);
-        return `@font-face{font-family:"${name}";src:url("${font.fileUrl}") format("${font.format}");font-weight:normal;font-style:${isItalic ? "italic" : "normal"};font-display:swap;}`;
+        return `@font-face{font-family:"${name}";src:url("${font.fileUrl}") format("${font.format}");font-weight:normal;font-style:${isItalic ? 'italic' : 'normal'};font-display:swap;}`;
       })
       .filter(Boolean)
-      .join("\n");
+      .join('\n');
     style.textContent = css;
     if (!style.parentNode) {
       document.head.appendChild(style);
@@ -1721,52 +1760,32 @@ function App() {
     const themeFont = getThemeFont(themeKey);
     const appChoice = resolveFontChoice(appFontFamily, themeFont);
     const timelineSetting = timelineData?.file?.font;
-    const useAppFont =
-      !timelineSetting || String(timelineSetting).toLowerCase() === "default";
-    const timelineChoice = useAppFont
-      ? appChoice
-      : resolveFontChoice(timelineSetting, null);
+    const useAppFont = !timelineSetting || String(timelineSetting).toLowerCase() === 'default';
+    const timelineChoice = useAppFont ? appChoice : resolveFontChoice(timelineSetting, null);
     const finalChoice = timelineData ? timelineChoice : appChoice;
 
-    document.documentElement.style.setProperty(
-      "--app-font-family",
-      resolveFontStack(finalChoice.family)
-    );
-    document.documentElement.style.setProperty(
-      "--app-font-size",
-      `${Number(appFontSize) || 14}px`
-    );
-    document.documentElement.style.setProperty(
-      "--app-font-scale",
-      String((Number(appFontSize) || 14) / 14)
-    );
+    document.documentElement.style.setProperty('--app-font-family', resolveFontStack(finalChoice.family));
+    document.documentElement.style.setProperty('--app-font-size', `${Number(appFontSize) || 14}px`);
+    document.documentElement.style.setProperty('--app-font-scale', String((Number(appFontSize) || 14) / 14));
 
-    const linkId = "theme-font-css";
+    const linkId = 'theme-font-css';
     const existing = document.getElementById(linkId);
-    if (finalChoice.source === "theme" && finalChoice.cssUrl) {
+    if (finalChoice.source === 'theme' && finalChoice.cssUrl) {
       if (existing) {
-        if (existing.getAttribute("href") !== finalChoice.cssUrl) {
-          existing.setAttribute("href", finalChoice.cssUrl);
+        if (existing.getAttribute('href') !== finalChoice.cssUrl) {
+          existing.setAttribute('href', finalChoice.cssUrl);
         }
       } else {
-        const link = document.createElement("link");
+        const link = document.createElement('link');
         link.id = linkId;
-        link.rel = "stylesheet";
+        link.rel = 'stylesheet';
         link.href = finalChoice.cssUrl;
         document.head.appendChild(link);
       }
     } else if (existing) {
       existing.remove();
     }
-  }, [
-    appFontFamily,
-    appFontSize,
-    timelineData,
-    timelineData?.file?.font,
-    themeKey,
-    themeConfig,
-    getThemeFont,
-  ]);
+  }, [appFontFamily, appFontSize, timelineData, timelineData?.file?.font, themeKey, themeConfig, getThemeFont]);
 
   useEffect(() => {
     if (timelineData?.file) {
@@ -1807,10 +1826,10 @@ function App() {
   };
 
   const handleTimelineStorageDirChange = async (nextDir) => {
-    setTimelineStorageDir(nextDir || "");
+    setTimelineStorageDir(nextDir || '');
     await saveAppSettings({
       theme: appThemePreference,
-      timelineStorageDir: nextDir || "",
+      timelineStorageDir: nextDir || '',
       notesStorageDir,
       appFontFamily,
       appFontSize,
@@ -1820,11 +1839,11 @@ function App() {
   };
 
   const handleNotesStorageDirChange = async (nextDir) => {
-    setNotesStorageDir(nextDir || "");
+    setNotesStorageDir(nextDir || '');
     await saveAppSettings({
       theme: appThemePreference,
       timelineStorageDir,
-      notesStorageDir: nextDir || "",
+      notesStorageDir: nextDir || '',
       assetsStorageDir,
       appFontFamily,
       appFontSize,
@@ -1834,19 +1853,18 @@ function App() {
   };
 
   const handleAssetsStorageDirChange = async (nextDir) => {
-    setAssetsStorageDir(nextDir || "");
+    setAssetsStorageDir(nextDir || '');
     await saveAppSettings({
       theme: appThemePreference,
       timelineStorageDir,
       notesStorageDir,
-      assetsStorageDir: nextDir || "",
+      assetsStorageDir: nextDir || '',
       appFontFamily,
       appFontSize,
       hardwareAcceleration,
       startMaximized,
     });
   };
-
 
   const handleAppFontSizeChange = async (nextSize) => {
     const next = Number(nextSize) || 14;
@@ -1886,7 +1904,7 @@ function App() {
       startMaximized,
     });
     if (window.electron?.relaunchApp) {
-      const confirmed = window.confirm("Restart required to apply hardware acceleration change. Restart now?");
+      const confirmed = window.confirm('Restart required to apply hardware acceleration change. Restart now?');
       if (confirmed) window.electron.relaunchApp();
     }
   };
@@ -1929,7 +1947,6 @@ function App() {
     await openAssetsFolder();
   };
 
-
   const handleOpenFontsFolder = async () => {
     await openFontsFolder();
   };
@@ -1948,7 +1965,7 @@ function App() {
     const showSet = new Set(activeTags);
     const hideSet = new Set(hiddenTags);
     return timelineData.elements.filter((element) => {
-      if (element.type !== "event" && element.type !== "span") {
+      if (element.type !== 'event' && element.type !== 'span') {
         return true;
       }
       const tags = Array.isArray(element.tags) ? element.tags : [];
@@ -1972,14 +1989,15 @@ function App() {
     const defaultGroupId = groups[0]?.id || DEFAULT_GROUP_ID;
     const spanGroupById = Object.fromEntries(
       filteredElements
-        .filter((el) => el.type === "span" && groupIdSet.has(el.groupId))
-        .map((el) => [el.id, el.groupId])
+        .filter((el) => el.type === 'span' && groupIdSet.has(el.groupId))
+        .map((el) => [el.id, el.groupId]),
     );
     const resolvedElements = filteredElements.map((el) => {
-      if ((el.type !== "event" && el.type !== "span") || groupIdSet.has(el.groupId)) return el;
-      const parentGroupId = el.type === "event" && Array.isArray(el.parents)
-        ? el.parents.map((pid) => spanGroupById[pid]).find(Boolean)
-        : undefined;
+      if ((el.type !== 'event' && el.type !== 'span') || groupIdSet.has(el.groupId)) return el;
+      const parentGroupId =
+        el.type === 'event' && Array.isArray(el.parents)
+          ? el.parents.map((pid) => spanGroupById[pid]).find(Boolean)
+          : undefined;
       return { ...el, groupId: parentGroupId ?? defaultGroupId };
     });
     return { ...timelineData, elements: resolvedElements };
@@ -1989,14 +2007,16 @@ function App() {
     if (!timelineData?.elements) return [];
     const tags = new Set();
     timelineData.elements.forEach((element) => {
-      if (element.type !== "event" && element.type !== "span") return;
+      if (element.type !== 'event' && element.type !== 'span') return;
       if (Array.isArray(element.tags)) {
         element.tags.forEach((tag) => {
           if (tag) tags.add(tag);
         });
       }
     });
-    return Array.from(tags).filter((tag): tag is string => typeof tag === "string").sort((a, b) => a.localeCompare(b));
+    return Array.from(tags)
+      .filter((tag): tag is string => typeof tag === 'string')
+      .sort((a, b) => a.localeCompare(b));
   }, [timelineData]);
 
   useEffect(() => {
@@ -2016,22 +2036,22 @@ function App() {
   }, [filteredElements, selectedId]);
 
   useEffect(() => {
-    if (viewMode === "spreadsheet" && !timelineData?.file?.useSpreadsheet) {
-      setViewMode("timeline");
+    if (viewMode === 'spreadsheet' && !timelineData?.file?.useSpreadsheet) {
+      setViewMode('timeline');
     }
   }, [viewMode, timelineData?.file?.useSpreadsheet]);
 
   const compareElementsByTimelineOrder = useCallback((a, b) => {
-    if (a.type === "event" && b.type === "event") {
+    if (a.type === 'event' && b.type === 'event') {
       if ((a.date ?? 0) !== (b.date ?? 0)) return (a.date ?? 0) - (b.date ?? 0);
       return String(a.id).localeCompare(String(b.id));
     }
-    if (a.type === "span" && b.type === "span") {
+    if (a.type === 'span' && b.type === 'span') {
       if ((a.start ?? 0) !== (b.start ?? 0)) return (a.start ?? 0) - (b.start ?? 0);
       if ((a.end ?? 0) !== (b.end ?? 0)) return (a.end ?? 0) - (b.end ?? 0);
       return String(a.id).localeCompare(String(b.id));
     }
-    if (a.type === "era" && b.type === "era") {
+    if (a.type === 'era' && b.type === 'era') {
       if ((a.start ?? 0) !== (b.start ?? 0)) return (a.start ?? 0) - (b.start ?? 0);
       if ((a.end ?? 0) !== (b.end ?? 0)) return (b.end ?? 0) - (a.end ?? 0);
       return String(a.id).localeCompare(String(b.id));
@@ -2053,9 +2073,8 @@ function App() {
     return {
       selectedElement,
       prevElement: currentIndex > 0 ? sameTypeElements[currentIndex - 1] : null,
-      nextElement: currentIndex >= 0 && currentIndex < sameTypeElements.length - 1
-        ? sameTypeElements[currentIndex + 1]
-        : null,
+      nextElement:
+        currentIndex >= 0 && currentIndex < sameTypeElements.length - 1 ? sameTypeElements[currentIndex + 1] : null,
     };
   }, [selectedId, filteredElements, compareElementsByTimelineOrder]);
 
@@ -2069,28 +2088,31 @@ function App() {
     handleSelect(selectionNavigation.nextElement.id);
   }, [selectionNavigation.nextElement, handleSelect]);
 
-  const TYPE_ORDER = ["event", "span", "era"];
+  const TYPE_ORDER = ['event', 'span', 'era'];
 
   const elementRepDate = (el) => {
-    if (el.type === "event") return el.date ?? 0;
+    if (el.type === 'event') return el.date ?? 0;
     return el.start ?? 0;
   };
 
-  const selectByTypeDelta = useCallback((delta) => {
-    const selectedElement = selectionNavigation.selectedElement;
-    if (!selectedElement) return;
-    const currentTypeIdx = TYPE_ORDER.indexOf(selectedElement.type);
-    const targetTypeIdx = currentTypeIdx + delta;
-    if (currentTypeIdx === -1 || targetTypeIdx < 0 || targetTypeIdx >= TYPE_ORDER.length) return;
-    const targetType = TYPE_ORDER[targetTypeIdx];
-    const candidates = filteredElements.filter((el) => el.type === targetType);
-    if (!candidates.length) return;
-    const refDate = elementRepDate(selectedElement);
-    const closest = candidates.reduce((best, el) =>
-      Math.abs(elementRepDate(el) - refDate) < Math.abs(elementRepDate(best) - refDate) ? el : best
-    );
-    handleSelect(closest.id);
-  }, [selectionNavigation.selectedElement, filteredElements, handleSelect]);
+  const selectByTypeDelta = useCallback(
+    (delta) => {
+      const selectedElement = selectionNavigation.selectedElement;
+      if (!selectedElement) return;
+      const currentTypeIdx = TYPE_ORDER.indexOf(selectedElement.type);
+      const targetTypeIdx = currentTypeIdx + delta;
+      if (currentTypeIdx === -1 || targetTypeIdx < 0 || targetTypeIdx >= TYPE_ORDER.length) return;
+      const targetType = TYPE_ORDER[targetTypeIdx];
+      const candidates = filteredElements.filter((el) => el.type === targetType);
+      if (!candidates.length) return;
+      const refDate = elementRepDate(selectedElement);
+      const closest = candidates.reduce((best, el) =>
+        Math.abs(elementRepDate(el) - refDate) < Math.abs(elementRepDate(best) - refDate) ? el : best,
+      );
+      handleSelect(closest.id);
+    },
+    [selectionNavigation.selectedElement, filteredElements, handleSelect],
+  );
 
   const handleSelectTypeDown = useCallback(() => {
     selectByTypeDelta(1);
@@ -2106,9 +2128,9 @@ function App() {
     const handleSelectionNavigation = (e) => {
       const target = e.target;
       const isEditable =
-        target?.tagName === "INPUT" ||
-        target?.tagName === "TEXTAREA" ||
-        target?.tagName === "SELECT" ||
+        target?.tagName === 'INPUT' ||
+        target?.tagName === 'TEXTAREA' ||
+        target?.tagName === 'SELECT' ||
         target?.isContentEditable;
       if (isEditable) return;
 
@@ -2135,9 +2157,19 @@ function App() {
       }
     };
 
-    window.addEventListener("keydown", handleSelectionNavigation);
-    return () => window.removeEventListener("keydown", handleSelectionNavigation);
-  }, [selectedId, timelineData, keybinds, selectionNavigation.prevElement, selectionNavigation.nextElement, handleSelectPrevious, handleSelectNext, handleSelectTypeDown, handleSelectTypeUp]);
+    window.addEventListener('keydown', handleSelectionNavigation);
+    return () => window.removeEventListener('keydown', handleSelectionNavigation);
+  }, [
+    selectedId,
+    timelineData,
+    keybinds,
+    selectionNavigation.prevElement,
+    selectionNavigation.nextElement,
+    handleSelectPrevious,
+    handleSelectNext,
+    handleSelectTypeDown,
+    handleSelectTypeUp,
+  ]);
 
   // Show HomePage if no timeline is loaded
   if (!timelineData) {
@@ -2193,128 +2225,138 @@ function App() {
   }
 
   const selectedElement = timelineData.elements.find((el) => el.id === selectedId);
-  const displayedElement = selectedElement
-    || (rightLockState === "open" ? timelineData.elements.find((el) => el.id === lastSelectedId) : null);
-  const isRightPanelVisible = rightLockState === "closed"
-    ? false
-    : rightLockState === "open"
-      ? Boolean(displayedElement) && !isRightCollapsed
-      : Boolean(selectedElement) && !isRightCollapsed;
+  const displayedElement =
+    selectedElement ||
+    (rightLockState === 'open' ? timelineData.elements.find((el) => el.id === lastSelectedId) : null);
+  const isRightPanelVisible =
+    rightLockState === 'closed'
+      ? false
+      : rightLockState === 'open'
+        ? Boolean(displayedElement) && !isRightCollapsed
+        : Boolean(selectedElement) && !isRightCollapsed;
 
   return (
     <>
       <TopBar
-        title={timelineData.file?.title || "Timelines"}
+        title={timelineData.file?.title || 'Timelines'}
         isLeftCollapsed={isLeftCollapsed}
-        onToggleLeft={viewMode !== "spreadsheet" ? () => setIsLeftCollapsed((v) => !v) : undefined}
+        onToggleLeft={viewMode !== 'spreadsheet' ? () => setIsLeftCollapsed((v) => !v) : undefined}
         isRightCollapsed={!isRightPanelVisible}
-        onToggleRight={viewMode !== "spreadsheet" ? () => {
-          if (rightLockState === "closed") setRightLockState(null);
-          setIsRightCollapsed((v) => !v);
-        } : undefined}
+        onToggleRight={
+          viewMode !== 'spreadsheet'
+            ? () => {
+                if (rightLockState === 'closed') setRightLockState(null);
+                setIsRightCollapsed((v) => !v);
+              }
+            : undefined
+        }
         rightLockState={rightLockState}
-        onCycleRightLock={viewMode !== "spreadsheet" ? () => {
-          setRightLockState((prev) => {
-            if (prev) return null;
-            return isRightPanelVisible ? "open" : "closed";
-          });
-        } : undefined}
+        onCycleRightLock={
+          viewMode !== 'spreadsheet'
+            ? () => {
+                setRightLockState((prev) => {
+                  if (prev) return null;
+                  return isRightPanelVisible ? 'open' : 'closed';
+                });
+              }
+            : undefined
+        }
       />
       <div className={`app-shell ${isElectron ? 'with-title-bar' : ''}`}>
-      {viewMode !== "spreadsheet" && (
-        <>
-          <div
-            className="sidebar-resizer overlay-resizer"
-            style={{ left: `${currentLeftWidth - 3}px` }}
-            onMouseDown={(e) => {
-              e.preventDefault();
-              isDraggingLeft.current = true;
-              document.body.classList.add("dragging");
-            }}
-          />
-          <aside
-            className="app-sidebar overlay-sidebar"
-            style={{ width: isLeftCollapsed ? COLLAPSED_WIDTH : sidebarWidth }}
-          >
-            <ErrorBoundary name="Sidebar">
-            <Sidebar
-              isCollapsed={isLeftCollapsed}
-              onToggle={() => setIsLeftCollapsed((v) => !v)}
-              selectedId={selectedId}
-              onSelect={handleSelect}
-              timelineData={filteredTimelineData}
-              allElements={timelineData.elements}
-              chipFilter={parsedChipQuery}
-              activeTags={activeTags}
-              hiddenTags={hiddenTags}
-              onToggleTag={handleToggleTag}
-              onToggleHiddenTag={handleToggleHiddenTag}
-              onClearTags={handleClearTags}
-              pinnedTags={pinnedTags}
-              onTogglePinnedTag={handleTogglePinnedTag}
-              onAddGroup={handleAddGroup}
-              onUpdateGroup={handleUpdateGroup}
-              onUpdateGroups={handleUpdateGroups}
-              onDeleteGroup={handleDeleteGroup}
-              onCenterGroup={handleCenterGroup}
-              tagColors={timelineData.file?.tagColors || {}}
-              onUpdateTagColor={handleUpdateTagColor}
-              onAddEvent={handleAddEvent}
-              onAddSpan={handleAddSpan}
-              onAddEra={handleAddEra}
-              onOpenSettings={() => setIsSettingsOpen(true)}
-              onDownloadJson={handleDownloadJSON}
-              onDownloadPackage={handleDownloadPackage}
-              onDownloadPng={handleDownloadPNG}
-              onDownloadVideo={handleDownloadVideo}
-              onLoadTimeline={handleLoadTimeline}
-              onNewTimeline={handleNewTimeline}
-              onDuplicateTimeline={handleDuplicateTimeline}
-              onBackToHome={handleBackToHome}
-              onDelete={handleRequestDelete}
-              onDuplicateElement={handleDuplicateElement}
-              onEditElement={handleEditElement}
-              onPatchFile={handlePatchFile}
-              keybinds={keybinds}
+        {viewMode !== 'spreadsheet' && (
+          <>
+            <div
+              className="sidebar-resizer overlay-resizer"
+              style={{ left: `${currentLeftWidth - 3}px` }}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                isDraggingLeft.current = true;
+                document.body.classList.add('dragging');
+              }}
             />
-            </ErrorBoundary>
-          </aside>
-        </>
-      )}
+            <aside
+              className="app-sidebar overlay-sidebar"
+              style={{ width: isLeftCollapsed ? COLLAPSED_WIDTH : sidebarWidth }}
+            >
+              <ErrorBoundary name="Sidebar">
+                <Sidebar
+                  isCollapsed={isLeftCollapsed}
+                  onToggle={() => setIsLeftCollapsed((v) => !v)}
+                  selectedId={selectedId}
+                  onSelect={handleSelect}
+                  timelineData={filteredTimelineData}
+                  allElements={timelineData.elements}
+                  chipFilter={parsedChipQuery}
+                  activeTags={activeTags}
+                  hiddenTags={hiddenTags}
+                  onToggleTag={handleToggleTag}
+                  onToggleHiddenTag={handleToggleHiddenTag}
+                  onClearTags={handleClearTags}
+                  pinnedTags={pinnedTags}
+                  onTogglePinnedTag={handleTogglePinnedTag}
+                  onAddGroup={handleAddGroup}
+                  onUpdateGroup={handleUpdateGroup}
+                  onUpdateGroups={handleUpdateGroups}
+                  onDeleteGroup={handleDeleteGroup}
+                  onCenterGroup={handleCenterGroup}
+                  tagColors={timelineData.file?.tagColors || {}}
+                  onUpdateTagColor={handleUpdateTagColor}
+                  onAddEvent={handleAddEvent}
+                  onAddSpan={handleAddSpan}
+                  onAddEra={handleAddEra}
+                  onOpenSettings={() => setIsSettingsOpen(true)}
+                  onDownloadJson={handleDownloadJSON}
+                  onDownloadPackage={handleDownloadPackage}
+                  onDownloadPng={handleDownloadPNG}
+                  onDownloadVideo={handleDownloadVideo}
+                  onLoadTimeline={handleLoadTimeline}
+                  onNewTimeline={handleNewTimeline}
+                  onDuplicateTimeline={handleDuplicateTimeline}
+                  onBackToHome={handleBackToHome}
+                  onDelete={handleRequestDelete}
+                  onDuplicateElement={handleDuplicateElement}
+                  onEditElement={handleEditElement}
+                  onPatchFile={handlePatchFile}
+                  keybinds={keybinds}
+                />
+              </ErrorBoundary>
+            </aside>
+          </>
+        )}
 
-      {diskReloadNotice && currentTimelineId && (
-        <div
-          style={{
-            position: "fixed",
-            top: 52,
-            left: "50%",
-            transform: "translateX(-50%)",
-            zIndex: 1200,
-            display: "flex",
-            gap: 8,
-            alignItems: "center",
-            padding: "10px 12px",
-            borderRadius: 12,
-            border: "1px solid var(--border-color)",
-            background: "var(--surface)",
-            boxShadow: "0 12px 30px rgba(0,0,0,0.12)",
-          }}
-        >
-          <span>Timeline changed on disk.</span>
-          <button className="folder-modal-btn folder-modal-btn-primary" onClick={() => handleLoadTimeline(currentTimelineId)}>
-            Reload
-          </button>
-          <button className="folder-modal-btn" onClick={() => setDiskReloadNotice(false)}>
-            Dismiss
-          </button>
-        </div>
-      )}
+        {diskReloadNotice && currentTimelineId && (
+          <div
+            style={{
+              position: 'fixed',
+              top: 52,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 1200,
+              display: 'flex',
+              gap: 8,
+              alignItems: 'center',
+              padding: '10px 12px',
+              borderRadius: 12,
+              border: '1px solid var(--border-color)',
+              background: 'var(--surface)',
+              boxShadow: '0 12px 30px rgba(0,0,0,0.12)',
+            }}
+          >
+            <span>Timeline changed on disk.</span>
+            <button
+              className="folder-modal-btn folder-modal-btn-primary"
+              onClick={() => handleLoadTimeline(currentTimelineId)}
+            >
+              Reload
+            </button>
+            <button className="folder-modal-btn" onClick={() => setDiskReloadNotice(false)}>
+              Dismiss
+            </button>
+          </div>
+        )}
 
-      <main
-        className="app-content"
-        style={{ display: isRightMaximized ? "none" : "block" }}
-      >
-          {viewMode === "spreadsheet" ? (
+        <main className="app-content" style={{ display: isRightMaximized ? 'none' : 'block' }}>
+          {viewMode === 'spreadsheet' ? (
             <ErrorBoundary name="Spreadsheet">
               <SpreadsheetView
                 timelineData={filteredTimelineData}
@@ -2345,275 +2387,276 @@ function App() {
             </ErrorBoundary>
           ) : (
             <ErrorBoundary name="Timeline">
-            <TimelineView
-              ref={timelineViewRef}
-              selectedId={selectedId}
-              onSelect={handleSelect}
-              timelineData={filteredTimelineData}
-              onAddEvent={handleAddEvent}
-              onAddSpan={handleAddSpan}
-              onAddEra={handleAddEra}
-              onOpenSettings={() => setIsSettingsOpen(true)}
-              onDelete={handleRequestDelete}
-              onDuplicateElement={handleDuplicateElement}
-              onEditElement={handleEditElement}
-              downloadPngTrigger={downloadPngTrigger}
-              exportPngOptions={exportPngOptions}
-              onExportPng={handleDownloadPNG}
-              onExportVideo={handleDownloadVideo}
-              rightPanelWidth={rightWidth}
-              isRightPanelOpen={isRightPanelVisible}
-              leftPanelWidth={currentLeftWidth}
-              isLeftPanelOpen={!isLeftCollapsed}
-              activeTags={activeTags}
-              hiddenTags={hiddenTags}
-              allTags={allTags}
-              onToggleTag={handleToggleTag}
-              onToggleHiddenTag={handleToggleHiddenTag}
-              onClearTags={handleClearTags}
-              pinnedTags={pinnedTags}
-              onTogglePinnedTag={handleTogglePinnedTag}
-              onViewportYearChange={handleViewportYearChange}
-              onChipQueryChange={setChipQuery}
-              tagColors={timelineData.file?.tagColors || {}}
-              keybinds={keybinds}
-              onSetViewMode={filteredTimelineData?.file?.useSpreadsheet ? setViewMode : undefined}
-            />
+              <TimelineView
+                ref={timelineViewRef}
+                selectedId={selectedId}
+                onSelect={handleSelect}
+                timelineData={filteredTimelineData}
+                onAddEvent={handleAddEvent}
+                onAddSpan={handleAddSpan}
+                onAddEra={handleAddEra}
+                onOpenSettings={() => setIsSettingsOpen(true)}
+                onDelete={handleRequestDelete}
+                onDuplicateElement={handleDuplicateElement}
+                onEditElement={handleEditElement}
+                downloadPngTrigger={downloadPngTrigger}
+                exportPngOptions={exportPngOptions}
+                onExportPng={handleDownloadPNG}
+                onExportVideo={handleDownloadVideo}
+                rightPanelWidth={rightWidth}
+                isRightPanelOpen={isRightPanelVisible}
+                leftPanelWidth={currentLeftWidth}
+                isLeftPanelOpen={!isLeftCollapsed}
+                activeTags={activeTags}
+                hiddenTags={hiddenTags}
+                allTags={allTags}
+                onToggleTag={handleToggleTag}
+                onToggleHiddenTag={handleToggleHiddenTag}
+                onClearTags={handleClearTags}
+                pinnedTags={pinnedTags}
+                onTogglePinnedTag={handleTogglePinnedTag}
+                onViewportYearChange={handleViewportYearChange}
+                onChipQueryChange={setChipQuery}
+                tagColors={timelineData.file?.tagColors || {}}
+                keybinds={keybinds}
+                onSetViewMode={filteredTimelineData?.file?.useSpreadsheet ? setViewMode : undefined}
+              />
             </ErrorBoundary>
           )}
-      </main>
+        </main>
 
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={handleCloseSettings}
-        onOpenAppSettings={handleOpenAppSettingsFromProject}
-        isCovered={isProjectSettingsCovered}
-        timelineData={timelineData}
-        onUpdateTimeline={handleUpdateTimeline}
-        renameErrorMessage={settingsRenameError}
-        onClearRenameError={() => setSettingsRenameError("")}
-        themeKey={themeKey}
-        defaultThemeKey={defaultThemeKey}
-        themes={themeConfig.themes}
-        fonts={availableFonts}
-        onThemeChange={setThemeKey}
-        oldFormatThemeCount={oldFormatThemeCount}
-        onMigrateOldThemes={handleMigrateOldThemes}
-      />
-
-      {isAppSettingsOverlayOpen && (
-        <HomePage
-          settingsOnly
-          reuseExistingBackdrop={returnToProjectSettings}
-          onSelectTimeline={handleLoadTimeline}
-          onRenameTimeline={handleRenameTimelineFromLibrary}
-          onTimelineRenamed={handleLibraryTimelineRenamed}
-          onCreateTimeline={handleCreateTimeline}
-          appThemeKey={appThemeKey}
+        <SettingsModal
+          isOpen={isSettingsOpen}
+          onClose={handleCloseSettings}
+          onOpenAppSettings={handleOpenAppSettingsFromProject}
+          isCovered={isProjectSettingsCovered}
+          timelineData={timelineData}
+          onUpdateTimeline={handleUpdateTimeline}
+          renameErrorMessage={settingsRenameError}
+          onClearRenameError={() => setSettingsRenameError('')}
+          themeKey={themeKey}
+          defaultThemeKey={defaultThemeKey}
           themes={themeConfig.themes}
-          onAppThemeChange={handleAppThemeChange}
+          fonts={availableFonts}
+          onThemeChange={setThemeKey}
           oldFormatThemeCount={oldFormatThemeCount}
           onMigrateOldThemes={handleMigrateOldThemes}
-          appFontFamily={appFontFamily}
-          appFontSize={appFontSize}
-          fonts={availableFonts}
-          timelineStorageDir={timelineStorageDir}
-          notesStorageDir={notesStorageDir}
-          onTimelineStorageDirChange={handleTimelineStorageDirChange}
-          onNotesStorageDirChange={handleNotesStorageDirChange}
-          onPickTimelinesDir={handlePickTimelinesDir}
-          onPickNotesDir={handlePickNotesDir}
-          assetsStorageDir={assetsStorageDir}
-          onAssetsStorageDirChange={handleAssetsStorageDirChange}
-          onPickAssetsDir={handlePickAssetsDir}
-          onOpenAssetsFolder={handleOpenAssetsFolder}
-          onOpenFontsFolder={handleOpenFontsFolder}
-          onOpenTimelinesFolder={handleOpenTimelinesFolder}
-          onOpenNotesFolder={handleOpenNotesFolder}
-          onAppFontChange={handleAppFontChange}
-          onAppFontSizeChange={handleAppFontSizeChange}
-          hardwareAcceleration={hardwareAcceleration}
-          onHardwareAccelerationChange={handleHardwareAccelerationChange}
-          startMaximized={startMaximized}
-          onStartMaximizedChange={handleStartMaximizedChange}
-          onRefreshThemes={refreshUserThemes}
-          openSettingsSignal={homeSettingsSignal}
-          onAppSettingsClosed={handleAppSettingsClosedFromHome}
-          keybinds={keybinds}
-          onKeybindsChange={setKeybinds}
-          thumbnailRefreshSignal={thumbnailRefreshSignal}
         />
-      )}
 
-      {viewMode !== "spreadsheet" && (
-        <>
-          {!isRightMaximized && isRightPanelVisible && (
-            <div
-              className="right-resizer overlay-resizer"
-              style={{ right: `${Math.max(rightWidth, MIN_WIDTH) - 3}px` }}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                isDraggingRight.current = true;
-                rightMaxReachedRef.current = false;
-                rightReversedAfterMaxRef.current = false;
-                rightLastDistanceRef.current = null;
-                document.body.classList.add("dragging");
-              }}
-            />
-          )}
+        {isAppSettingsOverlayOpen && (
+          <HomePage
+            settingsOnly
+            reuseExistingBackdrop={returnToProjectSettings}
+            onSelectTimeline={handleLoadTimeline}
+            onRenameTimeline={handleRenameTimelineFromLibrary}
+            onTimelineRenamed={handleLibraryTimelineRenamed}
+            onCreateTimeline={handleCreateTimeline}
+            appThemeKey={appThemeKey}
+            themes={themeConfig.themes}
+            onAppThemeChange={handleAppThemeChange}
+            oldFormatThemeCount={oldFormatThemeCount}
+            onMigrateOldThemes={handleMigrateOldThemes}
+            appFontFamily={appFontFamily}
+            appFontSize={appFontSize}
+            fonts={availableFonts}
+            timelineStorageDir={timelineStorageDir}
+            notesStorageDir={notesStorageDir}
+            onTimelineStorageDirChange={handleTimelineStorageDirChange}
+            onNotesStorageDirChange={handleNotesStorageDirChange}
+            onPickTimelinesDir={handlePickTimelinesDir}
+            onPickNotesDir={handlePickNotesDir}
+            assetsStorageDir={assetsStorageDir}
+            onAssetsStorageDirChange={handleAssetsStorageDirChange}
+            onPickAssetsDir={handlePickAssetsDir}
+            onOpenAssetsFolder={handleOpenAssetsFolder}
+            onOpenFontsFolder={handleOpenFontsFolder}
+            onOpenTimelinesFolder={handleOpenTimelinesFolder}
+            onOpenNotesFolder={handleOpenNotesFolder}
+            onAppFontChange={handleAppFontChange}
+            onAppFontSizeChange={handleAppFontSizeChange}
+            hardwareAcceleration={hardwareAcceleration}
+            onHardwareAccelerationChange={handleHardwareAccelerationChange}
+            startMaximized={startMaximized}
+            onStartMaximizedChange={handleStartMaximizedChange}
+            onRefreshThemes={refreshUserThemes}
+            openSettingsSignal={homeSettingsSignal}
+            onAppSettingsClosed={handleAppSettingsClosedFromHome}
+            keybinds={keybinds}
+            onKeybindsChange={setKeybinds}
+            thumbnailRefreshSignal={thumbnailRefreshSignal}
+          />
+        )}
 
-          {!isRightPanelVisible && rightLockState !== "closed" && (
-            <div
-              className="right-resizer overlay-resizer"
-              style={{ right: "-3px" }}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                isDraggingRight.current = true;
-                rightMaxReachedRef.current = false;
-                rightReversedAfterMaxRef.current = false;
-                rightLastDistanceRef.current = null;
-                document.body.classList.add("dragging");
-              }}
-            />
-          )}
-
-          {isRightPanelVisible && (
-            <aside
-              className="app-right overlay-right"
-              style={{
-                width: isRightMaximized
-                  ? `calc(100% - ${currentLeftWidth}px)`
-                  : rightWidth
-              }}
-            >
-              <ErrorBoundary name="Right panel">
-              <RightPanel
-                onSelect={handleSelect}
-                selectedElement={displayedElement}
-                onUpdate={handleUpdate}
-                timelineData={timelineData}
-                editRequestId={editRequestId}
-                onEditRequestHandled={() => setEditRequestId(null)}
-                isMaximized={isRightMaximized}
-                onToggleMaximize={() => setIsRightMaximized((prev) => !prev)}
-                onFilterByTag={handleFilterByTag}
-                activeTags={activeTags}
-                onToggleTag={handleToggleTag}
-                onUpdateGroups={handleUpdateGroups}
-                tagColors={timelineData.file?.tagColors || {}}
-                onRequestDelete={handleRequestDelete}
-                onSelectPrevious={handleSelectPrevious}
-                onSelectNext={handleSelectNext}
-                prevElement={selectionNavigation.prevElement}
-                nextElement={selectionNavigation.nextElement}
+        {viewMode !== 'spreadsheet' && (
+          <>
+            {!isRightMaximized && isRightPanelVisible && (
+              <div
+                className="right-resizer overlay-resizer"
+                style={{ right: `${Math.max(rightWidth, MIN_WIDTH) - 3}px` }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  isDraggingRight.current = true;
+                  rightMaxReachedRef.current = false;
+                  rightReversedAfterMaxRef.current = false;
+                  rightLastDistanceRef.current = null;
+                  document.body.classList.add('dragging');
+                }}
               />
-              </ErrorBoundary>
-            </aside>
-          )}
-        </>
-      )}
+            )}
 
-      {deleteElementDialog && (
-        <div
-          className="settings-backdrop"
-          onClick={() => setDeleteElementDialog(null)}
-        >
-          <div
-            className="settings-modal confirm-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="settings-header">
-              <h2 className="settings-title">
-                {deleteElementDialog.length > 1
-                  ? `DELETE ${deleteElementDialog.length} ELEMENTS`
-                  : `DELETE ${deleteElementDialog[0].type?.toUpperCase()}`}
-              </h2>
-              <button
-                className="settings-back-button"
-                onClick={() => setDeleteElementDialog(null)}
-                aria-label="Close delete dialog"
-              >
-                Close
-              </button>
-            </div>
+            {!isRightPanelVisible && rightLockState !== 'closed' && (
+              <div
+                className="right-resizer overlay-resizer"
+                style={{ right: '-3px' }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  isDraggingRight.current = true;
+                  rightMaxReachedRef.current = false;
+                  rightReversedAfterMaxRef.current = false;
+                  rightLastDistanceRef.current = null;
+                  document.body.classList.add('dragging');
+                }}
+              />
+            )}
 
-            <div className="confirm-content">
-              <p className="confirm-text">
-                {deleteElementDialog.length > 1
-                  ? `Are you sure you want to delete these ${deleteElementDialog.length} elements? This cannot be undone.`
-                  : `Are you sure you want to delete "${deleteElementDialog[0].title}"? This cannot be undone.`}
-              </p>
-              <label className="confirm-checkbox">
-                <input
-                  type="checkbox"
-                  checked={deleteElementWithNotes}
-                  disabled={!deleteElementDialog.some((el) => el.noteFile)}
-                  onChange={(e) => setDeleteElementWithNotes(e.target.checked)}
-                />
-                Also delete linked note file{deleteElementDialog.filter((el) => el.noteFile).length > 1 ? "s" : ""}
-              </label>
-              <label className="confirm-checkbox">
-                <input
-                  type="checkbox"
-                  checked={deleteElementWithImage}
-                  disabled={!deleteElementDialog.some((el) => getLocalThumbnailFilename(el.thumbnail))}
-                  onChange={(e) => setDeleteElementWithImage(e.target.checked)}
-                />
-                Also delete image file{deleteElementDialog.filter((el) => getLocalThumbnailFilename(el.thumbnail)).length > 1 ? "s" : ""}
-              </label>
-            </div>
+            {isRightPanelVisible && (
+              <aside
+                className="app-right overlay-right"
+                style={{
+                  width: isRightMaximized ? `calc(100% - ${currentLeftWidth}px)` : rightWidth,
+                }}
+              >
+                <ErrorBoundary name="Right panel">
+                  <RightPanel
+                    onSelect={handleSelect}
+                    selectedElement={displayedElement}
+                    onUpdate={handleUpdate}
+                    timelineData={timelineData}
+                    editRequestId={editRequestId}
+                    onEditRequestHandled={() => setEditRequestId(null)}
+                    isMaximized={isRightMaximized}
+                    onToggleMaximize={() => setIsRightMaximized((prev) => !prev)}
+                    onFilterByTag={handleFilterByTag}
+                    activeTags={activeTags}
+                    onToggleTag={handleToggleTag}
+                    onUpdateGroups={handleUpdateGroups}
+                    tagColors={timelineData.file?.tagColors || {}}
+                    onRequestDelete={handleRequestDelete}
+                    onSelectPrevious={handleSelectPrevious}
+                    onSelectNext={handleSelectNext}
+                    prevElement={selectionNavigation.prevElement}
+                    nextElement={selectionNavigation.nextElement}
+                  />
+                </ErrorBoundary>
+              </aside>
+            )}
+          </>
+        )}
 
-            <div className="confirm-actions">
-              <button
-                className="settings-folder-button"
-                onClick={() => setDeleteElementDialog(null)}
-              >
-                Cancel
-              </button>
-              <button
-                className="settings-folder-button confirm-delete-button"
-                onClick={handleConfirmDeleteElement}
-              >
-                Delete
-              </button>
+        {deleteElementDialog && (
+          <div className="settings-backdrop" onClick={() => setDeleteElementDialog(null)}>
+            <div className="settings-modal confirm-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="settings-header">
+                <h2 className="settings-title">
+                  {deleteElementDialog.length > 1
+                    ? `DELETE ${deleteElementDialog.length} ELEMENTS`
+                    : `DELETE ${deleteElementDialog[0].type?.toUpperCase()}`}
+                </h2>
+                <button
+                  className="settings-back-button"
+                  onClick={() => setDeleteElementDialog(null)}
+                  aria-label="Close delete dialog"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="confirm-content">
+                <p className="confirm-text">
+                  {deleteElementDialog.length > 1
+                    ? `Are you sure you want to delete these ${deleteElementDialog.length} elements? This cannot be undone.`
+                    : `Are you sure you want to delete "${deleteElementDialog[0].title}"? This cannot be undone.`}
+                </p>
+                <label className="confirm-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={deleteElementWithNotes}
+                    disabled={!deleteElementDialog.some((el) => el.noteFile)}
+                    onChange={(e) => setDeleteElementWithNotes(e.target.checked)}
+                  />
+                  Also delete linked note file{deleteElementDialog.filter((el) => el.noteFile).length > 1 ? 's' : ''}
+                </label>
+                <label className="confirm-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={deleteElementWithImage}
+                    disabled={!deleteElementDialog.some((el) => getLocalThumbnailFilename(el.thumbnail))}
+                    onChange={(e) => setDeleteElementWithImage(e.target.checked)}
+                  />
+                  Also delete image file
+                  {deleteElementDialog.filter((el) => getLocalThumbnailFilename(el.thumbnail)).length > 1 ? 's' : ''}
+                </label>
+              </div>
+
+              <div className="confirm-actions">
+                <button className="settings-folder-button" onClick={() => setDeleteElementDialog(null)}>
+                  Cancel
+                </button>
+                <button className="settings-folder-button confirm-delete-button" onClick={handleConfirmDeleteElement}>
+                  Delete
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      <NewTimelineModal
-        isOpen={isNewTimelineModalOpen}
-        onClose={() => setIsNewTimelineModalOpen(false)}
-        onCreate={handleCreateTimeline}
-      />
+        <NewTimelineModal
+          isOpen={isNewTimelineModalOpen}
+          onClose={() => setIsNewTimelineModalOpen(false)}
+          onCreate={handleCreateTimeline}
+        />
 
-      <ExportPngModal
-        isOpen={isExportPngModalOpen}
-        onClose={() => setIsExportPngModalOpen(false)}
-        onExport={handleExportPng}
-        timelineData={timelineData}
-        timelineViewRef={timelineViewRef}
-      />
+        <ExportPngModal
+          isOpen={isExportPngModalOpen}
+          onClose={() => setIsExportPngModalOpen(false)}
+          onExport={handleExportPng}
+          timelineData={timelineData}
+          timelineViewRef={timelineViewRef}
+        />
 
-      <ExportVideoModal
-        isOpen={isExportVideoModalOpen}
-        onClose={() => setIsExportVideoModalOpen(false)}
-        timelineData={timelineData}
-        timelineViewRef={timelineViewRef}
-      />
+        <ExportVideoModal
+          isOpen={isExportVideoModalOpen}
+          onClose={() => setIsExportVideoModalOpen(false)}
+          timelineData={timelineData}
+          timelineViewRef={timelineViewRef}
+        />
 
-      <SearchOverlay
-        isOpen={isSearchOpen}
-        onClose={() => setIsSearchOpen(false)}
-        elements={timelineData?.elements ?? []}
-        onSelect={handleSearchSelect}
-        fileSettings={timelineData?.file}
-      />
-      {importConflictModal}
-      {skippedFilesModal}
+        <SearchOverlay
+          isOpen={isSearchOpen}
+          onClose={() => setIsSearchOpen(false)}
+          elements={timelineData?.elements ?? []}
+          onSelect={handleSearchSelect}
+          fileSettings={timelineData?.file}
+        />
+        {importConflictModal}
+        {skippedFilesModal}
       </div>
       {screenshotToast && (
-        <div style={{ position: 'fixed', bottom: '20px', right: '20px', background: '#1a7a4a', borderRadius: '8px', padding: '8px 14px', zIndex: 9999, fontSize: 'var(--text-sm)', color: '#fff', boxShadow: '0 4px 12px rgba(0,0,0,0.2)', pointerEvents: 'none' }}>
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '20px',
+            right: '20px',
+            background: '#1a7a4a',
+            borderRadius: '8px',
+            padding: '8px 14px',
+            zIndex: 9999,
+            fontSize: 'var(--text-sm)',
+            color: '#fff',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+            pointerEvents: 'none',
+          }}
+        >
           Screenshot saved
         </div>
       )}
